@@ -81,6 +81,7 @@ export class Settings {
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();
+    $('check-new-sources').onclick = () => this.app.collect('collect', $('check-new-sources'), true);
     $('refresh-sources').onclick = () => this.app.collect('collect', $('refresh-sources'));
     $('discover-feed').onclick = () => busy($('discover-feed'), async () => {
       $('source-error').textContent = '';
@@ -129,6 +130,7 @@ export class Settings {
       $('panel-' + id).hidden = name !== id;
       document.querySelector(`[data-tab="${id}"]`).classList.toggle('active', name === id);
     });
+    if (name === 'sources' && this.values) this.refreshSources().catch(error => notify(error.message, true));
   }
 
   async load() {
@@ -196,8 +198,16 @@ export class Settings {
     $('ai-help').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend—not your browser—must be able to reach it.'));
   }
 
+  syncNewSources() {
+    const count = this.sources.filter(source => source.enabled && source.last_checked === null).length;
+    $('check-new-sources').textContent = `Check new sources (${count})`;
+    $('check-new-sources').disabled = Boolean(this.app.overview?.collector.running) || count === 0;
+    $('check-new-sources').title = count ? 'Check only enabled sources with no recorded check' : 'No enabled sources are awaiting their first check';
+  }
+
   async refreshSources() {
     this.sources = await api('sources');
+    this.syncNewSources();
     $('source-list').replaceChildren(...this.sources.map(source => {
       const row = el('div', 'source-row');
       const info = el('div', 'source-info');
@@ -247,7 +257,7 @@ export class Settings {
     $('schedule-timezone').textContent = `Uses the app server’s local timezone (${overview.timezone}). The server must be running. If today’s scheduled time was missed, it catches up after startup.`;
     const runs = overview.runs.map(run => {
       const details = el('details', 'run');
-      details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind} · ${run.status}`));
+      details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : ''} · ${run.status}`));
       const d = run.details;
       details.append(el('p', '', `${d.added || 0} added · ${d.reviewed || 0} reviewed · ${d.duplicates || 0} duplicates · ${d.filtered || 0} filtered`));
       if (d.note) details.append(el('p', '', d.note));

@@ -226,11 +226,14 @@ class Store:
             revision = json.loads(db.execute("SELECT value FROM settings WHERE key='data_revision'").fetchone()[0])
             return {"dates": dates, "tags": tags, "counts": counts, "runs": runs, 'revision': revision}
 
-    def pending(self, limit):
+    def pending(self, limit, *, source_ids=None):
+        if source_ids is not None and not source_ids:
+            return []
+        scope = '' if source_ids is None else ' AND s.source_id IN (' + ','.join('?' for _ in source_ids) + ')'
         with self.connect() as db:
             return [dict(r) for r in db.execute("""SELECT s.*,src.category FROM stories s
-                LEFT JOIN sources src ON s.source_id=src.id WHERE s.status='pending' AND s.attempts<3
-                ORDER BY s.attempts,s.discovered_at DESC,s.id LIMIT ?""", (limit,))]
+                LEFT JOIN sources src ON s.source_id=src.id WHERE s.status='pending' AND s.attempts<3""" + scope + """
+                ORDER BY s.attempts,s.discovered_at DESC,s.id LIMIT ?""", (*(source_ids or []), limit))]
 
     def recent(self):
         with self.connect() as db:
@@ -292,9 +295,9 @@ class Store:
             db.execute("UPDATE settings SET value=? WHERE key='data_revision'", (json.dumps(secrets.token_hex(16)),))
             return result
 
-    def start_run(self, kind):
+    def start_run(self, kind, details=None):
         with self.connect() as db:
-            return db.execute("INSERT INTO runs(kind,started_at,status) VALUES (?,?,'running')", (kind, utcnow())).lastrowid
+            return db.execute("INSERT INTO runs(kind,started_at,status,details) VALUES (?,?,'running',?)", (kind, utcnow(), json.dumps(details or {}))).lastrowid
 
     def finish_run(self, run_id, status, details):
         with self.connect() as db:

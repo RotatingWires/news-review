@@ -345,7 +345,10 @@ class Handler(BaseHTTPRequestHandler):
             kind = data.get("kind", "collect")
             if kind not in ("collect", "review"):
                 raise ValueError("Unknown job type")
-            started = self.server.collector.start(kind)
+            unchecked_only = validation.boolean(data.get("unchecked_only", False), "Unchecked only")
+            if unchecked_only and kind != "collect":
+                raise ValueError("New-source checks require a collection job")
+            started = self.server.collector.start(kind, unchecked_only=unchecked_only)
             self.send(202 if started else 409, {"ok": started, "error": "A job is already running" if not started else None})
         elif path == "/api/requeue" and self.command == "POST":
             # The queue lock keeps requeue and review decisions from racing.

@@ -70,7 +70,7 @@
       </section>
 
       <section id="panel-sources" class="settings-panel" hidden>
-        <div class="section-heading"><div><h2>Your sources</h2><p class="muted">Collect from RSS/Atom or directly from a news listing page.</p></div><div class="button-row"><button id="refresh-sources">Refresh sources</button><button id="add-source" class="primary">+ Add source</button></div></div>
+        <div class="section-heading"><div><h2>Your sources</h2><p class="muted">Collect from RSS/Atom or directly from a news listing page.</p></div><div class="button-row"><button id="check-new-sources" title="Check only enabled sources with no recorded check">Check new sources</button><button id="refresh-sources">Refresh sources</button><button id="add-source" class="primary">+ Add source</button></div></div>
         <p id="source-refresh-status" role="status" class="callout">Ready to check sources.</p>
         <p class="callout">Health reflects the last check, newest reported publication, and observed activity. Inactivity is a warning, not proof a site is dead. Edit the warning interval for slow publishers. Forum feeds include discussions; use a narrower category feed to reduce noise.</p>
         <div id="source-list" class="source-list"></div>
@@ -179,7 +179,7 @@
       <p>Feeds/listings find the links. During AI review, NewsReview downloads each article or thread page to extract readable text. A headline-only feed can work if that page is readable. If it is blocked, only the available excerpt is used and labeled. JavaScript-only, restricted, or unusual pages may need a custom adapter.</p>
       <h3>Search and source health</h3>
       <p>Combine dates and times with a comma: 9/1/26 - 10/1/26, 10am - 3pm. A date range or time range alone also works. Times match the displayed publication time in your browser timezone, or collection time for undated stories; overnight ranges are supported. Topics match any checked selection.</p>
-      <p>The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
+      <p>Check new sources collects only enabled sources that have never been checked, including newly added sources. Refresh sources checks all enabled sources, including failed ones. The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
       <h3>Backups and fresh starts</h3>
       <p>Open Settings, Collection &amp; history, then Import/Export to download a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>
       <p>Fresh start in Settings lets you clear selected data, including history, bookmarks, interests, guidance, sources, or settings. Unchecked categories are preserved. Keeping Bookmarks unchecked preserves saved stories when clearing other history.</p>

@@ -165,6 +165,43 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(all(s['status'] == 'pending' and s['review_error'] for s in stories))
         self.assertEqual(self.store.overview()['runs'][0]['status'], 'partial')
 
+    def test_unchecked_collection_skips_checked_disabled_and_unrelated_review_queue(self):
+        checked = next(source for source in self.store.sources() if source['name'] == 'Fixture')
+        self.store.source_checked(checked['id'], 'Previously failed')
+        checked_before = next(source for source in self.store.sources() if source['id'] == checked['id'])
+        self.store.insert_story(checked['id'], {'headline': 'Old queued story', 'url': self.root + '/old-queued',
+            'excerpt': 'Old text', 'published_at': None, 'category': 'Standards'}, '2026-10-15')
+        fresh_id = self.store.save_source({'name': 'New listing', 'url': self.root + '/listing', 'feed_url': '',
+            'category': 'Radio', 'mode': 'page', 'enabled': True})
+        disabled_id = self.store.save_source({'name': 'Disabled new', 'url': self.root + '/disabled', 'feed_url': '',
+            'category': 'Radio', 'enabled': False})
+        self.store.save_settings({'ai': self.model_config()})
+        self.start_api()
+        self.assertEqual(self.request('/api/collect', 'POST', {'kind': 'review', 'unchecked_only': True})[0], 400)
+        self.assertEqual(self.request('/api/collect', 'POST', {'unchecked_only': 'yes'})[0], 400)
+        self.assertEqual(self.request('/api/collect', 'POST', {'unchecked_only': True})[0], 202)
+        self.collector.worker.join(10)
+        self.assertFalse(self.collector.status()['running'])
+        sources = {source['id']: source for source in self.store.sources()}
+        self.assertEqual(sources[checked['id']]['last_checked'], checked_before['last_checked'])
+        self.assertEqual(sources[checked['id']]['last_error'], 'Previously failed')
+        self.assertIsNotNone(sources[fresh_id]['last_checked'])
+        self.assertIsNone(sources[disabled_id]['last_checked'])
+        old_story = next(item for item in self.store.stories()['items'] if item['headline'] == 'Old queued story')
+        self.assertEqual(old_story['status'], 'pending')
+        self.assertEqual(old_story['attempts'], 0)
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(run['details']['scope'], 'unchecked')
+        self.assertEqual(run['details']['sources_checked'], 1)
+        self.assertEqual(run['details']['added'], 2)
+        self.assertEqual(run['details']['reviewed'], 1)
+        self.assertTrue(run['details']['errors'], 'The second listing fixture has no readable article/excerpt')
+        self.assertTrue(self.collector.schedule_due(datetime.now().astimezone().replace(hour=23, minute=59)))
+        self.assertTrue(self.collector.start(unchecked_only=True))
+        self.collector.worker.join(10)
+        self.assertEqual(self.store.overview()['runs'][0]['details']['sources_checked'], 0)
+        self.assertEqual(next(item for item in self.store.stories()['items'] if item['headline'] == 'Old queued story')['attempts'], 0)
+
     def test_one_source_failure_does_not_abort_others(self):
         self.store.save_source({'name': 'Broken', 'url': self.root + '/missing', 'feed_url': self.root + '/missing', 'category': 'Test', 'enabled': True})
         self.collect()

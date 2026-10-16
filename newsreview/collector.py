@@ -35,7 +35,9 @@ class Collector:
         with self.state_lock:
             self.state.update(values)
 
-    def start(self, kind="collect", *, scheduled=False):
+    def start(self, kind="collect", *, scheduled=False, unchecked_only=False):
+        if unchecked_only and (kind != "collect" or scheduled):
+            raise ValueError("New-source checks must be a manual collection")
         # Validate storage synchronously so /api/collect cannot acknowledge a job
         # which can only fail because its data folder was removed.
         self.store.settings()
@@ -45,24 +47,26 @@ class Collector:
             self.lock.release()
             return False
         self.update(running=True, kind=kind, message="Starting…")
-        self.worker = threading.Thread(target=self._run, args=(kind,), daemon=True, name="news-collector")
+        self.worker = threading.Thread(target=self._run, args=(kind, unchecked_only), daemon=True, name="news-collector")
         self.worker.start()
         return True
 
-    def _run(self, kind):
+    def _run(self, kind, unchecked_only=False):
         run_id = None
-        details = {"added": 0, "reviewed": 0, "duplicates": 0, "filtered": 0, "errors": []}
+        details = {"added": 0, "reviewed": 0, "duplicates": 0, "filtered": 0, "errors": [], "scope": "unchecked" if unchecked_only else "all", "sources_checked": 0}
         try:
-            run_id = self.store.start_run(kind)
+            run_id = self.store.start_run(kind, details)
             settings = self.store.settings()
             config = settings["collection"]
             now = datetime.now().astimezone()
             cutoff = now.astimezone(timezone.utc) - timedelta(days=config["lookback_days"])
             if kind == "collect":
-                sources = [s for s in self.store.sources() if s["enabled"]]
+                sources = [s for s in self.store.sources() if s["enabled"] and (not unchecked_only or s["last_checked"] is None)]
+                source_ids = [source["id"] for source in sources]
                 for number, source in enumerate(sources, 1):
                     if self.stop_event.is_set():
                         break
+                    details["sources_checked"] += 1
                     self.update(message=f"Checking {source['name']} ({number}/{len(sources)})")
                     try:
                         result = read_source(self.fetcher, source)
@@ -89,7 +93,7 @@ class Collector:
                 details["note"] = "No model configured. Stories are saved with source excerpts; configure AI and run Review pending."
             else:
                 recent = self.store.recent()
-                pending = self.store.pending(config["max_reviews"])
+                pending = self.store.pending(config["max_reviews"], source_ids=source_ids if unchecked_only else None)
                 consecutive_failures = 0
                 for number, story in enumerate(pending, 1):
                     if self.stop_event.is_set():
@@ -130,7 +134,7 @@ class Collector:
                             break
             status = "interrupted" if self.stop_event.is_set() else ("partial" if details["errors"] else "complete")
             self.store.finish_run(run_id, status, details)
-            self.update(message=f"Saved {details['added']} new stories · {details['reviewed']} reviewed" + (" · See run details for errors" if details["errors"] else ""))
+            self.update(message=(f"Checked {details['sources_checked']} new sources · " if unchecked_only else "") + f"Saved {details['added']} new stories · {details['reviewed']} reviewed" + (" · See run details for errors" if details["errors"] else ""))
         except Exception as exc:
             logger.exception("Collection failed")
             if run_id:
@@ -149,7 +153,7 @@ class Collector:
         if not config["enabled"] or (now.hour, now.minute) < (config["hour"], config["minute"]):
             return False
         with self.store.connect() as db:
-            rows = db.execute("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' ORDER BY id DESC LIMIT 1").fetchall()
+            rows = db.execute("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' AND COALESCE(json_extract(details,'$.scope'),'all')!='unchecked' ORDER BY id DESC LIMIT 1").fetchall()
             reset = db.execute("SELECT value FROM settings WHERE key='history_cleared_at'").fetchone()
         if reset and datetime.fromisoformat(json.loads(reset[0])).astimezone(now.tzinfo).date() == now.date():
             return False

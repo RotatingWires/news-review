@@ -248,8 +248,12 @@ def run():
                     if not configured['url'].startswith(f'http://127.0.0.1:{fixture.server_port}'):
                         store.save_source({**configured, 'enabled': False}, configured['id'])
                 page.get_by_role('button', name='Sources', exact=True).click()
-                page.get_by_role('button', name='Refresh sources', exact=True).click()
+                expect(page.locator('#check-new-sources')).to_be_enabled()
+                expect(page.locator('#check-new-sources')).to_have_text('Check new sources (2)')
+                page.locator('#check-new-sources').click()
                 expect(page.locator('#source-refresh-status')).to_contain_text('Last collection: complete', timeout=15000)
+                expect(page.locator('#check-new-sources')).to_have_text('Check new sources (0)')
+                expect(page.locator('#check-new-sources')).to_be_disabled()
                 expect(page.locator('.source-state.healthy')).to_have_count(2)
                 page.context.set_offline(True)
                 page.get_by_role('button', name='Refresh sources', exact=True).click()

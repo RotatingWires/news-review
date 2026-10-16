@@ -1,6 +1,6 @@
 # NewsReview
 
-A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let your own local model review the stories. The initial source list and interests are tuned to technology, security, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
+A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let your own local model review the stories. The initial source list and interests are tuned to technology, security, homelabbing/self-hosting, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
 
 Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Your own local model reviews and summarizes articles; no paid API, ChatGPT subscription, or cloud model is required.
 
@@ -8,10 +8,10 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 
 - Python 3.11 or newer; developed and tested locally on Python 3.14.
 - Python standard library HTTP server, SQLite, XML/HTML parsing, and HTTP transport.
-- Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
+- Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.8: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.9: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -28,10 +28,10 @@ On Windows:
 py -3 -m newsreview
 ```
 
-Open **http://127.0.0.1:8714**. There is no dependency installation step.
+Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Time-range search also needs a timezone database; Linux usually provides one. On hosts without system timezone data, install `tzdata` with `python3 -m pip install tzdata` (Windows: `py -3 -m pip install tzdata`).
 
 1. Open **Settings → Local AI** and enter the model server URL and exact installed model name.
-2. Use **Test with a sample article**, then **Save AI settings**.
+2. Use **Test with a sample article**, then **Save**.
 3. Click **Check sources**. The collector runs in the background; the page reports progress.
 4. Adjust **Settings → Interests** and **Collection & history** as desired.
 
@@ -96,6 +96,18 @@ Existing stories, summaries, bookmarks, and dates remain in SQLite when changing
 
 A small model must still follow instructions and produce valid structured output. The connection test checks a real sample review, not just an HTTP health endpoint. It does not measure factual quality; review a few actual summaries after changing models. No external model is used as an automatic fallback.
 
+## Interface and help
+
+**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
+
+The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
+
+Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds and errors after twelve; connection errors persist until a successful server response. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
+
+Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
+
+The Daily Feed topic menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
+
 ## Reading and searching
 
 - **Daily feed:** an edition contains stories first discovered on the selected day, using the server's local calendar date.
@@ -108,12 +120,18 @@ A small model must still follow instructions and produce valid structured output
 - **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
 - **Include filtered / duplicates:** reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
-- **Pagination:** 48 results per page. Relevant stories are ordered by edition day, relevance score, and collection time.
+- **Ordering and pagination:** 48 results per page, newest edition day first, then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
 
-Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known, relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; edition dates remain the server's recorded date.
+Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; edition dates remain the server's recorded date.
 
 No sample articles are inserted into your real database. The first edition starts empty until collection runs.
+
+Time search uses standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
+
+### Relevance colors
+
+Each story has a relevance square beside its bookmark: green **75–100**, yellow **40–74**, red **0–39**, or gray **awaiting AI review**. The key sits below the story count on both feeds. Hover over a square for its score; accessible labels include the same information. Scores reflect the interests used during the last successful review, not certainty or factual reliability. Pending/reassessment stories stay gray until reviewed. Changing interests does not rescore the archive automatically; use Reassess history when desired. This display uses stored scores and adds no statistics tracking.
 
 ## Sources
 
@@ -131,6 +149,8 @@ The following **32 sources** are seeded once on a fresh database:
 Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
 [SOURCES.md](SOURCES.md) links to the 20 current approved additions separately from the original 12 websites.
+
+The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.
 
 ### Add or edit a source
 
@@ -157,6 +177,17 @@ Edit a source to change its feed, default category, or enabled state. Disabling 
 Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. The local model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
 
 A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific scanner/SDR/manufacturer/category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
+
+### Collection buttons and new sources
+
+- **Check sources** on Daily Feed and **Refresh sources** in Settings check every enabled source and then review a bounded batch from the pending archive.
+- **Check new sources (N)** in Settings → Sources checks only enabled, active sources whose `last_checked` is empty. It shows the eligible count and is disabled when the count is zero or a job is running.
+- A successful or failed collection attempt records a check, so failed sources are excluded from Check new sources thereafter. Use Refresh sources to retry them. Disabled sources are skipped by both buttons.
+- Adding a source makes it eligible; Preview stories and Find RSS/Atom feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
+- New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
+- The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not satisfy or suppress the scheduled daily full collection; normal manual full collection still does.
+
+The API equivalent is `POST /api/collect` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. A review-only job cannot be combined with `unchecked_only`. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
 
 ### Health and refresh results
 
@@ -227,7 +258,7 @@ An article's publication time can differ from its edition day. Undated articles 
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
 - Each failed review increments an attempt count. After three attempts, use **Reset failed reviews** once the underlying issue is fixed.
 - Fresh/unattempted entries are processed first, newest first; older pending entries can wait on busy days. Increase the per-run limit or run additional review batches to catch up.
-- A daily collection starts after its configured local time if no collection was started that day. A manual source check counts for that day; review-only jobs do not.
+- A daily collection starts after its configured local time if no collection was started that day. A manual full-source collection counts for that day; review-only and new-source-only jobs do not.
 - There is no wake-from-sleep mechanism. If the service was offline, it checks current feeds when it resumes; it cannot reconstruct stories that have already disappeared from those feeds.
 - The schedule survives restarts through the SQLite run history. Partial/failed runs count as today's attempt; retry manually if needed. An interrupted process is marked interrupted at the next startup.
 - Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
@@ -304,6 +335,16 @@ Create a task that starts your Python executable with `-m newsreview`, and set *
 
 ## Backup, restore, and updates
 
+### ZIP import/export in Settings
+
+**Settings → Collection & history → Import/Export... → Download Export** snapshots the live database, including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (version, checksum, counts). It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
+
+Choose an export ZIP and check the replacement confirmation to restore. This replaces rather than merges the dataset. Uploads are limited to 256 MiB compressed and 1 GiB of database data. The server rejects extra archive members, damaged checksums, unsupported/newer versions, unexpected schema objects, invalid relationships, or invalid configuration. It imports validated rows into its own schema, without executing imported schema SQL. Before replacing data, it writes a recovery ZIP to `data/backups/before-restore-*.zip`; failure to save it aborts the operation. Keep enough free disk space for the current database, upload, extracted database, and recovery ZIP. Restore is blocked while collection/review runs. Interrupted imported runs are marked interrupted.
+
+Restore and reset change a dataset revision: other tabs refresh before making further writes. After an interrupted upload response, the UI reloads actual server data and reports that the restore could not be confirmed instead of retrying it automatically. Recovery ZIPs can be restored through the same dialog. The offline SQLite backup command remains available for larger datasets.
+
+### Offline SQLite backup and restore
+
 To create a consistent online backup, including while the app runs:
 
 ```bash
@@ -330,6 +371,17 @@ Stop the old process before updating. The Python package and launch command are 
 
 Point `--data-dir` at your existing data directory. If `newsreview.db` does not exist but `tech-news.db` does, startup makes a consistent SQLite backup into the new filename and preserves your sources, interests, settings, bookmarks, and archive. The original is left untouched as a recovery copy. Once the new database exists, the old file is never imported again, including after a history reset. Keep a separate backup and remove the old recovery file yourself when no longer needed. Do not run old and new versions against that directory simultaneously.
 
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Check new sources is disabled | All enabled sources have a recorded check, or a collection/review job is running. Enable a new source or use Refresh sources to retry checked sources. |
+| Source preview works but no new tiles appear | Preview never saves history. Collect afterward; lookback/per-source limits, known URLs, the selected edition, topics/search, or hidden filtered/duplicate coverage may explain the result. |
+| Stories show excerpts and gray squares | AI is paused, not yet run, or queued for reassessment. Save a model, test it, then use Review pending. Check Recent runs for failures and retry limits. |
+| A visible story does not match a time search | Times use the tile timestamp and browser timezone; dates select the edition/discovery day. Clear other filters and include filtered/duplicate coverage if necessary. |
+| A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess history to queue the archive explicitly. |
+| Connection or storage error in the footer | Check the app process, address, logs, and data directory. A deleted running database requires stopping and restarting or restoring a backup; write actions are not replayed automatically. |
+
 ## Tests and verification
 
 The automated suite needs only Python:
@@ -338,7 +390,7 @@ The automated suite needs only Python:
 python3 -m unittest discover -v
 ```
 
-It uses real temporary SQLite databases and local HTTP fixtures for RSS, article pages, Ollama, and compatible model responses. Tests cover parsing, extraction/excerpt fallback, settings validation, model output validation, duplicate references, queue retries, idempotent collection, source failures, history/search, bookmarks, authentication, origin checks, and static-file boundaries. No tests contact the live sources or require a real model. No monkey patches are used.
+It uses real temporary SQLite databases and local HTTP fixtures for RSS, article pages, Ollama, and compatible model responses. Tests cover parsing, extraction/excerpt fallback, settings/model validation, duplicate references, queue retries, idempotent/full/new-source collection, isolated review queues, daily scheduling, source failures/upgrades, history/search/timezones, bookmarks, ZIP restore validation and recovery, selective resets, authentication, origin checks, and static-file boundaries. No tests contact the live sources or require a real model. No monkey patches are used.
 
 Optional real-browser verification requires Playwright and its Chromium browser in your development environment:
 
@@ -346,7 +398,7 @@ Optional real-browser verification requires Playwright and its Chromium browser 
 python3 -m tests.browser_smoke
 ```
 
-This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, refresh completion, offline/reconnect handling, a fixture model connection, confirmed history deletion, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
+This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, new-source counts and refresh completion, offline/reconnect handling, a fixture model connection, ZIP transfer, selective history reset, relevance colors, text-selection scope, custom menus, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
 
 GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local verification for the initial release uses Python 3.14; a real installed user model still needs its own connection and quality check.
 
@@ -386,6 +438,13 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.9
+
+- Add Check new sources with an eligible count, selecting enabled sources with no previous collection attempt.
+- Scope AI review to selected sources, preserve the unrelated queue, and keep new-source runs independent of the daily full-collection schedule.
+- Record selection scope and attempted source count in run history; disable the action when busy or no sources qualify.
+- Audit README behavior, button labels, ordering, source upgrades, interface help, backup/restore, search, and operational guidance.
 
 ### v0.4.8
 
@@ -478,27 +537,3 @@ deploy/             example systemd unit
 - Support local Ollama and compatible model servers with validated summaries, significance, tags and conservative duplicate grouping.
 - Preserve readable source excerpts while AI is unavailable; expose retry/reassessment and run history.
 - Add password protection for LAN serving, light/dark themes, online backups, deployment guidance and automated coverage.
-
-## ZIP import/export and interface help
-
-**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
-
-**Settings → Collection & history → Import/Export... → Download Export** snapshots the live database, including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (version, checksum, counts). It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
-
-Choose an export ZIP and check the replacement confirmation to restore. This replaces rather than merges the dataset. Uploads are limited to 256 MiB compressed and 1 GiB of database data. The server rejects extra archive members, damaged checksums, unsupported/newer versions, unexpected schema objects, invalid relationships, or invalid configuration. It imports validated rows into its own schema, without executing imported schema SQL. Before replacing data, it writes a recovery ZIP to `data/backups/before-restore-*.zip`; failure to save it aborts the operation. Keep enough free disk space for the current database, upload, extracted database, and recovery ZIP. Restore is blocked while collection/review runs. Interrupted imported runs are marked interrupted.
-
-Restore and reset change a dataset revision: other tabs refresh before making further writes. After an interrupted upload response, the UI reloads actual server data and reports that the restore could not be confirmed instead of retrying it automatically. Recovery ZIPs can be restored through the same dialog. The offline SQLite backup command remains available for larger datasets.
-
-The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
-
-Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds and errors after twelve; connection errors persist until a successful server response. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
-
-Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
-
-The Daily Feed topic menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
-
-Time search uses standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
-
-Each story has a relevance square beside its bookmark: green **75–100**, yellow **40–74**, red **0–39**, or gray **awaiting AI review**. The key sits below the story count on both feeds. Hover over a square for its score; accessible labels include the same information. Scores reflect the interests used during the last successful review, not certainty or factual reliability. Pending/reassessment stories stay gray until reviewed. Changing interests does not rescore the archive automatically; use Reassess history when desired. This display uses stored scores and adds no statistics tracking.
-
-The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.

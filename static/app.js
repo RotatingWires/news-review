@@ -95,6 +95,7 @@ class App {
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
     $('refresh-sources').disabled = state.running;
+    this.settings.syncNewSources();
     this.transfer.sync();
     const last = this.overview.runs.find(run => run.kind === 'collect');
     let refreshStatus = state.running ? state.message : last
@@ -158,13 +159,13 @@ class App {
     } catch (error) { notify(error.message, true); }
   }
 
-  async collect(kind, button) {
+  async collect(kind, button, uncheckedOnly = false) {
     const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
       try {
-        await api('collect', 'POST', { kind });
+        await api('collect', 'POST', { kind, unchecked_only: uncheckedOnly });
         if (kind === 'collect') this.unconfirmedRefresh = null;
-        notify(kind === 'collect' ? 'Collection started in the background.' : 'Reviewing queued stories.');
+        notify(kind === 'collect' ? uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.' : 'Reviewing queued stories.');
       } catch (error) {
         if (error.connection) {
           if (kind === 'collect') this.unconfirmedRefresh = previousRun;
