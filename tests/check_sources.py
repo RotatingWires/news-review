@@ -1,9 +1,9 @@
 """Optional live feed audit: python -m tests.check_sources. Does not write data."""
 
 from concurrent.futures import ThreadPoolExecutor
-from technews.defaults import SOURCES
-from technews.feeds import discover, parse_feed
-from technews.network import Fetcher
+from newsreview.defaults import SOURCES
+from newsreview.feeds import discover, parse_feed
+from newsreview.network import Fetcher
 
 
 def check(source):

@@ -1,15 +1,15 @@
 [Unit]
-Description=Tech News Feed
+Description=NewsReview
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
 # Replace these paths and account before installation.
-User=technews
-WorkingDirectory=/opt/tech-news-feed
-EnvironmentFile=-/etc/tech-news-feed.env
-ExecStart=/usr/bin/python3 -m technews --host 127.0.0.1 --port 8713 --data-dir /var/lib/tech-news-feed
+User=newsreview
+WorkingDirectory=/opt/newsreview
+EnvironmentFile=-/etc/newsreview.env
+ExecStart=/usr/bin/python3 -m newsreview --host 127.0.0.1 --port 8714 --data-dir /var/lib/newsreview
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -17,7 +17,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/tech-news-feed
+ReadWritePaths=/var/lib/newsreview
 
 [Install]
 WantedBy=multi-user.target

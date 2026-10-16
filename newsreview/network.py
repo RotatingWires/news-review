@@ -7,7 +7,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHandler
 
-USER_AGENT = "TechNewsFeed/0.1 (+self-hosted personal RSS reader)"
+from . import __version__
+
+USER_AGENT = f"NewsReview/{__version__} (+self-hosted personal news reader)"
 
 
 def valid_url(value):

@@ -1,6 +1,7 @@
 """One bounded background queue shared by scheduled and manual collection."""
 
 from datetime import datetime, timedelta, timezone
+import json
 import logging
 import re
 import threading
@@ -32,8 +33,11 @@ class Collector:
         with self.state_lock:
             self.state.update(values)
 
-    def start(self, kind="collect"):
+    def start(self, kind="collect", *, scheduled=False):
         if not self.lock.acquire(blocking=False):
+            return False
+        if scheduled and not self.schedule_due(datetime.now().astimezone()):
+            self.lock.release()
             return False
         self.update(running=True, kind=kind, message="Starting…")
         self.worker = threading.Thread(target=self._run, args=(kind,), daemon=True, name="news-collector")
@@ -135,6 +139,9 @@ class Collector:
             return False
         with self.store.connect() as db:
             rows = db.execute("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' ORDER BY id DESC LIMIT 1").fetchall()
+            reset = db.execute("SELECT value FROM settings WHERE key='history_cleared_at'").fetchone()
+        if reset and datetime.fromisoformat(json.loads(reset[0])).astimezone(now.tzinfo).date() == now.date():
+            return False
         last_day = datetime.fromisoformat(rows[0][0]).astimezone(now.tzinfo).date() if rows else None
         return last_day != now.date()
 
@@ -144,7 +151,7 @@ class Collector:
         while not self.stop_event.wait(20):
             now = datetime.now().astimezone()
             if self.schedule_due(now):
-                self.start()
+                self.start(scheduled=True)
 
     def stop(self):
         self.stop_event.set()

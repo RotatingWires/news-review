@@ -56,6 +56,25 @@ export class Settings {
       toast(`${result.count} stories queued. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
+    $('clear-history').onclick = () => {
+      $('clear-history-confirmation').value = '';
+      $('clear-history-error').textContent = '';
+      $('clear-history-dialog').showModal();
+      $('clear-history-dialog').querySelector('[data-close]').focus();
+    };
+    $('clear-history-form').onsubmit = event => this.submit(event, async () => {
+      try {
+        const result = await api('history/clear', 'POST', { confirmation: $('clear-history-confirmation').value });
+        $('clear-history-dialog').close();
+        this.app.feed.clearFilters();
+        this.app.feed.page = 1;
+        $('stories').replaceChildren();
+        await this.app.refreshOverview();
+        await this.refreshSources();
+        await this.app.feed.load();
+        toast(`History cleared (${result.deleted} stories). Your preferences and sources were kept.`);
+      } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
+    });
     $('add-source').onclick = () => this.editSource();
     $('discover-feed').onclick = () => busy($('discover-feed'), async () => {
       $('source-error').textContent = '';
@@ -121,7 +140,7 @@ export class Settings {
     const row = el('div', 'interest-row');
     const input = el('input');
     input.value = topic.name;
-    input.placeholder = 'e.g. image compression or repeater linking';
+    input.placeholder = 'e.g. science, local news, or radio projects';
     input.required = true;
     input.maxLength = 120;
     input.setAttribute('aria-label', 'Interest topic');
@@ -180,7 +199,7 @@ export class Settings {
     $('source-name').value = source?.name || '';
     $('source-url').value = source?.url || '';
     $('source-feed').value = source?.feed_url || '';
-    $('source-category').value = source?.category || 'Technology';
+    $('source-category').value = source?.category || 'News';
     $('source-enabled').checked = source ? Boolean(source.enabled) : true;
     $('source-error').textContent = '';
     $('source-dialog').showModal();

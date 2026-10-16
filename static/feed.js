@@ -5,8 +5,13 @@ export class Feed {
     this.app = app;
     this.page = 1;
     this.requestId = 0;
+    this.selectedTopics = new Set();
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
-    ['day', 'tag', 'start', 'end', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    ['day', 'date-range', 'time-range', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
+    $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
+    document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') this.closeTopics(true); });
     $('previous-day').onclick = () => this.moveDay(-1);
     $('next-day').onclick = () => this.moveDay(1);
     $('today').onclick = () => { this.clearFilters(); $('day').value = app.overview.today; this.reload(); };
@@ -16,8 +21,34 @@ export class Feed {
   }
 
   clearFilters() {
-    ['query', 'start', 'end', 'tag'].forEach(id => { $(id).value = ''; });
+    ['query', 'date-range', 'time-range'].forEach(id => { $(id).value = ''; });
+    this.selectedTopics.clear();
+    this.renderTopics(this.app.overview.tags);
     $('show-hidden').checked = false;
+  }
+
+  closeTopics(close) {
+    $('topic-menu').hidden = close;
+    $('topic-button').setAttribute('aria-expanded', String(!close));
+  }
+
+  renderTopics(topics) {
+    this.selectedTopics = new Set([...this.selectedTopics].filter(topic => topics.includes(topic)));
+    $('topic-button').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected ▾` : 'Topics: All topics ▾';
+    $('topic-options').replaceChildren(...topics.map(topic => {
+      const label = el('label', 'checkbox');
+      const checkbox = el('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = this.selectedTopics.has(topic);
+      checkbox.onchange = () => {
+        if (checkbox.checked) this.selectedTopics.add(topic); else this.selectedTopics.delete(topic);
+        $('topic-button').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected ▾` : 'Topics: All topics ▾';
+        this.reload();
+      };
+      label.append(checkbox, document.createTextNode(topic));
+      return label;
+    }));
+    if (!topics.length) $('topic-options').append(el('p', 'muted', 'Topics will appear after stories are collected.'));
   }
 
   moveDay(offset) {
@@ -35,14 +66,15 @@ export class Feed {
 
   async load() {
     const requestId = ++this.requestId;
-    const query = $('query').value.trim(), start = $('start').value, end = $('end').value;
-    const history = Boolean(query || start || end);
+    if (!$('day').value) $('day').value = this.app.overview.today;
+    const query = $('query').value.trim(), dates = $('date-range').value.trim(), times = $('time-range').value.trim();
+    const history = Boolean(query || dates || times);
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page });
     if (query) params.set('query', query);
-    if (start) params.set('start', start);
-    if (end) params.set('end', end);
-    if ($('tag').value) params.set('tag', $('tag').value);
+    if (dates) params.set('date_range', dates);
+    if (times) params.set('time_range', times);
+    this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!history && !bookmarked) params.set('day', $('day').value);
     if (bookmarked) params.set('bookmarks', '1');
     if ($('show-hidden').checked) params.set('hidden', '1');
@@ -52,11 +84,11 @@ export class Feed {
       if (requestId !== this.requestId) return;
       $('stories').replaceChildren(...result.items.map(story => this.tile(story)));
       $('day-controls').hidden = bookmarked;
-      $('clear-search').hidden = !history && !$('tag').value && !$('show-hidden').checked;
+      $('clear-search').hidden = !history && !this.selectedTopics.size && !$('show-hidden').checked;
       $('results-heading').textContent = history ? 'From your history' : bookmarked ? 'Saved stories' : this.editionTitle();
       $('story-count').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('empty').hidden = result.total > 0;
-      $('empty-title').textContent = bookmarked ? 'Keep something interesting.' : history ? 'Nothing matched this search.' : 'A quieter corner of the internet.';
+      $('empty-title').textContent = bookmarked ? 'No bookmarks yet.' : history ? 'Nothing matched this search.' : 'No stories in this edition.';
       $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : history ? 'Try another keyword or a wider date range. Search includes saved headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Your local model can be connected whenever you’re ready.';
       $('empty-action').hidden = bookmarked || history;
       $('empty-action').onclick = () => this.app.collect('collect', $('empty-action'));
@@ -105,7 +137,7 @@ export class Feed {
     const tags = el('div', 'tags');
     story.tags.forEach(tag => {
       const button = el('button', 'tag', tag);
-      button.onclick = () => { $('tag').value = tag; this.reload(); };
+      button.onclick = () => { this.selectedTopics.add(tag); this.renderTopics(this.app.overview.tags); this.reload(); };
       tags.append(button);
     });
     card.append(tags);

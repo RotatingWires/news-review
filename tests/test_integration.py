@@ -10,12 +10,12 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from technews.collector import Collector
-from technews.feeds import discover
-from technews.network import Fetcher
-from technews.reviewer import Reviewer
-from technews.server import AppServer
-from technews.store import Store
+from newsreview.collector import Collector
+from newsreview.feeds import discover
+from newsreview.network import Fetcher
+from newsreview.reviewer import Reviewer
+from newsreview.server import AppServer
+from newsreview.store import Store
 from tests.test_core import review
 
 
@@ -195,8 +195,8 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/sources', 'POST', source)[0], 409)
         self.assertEqual(self.request('/api/bookmarks/1', 'PUT', {'bookmarked': 'yes'})[0], 400)
         self.assertEqual(self.request('/api/stories?query=%27%20OR%201%3D1--')[1]['total'], 0)
-        self.assertEqual(self.request('/data/tech-news.db')[0], 404)
-        self.assertEqual(self.request('/../technews/server.py')[0], 404)
+        self.assertEqual(self.request('/data/newsreview.db')[0], 404)
+        self.assertEqual(self.request('/../newsreview/server.py')[0], 404)
 
     def test_authentication_origin_cookie_and_rate_limit(self):
         self.start_api('long-test-password')
@@ -219,9 +219,31 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/overview', headers={'Host': 'attacker.example'})[0], 403)
         status, html, headers = self.request('/')
         self.assertEqual(status, 200)
-        self.assertIn('Tech News Feed', html)
+        self.assertIn('NewsReview', html)
         self.assertIn("script-src 'self'", headers['Content-Security-Policy'])
         self.assertEqual(headers['X-Content-Type-Options'], 'nosniff')
+
+    def test_multitopic_date_time_api_and_confirmed_reset(self):
+        self.collect()
+        self.start_api()
+        self.assertEqual(self.request('/api/stories?tag=Standards&tag=Radio')[1]['total'], 2)
+        self.assertEqual(self.request('/api/stories?date_range=1%2F1%2F2000+-+1%2F2%2F2000')[1]['total'], 0)
+        self.assertEqual(self.request('/api/stories?time_range=9am+-+9pm')[0], 200)
+        self.assertEqual(self.request('/api/stories?time_range=nonsense')[0], 400)
+        self.assertEqual(self.request('/api/history/clear', 'POST', {})[0], 400)
+        self.assertEqual(self.store.stories()['total'], 2)
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(self.request('/api/history/clear', 'POST', {'confirmation': 'DELETE HISTORY'})[0], 409)
+        finally:
+            self.collector.lock.release()
+        settings = self.store.settings()
+        status, result, _ = self.request('/api/history/clear', 'POST', {'confirmation': 'DELETE HISTORY'})
+        self.assertEqual(status, 200)
+        self.assertEqual(result['deleted'], 2)
+        self.assertEqual(self.store.settings(), settings)
+        self.assertEqual(self.request('/api/stories')[1]['total'], 0)
+        self.assertEqual(self.request('/api/overview')[1]['runs'], [])
 
 
 if __name__ == '__main__':

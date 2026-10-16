@@ -4,21 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="Your daily record of technology, security, standards, radio and telephony.">
-  <title>Tech News Feed</title>
+  <meta name="description" content="Your personal news reader, review desk, and searchable archive.">
+  <title>NewsReview</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to stories</a>
+  <div class="window">
+  <div class="titlebar"><span class="titlebar-name"><img src="/icon.svg" alt="" width="20" height="20"> NewsReview</span><span class="titlebar-caption">Personal news reader</span></div>
   <header class="masthead">
-    <a class="brand" href="/" aria-label="Tech News Feed home"><span class="brand-icon" aria-hidden="true">↗</span><span>TECH NEWS<span class="brand-sub">THE PERSONAL EDITION</span></span></a>
     <nav aria-label="Main navigation">
       <button id="daily-nav" class="nav-button active" aria-current="page">Daily feed</button>
       <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
       <button id="settings-nav" class="nav-button">Settings</button>
-      <button id="theme" class="icon-button" aria-label="Switch color theme" title="Switch color theme">◐</button>
+      <button id="theme" class="nav-button" aria-label="Switch color theme" title="Switch color theme">Dark theme</button>
       <button id="logout" class="nav-button" hidden>Sign out</button>
     </nav>
   </header>
@@ -26,7 +27,7 @@
   <main id="main" tabindex="-1">
     <section id="reader">
       <div class="edition-header">
-        <div><p class="eyebrow" id="edition-label">YOUR DAILY SIGNAL</p><h1 id="feed-title">Under the surface.</h1><p class="intro" id="feed-intro">Technology, security, standards, and the things worth understanding.</p></div>
+        <div><h1 id="feed-title">Daily feed</h1><p class="intro" id="feed-intro">Stories from your sources, reviewed for your interests.</p></div>
         <button id="collect" class="primary">↻ Check sources</button>
       </div>
       <div class="status-bar"><span class="status-dot" aria-hidden="true"></span><span id="collector-status" role="status">Loading your feed…</span><button id="review-pending" class="text-button">Review pending</button></div>
@@ -41,19 +42,20 @@
         <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
       </div>
       <div class="filter-bar">
-        <label>Topic <select id="tag"><option value="">All topics</option></select></label>
-        <label>From <input type="date" id="start"></label><label>To <input type="date" id="end"></label>
+        <div class="topic-filter"><button id="topic-button" aria-expanded="false" aria-controls="topic-menu">Topics: All topics ▾</button><fieldset id="topic-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
+        <label>Date range<input type="text" id="date-range" form="search" placeholder="10/3 - 10/8" autocomplete="off" spellcheck="false" maxlength="100"></label>
+        <label>Time range<input type="text" id="time-range" form="search" placeholder="9am - 9pm" autocomplete="off" spellcheck="false" maxlength="100"></label>
         <label class="checkbox"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
         <button id="clear-search" class="text-button" hidden>Clear search</button>
       </div>
       <div class="section-heading"><h2 id="results-heading">Today’s edition</h2><span id="story-count"></span></div>
       <div id="stories" class="story-grid" aria-live="polite" aria-busy="true"></div>
-      <div id="empty" class="empty" hidden><span class="empty-mark" aria-hidden="true">⌁</span><h2 id="empty-title">A quieter corner of the internet.</h2><p id="empty-description"></p><button id="empty-action" class="primary">Check sources</button></div>
+      <div id="empty" class="empty" hidden><h2 id="empty-title">No stories in this edition.</h2><p id="empty-description"></p><button id="empty-action" class="primary">Check sources</button></div>
       <div class="pagination"><button id="page-prev" hidden>← Previous page</button><span id="page-label"></span><button id="page-next" hidden>Next page →</button></div>
     </section>
 
     <section id="settings" hidden>
-      <div class="edition-header"><div><p class="eyebrow">MAKE IT YOURS</p><h1>The editorial desk.</h1><p class="intro">Choose your sources, tune your interests, and connect your own model.</p></div></div>
+      <div class="edition-header"><div><h1>Settings</h1><p class="intro">Sources, interests, local AI, and collection preferences.</p></div></div>
       <fieldset id="settings-fields" disabled>
       <legend class="sr-only">Reader settings</legend>
       <div class="settings-tabs" role="group" aria-label="Settings section"><button data-tab="interests" class="active">Interests</button><button data-tab="sources">Sources</button><button data-tab="ai">Local AI</button><button data-tab="collection">Collection & history</button></div>
@@ -75,7 +77,7 @@
       </section>
 
       <section id="panel-ai" class="settings-panel" hidden>
-        <h2>Your model. Your machine.</h2><p class="muted">Article text goes to the server you configure. No paid API or subscription is required.</p>
+        <h2>Local model connection</h2><p class="muted">Article text goes to the server you configure. No paid API or subscription is required.</p>
         <form id="ai-form" class="form-grid">
           <label>Server type<select id="ai-provider"><option value="ollama">Ollama</option><option value="compatible">Compatible local chat server (e.g. LM Studio)</option></select></label>
           <label>Server base URL<input id="ai-url" type="url" required></label>
@@ -86,11 +88,11 @@
           <div class="button-row full"><button class="primary" type="submit">Save AI settings</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
         </form>
-        <p class="muted">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses TECHNEWS_MODEL_API_KEY on the app server.</p>
+        <p class="muted">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
       </section>
 
       <section id="panel-collection" class="settings-panel" hidden>
-        <h2>A daily habit, automatically.</h2><p class="muted" id="schedule-timezone"></p>
+        <h2>Daily collection</h2><p class="muted" id="schedule-timezone"></p>
         <form id="collection-form" class="form-grid">
           <label class="checkbox full"><input type="checkbox" id="schedule-enabled"> Enable daily collection</label>
           <label>Collection time<input id="schedule-time" type="time" required></label>
@@ -101,16 +103,19 @@
         </form>
         <div class="maintenance"><h3>Review queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button id="retry-failed">Reset failed reviews</button><button id="reassess">Reassess history…</button></div></div>
         <h3>Recent runs</h3><div id="run-history"></div>
+        <div class="maintenance"><h3>Fresh start</h3><p>Delete all stories, bookmarks, summaries, and collection/review history. Keep your sources, interests, editorial guidance, exclusions, local AI, and schedule settings.</p><p class="muted">This cannot be undone in the app. The next scheduled collection will be tomorrow; you can check sources manually whenever you are ready.</p><button id="clear-history" class="danger">Delete all history…</button></div>
       </section>
       </fieldset>
     </section>
   </main>
 
-  <footer><span>TECH NEWS FEED <span id="version"></span></span><span>A record worth keeping.</span></footer>
+  <footer><span>NewsReview <span id="version"></span></span><span>A record worth keeping.</span></footer>
+  </div>
   <div id="toast" role="status" hidden></div>
 
   <dialog id="source-dialog"><form id="source-form"><div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div><input type="hidden" id="source-id"><label>Name<input id="source-name" maxlength="100" required></label><label>Website URL<input id="source-url" type="url" required></label><div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button></div><label>Feed URL <span class="muted">— blank to discover during collection</span><input id="source-feed" type="url"></label><label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label><datalist id="source-categories"><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio & SDR</option><option>PBX & VoIP</option></datalist><label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label><p id="source-error" class="error" role="alert"></p><div class="button-row"><button class="primary" type="submit">Save source</button><button type="button" data-close="source-dialog">Cancel</button></div></form></dialog>
   <dialog id="confirm-dialog"><h2>Reassess saved history?</h2><p>Queue every saved story for review using your current interests and model. Existing summaries remain visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p><div class="button-row"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div></dialog>
+  <dialog id="clear-history-dialog"><form id="clear-history-form"><h2>Delete all history?</h2><p>All stories, bookmarks, summaries, and run history will be permanently removed from the active database. Your sources, interests, editorial guidance, exclusions, AI settings, and collection settings will stay.</p><label>Type DELETE HISTORY to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="DELETE HISTORY"></label><p id="clear-history-error" class="error" role="alert"></p><div class="button-row"><button class="danger" type="submit">Delete history permanently</button><button type="button" data-close="clear-history-dialog">Cancel</button></div></form></dialog>
   <dialog id="login-dialog"><form id="login-form"><p class="eyebrow">YOUR PERSONAL EDITION</p><h2>Welcome back.</h2><label>Server password<input id="password" type="password" autocomplete="current-password" required></label><p id="login-error" class="error" role="alert"></p><button class="primary" type="submit">Sign in</button></form></dialog>
 </body>
 </html>

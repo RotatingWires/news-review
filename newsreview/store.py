@@ -69,7 +69,7 @@ class Store:
 
     def settings(self):
         with self.connect() as db:
-            return {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] != "sources_seeded"}
+            return {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] not in ("sources_seeded", "history_cleared_at")}
 
     def save_settings(self, values):
         with self.connect() as db:
@@ -107,14 +107,27 @@ class Store:
         result["bookmarked"] = bool(result["bookmarked"])
         return result
 
-    def stories(self, *, day="", query="", start="", end="", tag="", bookmarks=False, show_hidden=False, page=1):
+    def stories(self, *, day="", query="", start="", end="", tag="", tags=None,
+                time_start=None, time_end=None, bookmarks=False, show_hidden=False, page=1):
         clauses, args = ["1=1"], []
         if not show_hidden:
             clauses.append("(s.status NOT IN ('filtered','duplicate') OR s.bookmarked=1)")
-        for value, clause in [(day, "s.day=?"), (start, "s.day>=?"), (end, "s.day<=?"), (tag, "EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value=?)")]:
+        for value, clause in [(day, "s.day=?"), (start, "s.day>=?"), (end, "s.day<=?")]:
             if value:
                 clauses.append(clause)
                 args.append(value)
+        selected_tags = list(dict.fromkeys([*(tags or []), *([tag] if tag else [])]))
+        if selected_tags:
+            placeholders = ','.join('?' for _ in selected_tags)
+            clauses.append(f"EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value IN ({placeholders}))")
+            args.extend(selected_tags)
+        if time_start is not None:
+            minutes = "(CAST(strftime('%H',s.discovered_at,'localtime') AS INTEGER)*60 + CAST(strftime('%M',s.discovered_at,'localtime') AS INTEGER))"
+            if time_start <= time_end:
+                clauses.append(f"({minutes}>=? AND {minutes}<=?)")
+            else:
+                clauses.append(f"({minutes}>=? OR {minutes}<=?)")
+            args.extend([time_start, time_end])
         if query:
             clauses.append("(s.headline LIKE ? ESCAPE '\\' OR s.summary LIKE ? ESCAPE '\\' OR s.excerpt LIKE ? ESCAPE '\\' OR s.tags LIKE ? ESCAPE '\\')")
             pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
@@ -178,6 +191,18 @@ class Store:
         with self.connect() as db:
             where = "review_error IS NOT NULL" if failed_only else "1=1"
             return db.execute(f"UPDATE stories SET status='pending',attempts=0,review_error=NULL,duplicate_of=NULL WHERE {where}").rowcount
+
+    def clear_history(self):
+        """Remove the archive in one transaction, preserving every user setting."""
+        with self.connect() as db:
+            count = db.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
+            # Break self-references before deletion, including any related coverage.
+            db.execute("UPDATE stories SET duplicate_of=NULL")
+            db.execute("DELETE FROM stories")
+            db.execute("DELETE FROM runs")
+            db.execute("UPDATE sources SET last_checked=NULL,last_error=NULL")
+            db.execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(utcnow()),))
+            return count
 
     def start_run(self, kind):
         with self.connect() as db:

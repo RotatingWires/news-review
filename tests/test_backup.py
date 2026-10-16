@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-from technews.store import Store
+from newsreview.store import Store
 
 
 class BackupTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class BackupTests(unittest.TestCase):
                                           'excerpt': 'A useful project.', 'published_at': None, 'category': 'Radio'}, '2026-10-15')
             story = store.stories()['items'][0]
             store.bookmark(story['id'], True)
-            command = [sys.executable, '-m', 'technews.backup', '--database', str(store.path), '--output', str(path / 'backup.db')]
+            command = [sys.executable, '-m', 'newsreview.backup', '--database', str(store.path), '--output', str(path / 'backup.db')]
             # Keep a reader connection open so this also exercises a live WAL database.
             with store.connect() as live:
                 self.assertEqual(live.execute('PRAGMA journal_mode').fetchone()[0], 'wal')

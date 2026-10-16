@@ -15,14 +15,16 @@ class App {
 
   async init() {
     try {
-      const saved = localStorage.getItem('technews-theme');
-      document.documentElement.dataset.theme = saved || 'dark';
+      const saved = localStorage.getItem('newsreview-theme');
+      document.documentElement.dataset.theme = saved || 'light';
     } catch { /* Storage may be disabled; the default theme remains usable. */ }
     $('theme').onclick = () => {
       const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
       document.documentElement.dataset.theme = theme;
-      try { localStorage.setItem('technews-theme', theme); } catch { /* Optional preference. */ }
+      $('theme').textContent = theme === 'light' ? 'Dark theme' : 'Light theme';
+      try { localStorage.setItem('newsreview-theme', theme); } catch { /* Optional preference. */ }
     };
+    $('theme').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
     document.querySelectorAll('[data-close]').forEach(button => { button.onclick = () => $(button.dataset.close).close(); });
     $('daily-nav').onclick = () => this.show('daily');
     $('bookmarks-nav').onclick = () => this.show('bookmarks');
@@ -77,10 +79,8 @@ class App {
     $('collector-status').textContent = state.running ? state.message : `${state.message} · ${pending} awaiting review`;
     $('collect').disabled = state.running;
     $('review-pending').disabled = state.running || pending === 0;
-    const current = $('tag').value;
-    $('tag').replaceChildren(new Option('All topics', ''));
-    this.overview.tags.forEach(tag => $('tag').add(new Option(tag, tag)));
-    $('tag').value = this.overview.tags.includes(current) ? current : '';
+    this.feed.renderTopics(this.overview.tags);
+    $('clear-history').disabled = state.running;
     this.settings.renderRuns();
   }
 
@@ -117,9 +117,8 @@ class App {
       if (view === 'settings') await this.settings.load();
       else {
         this.feed.page = 1;
-        $('edition-label').textContent = view === 'bookmarks' ? 'THE KEEPERS' : 'YOUR DAILY SIGNAL';
-        $('feed-title').textContent = view === 'bookmarks' ? 'Worth coming back to.' : 'Under the surface.';
-        $('feed-intro').textContent = view === 'bookmarks' ? 'Your saved stories, across every edition.' : 'Technology, security, standards, and the things worth understanding.';
+        $('feed-title').textContent = view === 'bookmarks' ? 'Bookmarks' : 'Daily feed';
+        $('feed-intro').textContent = view === 'bookmarks' ? 'Your saved stories, across every edition.' : 'Stories from your sources, reviewed for your interests.';
         await this.feed.load();
       }
     } catch (error) { toast(error.message, true); }

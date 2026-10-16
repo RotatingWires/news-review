@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 from . import __version__
 from . import validation
 from .feeds import discover
+from .search import date_range, time_range
 
 logger = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -48,7 +49,7 @@ class AppServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "TechNewsFeed"
+    server_version = "NewsReview"
 
     def log_message(self, fmt, *args):
         logger.info("%s %s", self.client_address[0], fmt % args)
@@ -90,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
             return True
         try:
             cookie = SimpleCookie(self.headers.get("Cookie", ""))
-            return "technews_session" in cookie and self.server.valid_session(cookie["technews_session"].value)
+            return "newsreview_session" in cookie and self.server.valid_session(cookie["newsreview_session"].value)
         except CookieError:
             return False
 
@@ -101,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             hostname = None
         if not hostname or (not self.server.password and hostname not in ("localhost", "127.0.0.1", "::1")):
-            self.send(403, {"error": "Set TECHNEWS_PASSWORD before using a non-local hostname"})
+            self.send(403, {"error": "Set NEWSREVIEW_PASSWORD before using a non-local hostname"})
             return False
         if write:
             origin = self.headers.get("Origin")
@@ -170,8 +171,8 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(password, str) or not hmac.compare_digest(hashlib.sha256(password.encode()).digest(), hashlib.sha256(self.server.password.encode()).digest()):
             self.send(401, {"error": "Incorrect password"})
             return
-        secure = "; Secure" if os.environ.get("TECHNEWS_SECURE_COOKIE") == "1" else ""
-        self.send(200, {"ok": True}, headers={"Set-Cookie": f"technews_session={self.server.session()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800{secure}"})
+        secure = "; Secure" if os.environ.get("NEWSREVIEW_SECURE_COOKIE") == "1" else ""
+        self.send(200, {"ok": True}, headers={"Set-Cookie": f"newsreview_session={self.server.session()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800{secure}"})
 
     def static(self, path):
         name = "index.html" if path == "/" else path.lstrip("/")
@@ -193,8 +194,20 @@ class Handler(BaseHTTPRequestHandler):
                     date.fromisoformat(values[key])
             if values["start"] and values["end"] and values["start"] > values["end"]:
                 raise ValueError("Start date must be before end date")
+            date_text = params.get("date_range", [""])[0]
+            time_text = params.get("time_range", [""])[0]
+            if len(date_text) > 100 or len(time_text) > 100:
+                raise ValueError("Date/time range is too long")
+            if date_text.strip():
+                values["start"], values["end"] = date_range(date_text)
+            time_start, time_end = time_range(time_text)
+            tags = params.get("tag", [])
+            if len(tags) > 100 or any(len(t) > 60 for t in tags):
+                raise ValueError("Choose at most 100 valid topics")
+            values.pop("tag")
             page = validation.integer(int(params.get("page", ["1"])[0]), "Page", 1, 100000)
-            result = store.stories(**values, bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
+            result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end,
+                                   bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
             for item in result["items"]:
                 for field in ("article_text", "interests_snapshot"):
                     item.pop(field, None)
@@ -213,8 +226,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self, path, data):
         store = self.server.store
-        if path == "/api/logout" and self.command == "POST":
-            self.send(200, {"ok": True}, headers={"Set-Cookie": "technews_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
+        if path == "/api/history/clear" and self.command == "POST":
+            if data.get("confirmation") != "DELETE HISTORY":
+                raise ValueError("Type DELETE HISTORY to confirm")
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {"error": "Wait for the current collection to finish before clearing history"})
+                return
+            try:
+                count = store.clear_history()
+                self.server.collector.update(message="History cleared. Check sources when you want a new edition.")
+                self.send(200, {"deleted": count})
+            finally:
+                self.server.collector.lock.release()
+        elif path == "/api/logout" and self.command == "POST":
+            self.send(200, {"ok": True}, headers={"Set-Cookie": "newsreview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
         elif path.startswith("/api/bookmarks/") and self.command == "PUT":
             store.bookmark(int(path.rsplit("/", 1)[1]), validation.boolean(data.get("bookmarked"), "Bookmarked"))
             self.send(200, {"ok": True})

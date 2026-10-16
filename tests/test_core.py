@@ -7,13 +7,13 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from technews.defaults import SETTINGS
-from technews.collector import Collector
-from technews.feeds import extract_article, parse_date, parse_feed, plain
-from technews.network import canonical_url, check_public, valid_url
-from technews.reviewer import candidates_for, validate_review
-from technews.store import Store
-from technews.validation import settings, source
+from newsreview.defaults import SETTINGS
+from newsreview.collector import Collector
+from newsreview.feeds import extract_article, parse_date, parse_feed, plain
+from newsreview.network import canonical_url, check_public, valid_url
+from newsreview.reviewer import candidates_for, validate_review
+from newsreview.store import Store
+from newsreview.validation import settings, source
 
 
 def review(**values):

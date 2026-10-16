@@ -7,8 +7,8 @@ import sqlite3
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Back up Tech News Feed's SQLite database")
-    parser.add_argument('--database', default='data/tech-news.db')
+    parser = argparse.ArgumentParser(description="Back up NewsReview's SQLite database")
+    parser.add_argument('--database', default='data/newsreview.db')
     parser.add_argument('--output', required=True, help='New backup file; existing files are never overwritten')
     args = parser.parse_args()
     source = Path(args.database).resolve()

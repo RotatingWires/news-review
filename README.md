@@ -1,6 +1,6 @@
-# Tech News Feed
+# NewsReview
 
-A small self-hosted news reader for the technical developments you actually want to follow: security, protocols, standards, formats, open source, hardware, SDR, ham radio, and PBX/VoIP.
+A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let your own local model review the stories. The initial source list and interests are tuned to technology, security, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
 
 Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Your own local model reviews and summarizes articles; no paid API, ChatGPT subscription, or cloud model is required.
 
@@ -10,8 +10,8 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Python standard library HTTP server, SQLite, XML/HTML parsing, and HTTP transport.
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
-- `technews/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.1.0: Describe the change`.
+- `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
+- Commits use the existing project convention: `v0.2.0: Describe the change`.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -19,16 +19,16 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 From the repository directory:
 
 ```bash
-python3 -m technews
+python3 -m newsreview
 ```
 
 On Windows:
 
 ```powershell
-py -3 -m technews
+py -3 -m newsreview
 ```
 
-Open **http://127.0.0.1:8713**. There is no dependency installation step.
+Open **http://127.0.0.1:8714**. There is no dependency installation step.
 
 1. Open **Settings → Local AI** and enter the model server URL and exact installed model name.
 2. Use **Test with a sample article**, then **Save AI settings**.
@@ -40,7 +40,7 @@ You can collect before setting up a model. Stories display source excerpts label
 The daily scheduler is enabled initially for **07:00 in the server's local timezone**. An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
 
 ```bash
-python3 -m technews --no-scheduler
+python3 -m newsreview --no-scheduler
 ```
 
 This flag disables the scheduler for that process only. The UI's schedule setting is persistent. Only one application process should use a data directory.
@@ -75,7 +75,7 @@ Load a model and start the inference server. Set:
 
 The adapter appends `/chat/completions`, requests JSON output, and validates the returned object. The API prefix belongs in the base URL; the final endpoint does not. See [LM Studio's chat API](https://lmstudio.ai/docs/developer/openai-compat/chat-completions).
 
-If your compatible server requires authentication, set `TECHNEWS_MODEL_API_KEY` in the application's environment. It is sent as a bearer token to that server and never returned to the browser. Native Ollama does not use this optional token.
+If your compatible server requires authentication, set `NEWSREVIEW_MODEL_API_KEY` in the application's environment. It is sent as a bearer token to that server and never returned to the browser. Native Ollama does not use this optional token.
 
 ### Move the model to another computer
 
@@ -101,12 +101,14 @@ A small model must still follow instructions and produce valid structured output
 - **Daily feed:** an edition contains stories first discovered on the selected day, using the server's local calendar date.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
 - **Search:** a keyword searches across all stored days, matching headlines, summaries, source excerpts, and tags. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
-- **From / To:** an inclusive range of edition/discovery dates. With a keyword, both constraints apply.
-- **Topic:** exact tag filtering. By itself it filters the selected day; with keyword/date search it filters the historical results.
+- **Date range:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
+- **Time range:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times filter the discovery timestamp in the **server's local timezone**, not publication time. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
+- Keyword, date, and time filters combine and search across the archive. Press Enter or Search to apply them; changing a range also applies it on blur.
+- **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
 - **Include filtered / duplicates:** reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
 - **Pagination:** 48 results per page. Relevant stories are ordered by edition day, relevance score, and collection time.
-- **Themes:** explicit dark/light selection, stored in browser local storage.
+- **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
 
 Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known, relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; edition dates remain the server's recorded date.
 
@@ -123,13 +125,17 @@ The following **27 sources** are seeded once on a fresh database:
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
 
-Defaults are defined in `technews/defaults.py`. Changes to those defaults do not overwrite an existing installation's sources or settings.
+Defaults are defined in `newsreview/defaults.py`. Changes to those defaults do not overwrite an existing installation's sources or settings.
+
+[SOURCES.md](SOURCES.md) links to the 15 approved additions separately from the original 12 websites.
 
 ### Add or edit a source
 
 Open **Settings → Sources → Add source**. Enter its name, website URL, and default category. Click **Find RSS/Atom feed**, or paste a known feed URL. A blank feed URL triggers discovery during collection. Save it, then check sources.
 
 The collector supports RSS 2.0, common RDF/RSS feeds, and Atom. Discovery follows RSS/Atom links advertised in the page's HTML. Most ordinary feeds require no new code. A website with no usable feed needs a purpose-built adapter; this version does not guess articles by indiscriminately crawling every link. Forum category feeds can be entered as sources in exactly the same way as publisher feeds.
+
+**RSS finds the stories; article webpages provide review text.** During AI review the collector visits each article URL and attempts to extract readable text, even when the feed has only a headline. This is an HTTP download, not a JavaScript browser session. A site that requires JavaScript, authentication, or a subscription may still be unreadable. In that case the model uses the available feed excerpt; if there is no usable article text or excerpt, the app keeps the headline/link and reports the review error. It does not summarize a headline as if it had read the article. Without a model configured, feed collection still works, but article extraction waits for the review stage.
 
 Edit a source to change its feed, default category, or enabled state. Disabling stops collection and preserves all existing stories. Sources are not deleted through the UI, keeping historical source references stable. RadioReference starts with its general forum feed; you can replace it with a narrower public forum/category feed to reduce support-thread noise.
 
@@ -154,6 +160,14 @@ Saving affects the next job's AI decisions. A currently running job keeps the se
 **Reassess history** queues every saved story for review with the current interests and model. It requires confirmation because it can be a lot of work. Existing summaries remain visible while queued; a successful new review replaces the previous summary and model metadata. Story IDs, publication dates, discovery dates, and bookmarks are preserved. This is an article archive, not a version history of every generated summary.
 
 Filtered stories stay in the database. Their default view is hidden, so you can inspect the decisions or reassess them later. Source retention remains independent of relevance.
+
+### Fresh start: delete all history
+
+Under **Settings → Collection & history → Fresh start**, select **Delete all history…**, then type `DELETE HISTORY` and confirm. Cancel or close the dialog to keep everything.
+
+This removes all stories (including bookmarks, filtered stories, and duplicate coverage), excerpts, extracted text, generated summaries, and collection/review run records from the active database. It clears source check/error timestamps. It preserves sources and enabled states, interests, editorial guidance, exclusions, AI configuration, and collection settings. Deletion is transactional and is rejected while a collector/reviewer is running.
+
+The daily scheduler skips the rest of the reset day, including after a restart, so it does not immediately refill the archive. Manual **Check sources** remains available. The next collection may rediscover recent stories because URL history was also deleted. Backups, logs, and the recovery copy from the initial-name migration are separate files and are not erased by this action. This is an archive reset, not a secure disk wipe; SQLite can reuse the freed space.
 
 ## Collection and AI pipeline
 
@@ -189,9 +203,9 @@ By default, runtime data is stored in `./data` relative to the working directory
 
 ```text
 data/
-  tech-news.db         stories, sources, settings, bookmarks, run history
-  tech-news.db-wal     SQLite's live write-ahead log, when present
-  tech-news.db-shm     SQLite's shared-memory file, when present
+  newsreview.db         stories, sources, settings, bookmarks, run history
+  newsreview.db-wal     SQLite's live write-ahead log, when present
+  newsreview.db-shm     SQLite's shared-memory file, when present
   server.log          application/HTTP logs, up to 5 MB
   server.log.1        one previous log file, up to 5 MB
 ```
@@ -200,14 +214,14 @@ The directory is Git-ignored. SQLite uses WAL, foreign keys, a busy timeout, and
 
 `PRAGMA user_version` tracks schema version 1. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
-The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, significance, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained indefinitely; this release does not automatically purge it.
+The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, significance, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
 | Environment variable | Purpose |
 | --- | --- |
-| `TECHNEWS_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
-| `TECHNEWS_PASSWORD` | Server password, required for non-loopback serving; at least 12 characters |
-| `TECHNEWS_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
-| `TECHNEWS_MODEL_API_KEY` | Optional bearer token for a compatible model server |
+| `NEWSREVIEW_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
+| `NEWSREVIEW_PASSWORD` | Server password, required for non-loopback serving; at least 12 characters |
+| `NEWSREVIEW_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
+| `NEWSREVIEW_MODEL_API_KEY` | Optional bearer token for a compatible model server |
 
 `.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
 
@@ -216,22 +230,22 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 Loopback access is the default. For LAN access, set a password and explicitly change the listening address:
 
 ```bash
-export TECHNEWS_PASSWORD='replace-with-a-long-private-password'
-python3 -m technews --host 0.0.0.0 --port 8713
+export NEWSREVIEW_PASSWORD='replace-with-a-long-private-password'
+python3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
 PowerShell:
 
 ```powershell
-$env:TECHNEWS_PASSWORD = 'replace-with-a-long-private-password'
-py -3 -m technews --host 0.0.0.0 --port 8713
+$env:NEWSREVIEW_PASSWORD = 'replace-with-a-long-private-password'
+py -3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
 The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Changing the environment password requires a restart.
 
 API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Without a configured password, requests using non-local hostnames are rejected. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
-This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `TECHNEWS_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
+This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `NEWSREVIEW_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
 
 ## Run as a service
 
@@ -239,39 +253,45 @@ The app must stay running for its scheduler to run. It can also be launched at l
 
 ### Linux / systemd
 
-`deploy/tech-news-feed.service` is a template, not an installer:
+`deploy/newsreview.service` is a template, not an installer:
 
 1. Create a dedicated service account and a private writable data directory.
 2. Place the checkout at the desired application path.
-3. Edit `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match those paths. `ProtectHome=true` means this template expects code outside `/home`, such as `/opt/tech-news-feed`.
-4. If needed, put variables in `/etc/tech-news-feed.env`, readable only by the service administrator. The template loads it as an optional environment file.
+3. Edit `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match those paths. `ProtectHome=true` means this template expects code outside `/home`, such as `/opt/newsreview`.
+4. If needed, put variables in `/etc/newsreview.env`, readable only by the service administrator. The template loads it as an optional environment file.
 5. Install the unit using your normal system administration process, then enable/start it.
 
 The template listens on loopback. Edit the bind address and set the required password if you want direct LAN access. The system's timezone controls daily collection. The app does not install or alter system services automatically.
 
 ### Windows / Task Scheduler
 
-Create a task that starts your Python executable with `-m technews`, and set **Start in** to the checkout directory. Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the daily schedule.
+Create a task that starts your Python executable with `-m newsreview`, and set **Start in** to the checkout directory. Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the daily schedule.
 
 ## Backup, restore, and updates
 
 To create a consistent online backup, including while the app runs:
 
 ```bash
-python3 -m technews.backup --output backups/tech-news-2026-10-15.db
+python3 -m newsreview.backup --output backups/newsreview-2026-10-15.db
 ```
 
 For a custom runtime directory:
 
 ```bash
-python3 -m technews.backup --database /path/to/data/tech-news.db --output /path/to/backups/news.db
+python3 -m newsreview.backup --database /path/to/data/newsreview.db --output /path/to/backups/news.db
 ```
 
 The command refuses to overwrite an existing file and checks the new database's integrity. Store backups privately: they contain your reading history and preferences. No credentials are in the database, but environment/service configuration must be backed up separately if needed.
 
-To restore: stop the app, move the entire existing data directory aside as a recovery copy, create a fresh data directory, and place the backup there as `tech-news.db`. Restart using that directory. Do not leave old `-wal`/`-shm` files beside a restored database. Do not copy only the main SQLite file while the app is writing; use the backup command or stop the process first.
+To restore: stop the app, move the entire existing data directory aside as a recovery copy, create a fresh data directory, and place the backup there as `newsreview.db`. Restart using that directory. Do not leave old `-wal`/`-shm` files beside a restored database. Do not copy only the main SQLite file while the app is writing; use the backup command or stop the process first.
 
 Before an update, make a backup, pull the code, and restart. Runtime data is ignored by Git, and saved defaults are not reset. There is no browser service worker caching old application files.
+
+### Upgrade from the first version
+
+Stop the old process before updating. The Python package and launch command are now `newsreview`; environment variables use `NEWSREVIEW_` (update the previous `TECHNEWS_` names in your shell/service configuration). The default port is now **8714**, so update reverse-proxy targets or bookmarks that used **8713**. Services use the `newsreview.service` template and new checkout path. Browser sessions and theme preferences start fresh under the new name/port.
+
+Point `--data-dir` at your existing data directory. If `newsreview.db` does not exist but `tech-news.db` does, startup makes a consistent SQLite backup into the new filename and preserves your sources, interests, settings, bookmarks, and archive. The original is left untouched as a recovery copy. Once the new database exists, the old file is never imported again, including after a history reset. Keep a separate backup and remove the old recovery file yourself when no longer needed. Do not run old and new versions against that directory simultaneously.
 
 ## Tests and verification
 
@@ -289,18 +309,20 @@ Optional real-browser verification requires Playwright and its Chromium browser 
 python3 -m tests.browser_smoke
 ```
 
-This exercises desktop/mobile reading, bookmarks, day navigation, search, editing interests, adding/discovering a source, a fixture model connection, and themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
+This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, adding/discovering a source, a fixture model connection, confirmed history deletion, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
 
 GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local verification for the initial release uses Python 3.14; a real installed user model still needs its own connection and quality check.
 
 ## Project layout
 
 ```text
-technews/
+newsreview/
   __init__.py       authoritative application version
   __main__.py       CLI, server startup, logging, daily scheduler startup
   defaults.py       initial source list, interests, collection/model defaults
   store.py          SQLite schema, queries, queue and settings persistence
+  migration.py      safe import of the first-version database filename
+  search.py         TaskList-compatible date/time range parsing
   network.py        bounded HTTP transport and news-source URL checks
   feeds.py          RSS/Atom parsing/discovery and article extraction
   reviewer.py       local model adapters, editorial prompt, output validation
@@ -310,7 +332,7 @@ technews/
   backup.py         consistent online SQLite backup command
 static/
   index.html        reader, settings panels, dialogs
-  style.css         responsive dark/light editorial layout
+  style.css         responsive Windows 95 light/dark layout
   app.js            startup, navigation and collection status
   shared.js         API, DOM, notification and formatting helpers
   feed.js           tiles, search, dates, pagination and bookmarks
@@ -321,6 +343,15 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.2.0
+
+- Rebrand the application, Python package, environment variables, service, and database to NewsReview; move the default port to 8714.
+- Import existing first-version databases without resetting stored sources, preferences, or history.
+- Replace the editorial UI with a responsive Windows 95 light/dark interface while retaining tiles, bookmarks, collection controls, and settings.
+- Add multi-topic checkbox filtering and TaskList-style date/time range search, including overnight ranges.
+- Add a confirmed fresh-start action that clears archive/run history while retaining sources and preferences, and prevents an immediate scheduled refill.
+- Document RSS discovery versus article webpage fetching, and provide the separately linked approved source additions.
 
 ### v0.1.0
 

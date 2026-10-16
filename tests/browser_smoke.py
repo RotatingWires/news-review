@@ -12,11 +12,11 @@ import re
 
 from playwright.sync_api import sync_playwright, expect
 
-from technews.collector import Collector
-from technews.network import Fetcher
-from technews.reviewer import Reviewer, validate_review
-from technews.server import AppServer
-from technews.store import Store
+from newsreview.collector import Collector
+from newsreview.network import Fetcher
+from newsreview.reviewer import Reviewer, validate_review
+from newsreview.server import AppServer
+from newsreview.store import Store
 from tests.test_core import review
 from tests.test_integration import FixtureHandler
 
@@ -58,7 +58,7 @@ def run():
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
-                page.screenshot(path='/tmp/tech-news-feed-desktop.png', full_page=True)
+                page.screenshot(path='/tmp/newsreview-desktop.png', full_page=True)
 
                 page.locator('.bookmark').first.click()
                 page.get_by_role('button', name='Bookmarks', exact=True).click()
@@ -74,6 +74,25 @@ def run():
                 page.get_by_role('button', name='Search', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
                 assert 'FreePBX' in page.locator('.story h3').inner_text()
+                page.get_by_role('button', name='Clear search').click()
+                expect(page.locator('.story')).to_have_count(4)
+
+                page.locator('#topic-button').click()
+                page.get_by_role('checkbox', name='Protocols', exact=True).check()
+                expect(page.locator('.story')).to_have_count(1)
+                page.get_by_role('checkbox', name='Radio & SDR', exact=True).check()
+                expect(page.locator('.story')).to_have_count(2)
+                page.locator('#topic-all').click()
+                expect(page.locator('.story')).to_have_count(4)
+                page.locator('#topic-button').click()
+                yesterday = date.today() - timedelta(days=1)
+                date_text = f'{yesterday.month}/{yesterday.day}/{yesterday.year} - {date.today().month}/{date.today().day}/{date.today().year}'
+                page.get_by_label('Date range', exact=True).fill(date_text)
+                page.get_by_label('Date range', exact=True).press('Enter')
+                expect(page.locator('.story')).to_have_count(5)
+                page.get_by_label('Time range', exact=True).fill('12am - 11:59pm')
+                page.get_by_label('Time range', exact=True).press('Enter')
+                expect(page.locator('.story')).to_have_count(5)
                 page.get_by_role('button', name='Clear search').click()
                 expect(page.locator('.story')).to_have_count(4)
 
@@ -103,15 +122,33 @@ def run():
                 page.get_by_role('button', name='Daily feed', exact=True).click()
                 page.wait_for_selector('.story')
                 page.set_viewport_size({'width': 390, 'height': 844})
-                page.screenshot(path='/tmp/tech-news-feed-mobile.png', full_page=True)
+                page.screenshot(path='/tmp/newsreview-mobile.png', full_page=True)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
                 page.get_by_role('button', name='Switch color theme').click()
-                assert page.locator('html').get_attribute('data-theme') == 'light'
-                page.screenshot(path='/tmp/tech-news-feed-light.png', full_page=True)
+                assert page.locator('html').get_attribute('data-theme') == 'dark'
+                page.screenshot(path='/tmp/newsreview-dark.png', full_page=True)
+                page.get_by_role('button', name='Settings', exact=True).click()
+                page.get_by_role('button', name='Collection & history', exact=True).click()
+                page.get_by_role('button', name='Delete all history…', exact=True).click()
+                page.locator('#clear-history-dialog').get_by_role('button', name='Cancel', exact=True).click()
+                assert store.stories()['total'] == 5
+                page.get_by_role('button', name='Delete all history…', exact=True).click()
+                page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('wrong')
+                page.get_by_role('button', name='Delete history permanently', exact=True).click()
+                assert store.stories()['total'] == 5
+                preferences = store.settings()
+                page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('DELETE HISTORY')
+                page.get_by_role('button', name='Delete history permanently', exact=True).click()
+                expect(page.locator('#toast')).to_contain_text('History cleared')
+                assert store.stories()['total'] == 0
+                assert store.settings() == preferences
+                assert len(store.sources()) == 28
+                page.get_by_role('button', name='Daily feed', exact=True).click()
+                expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors
                 browser.close()
-                print('Browser QA passed: daily feed, bookmarks, day navigation, search, interests, source discovery, local AI connection, mobile layout, themes; no browser errors.')
-                print('Screenshots: /tmp/tech-news-feed-{desktop,mobile,light}.png')
+                print('Browser QA passed: feed, bookmarks, navigation, keyword/date/time search, multi-topic filter, interests, source discovery, local AI, confirmed history reset, mobile layout, Win95 themes; no browser errors.')
+                print('Screenshots: /tmp/newsreview-{desktop,mobile,dark}.png')
         finally:
             collector.stop()
             server.shutdown()
