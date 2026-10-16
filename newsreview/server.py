@@ -269,7 +269,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Choose at most 100 valid topics")
             values.pop("tag")
             page = validation.integer(int(params.get("page", ["1"])[0]), "Page", 1, 100000)
-            result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end,
+            result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end, time_zone=params.get("time_zone", [""])[0],
                                    bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
             for item in result["items"]:
                 for field in ("article_text", "interests_snapshot"):

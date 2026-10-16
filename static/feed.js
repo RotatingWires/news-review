@@ -95,7 +95,10 @@ export class Feed {
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page });
     if (query) params.set('query', query);
-    if (period) params.set('period', period);
+    if (period) {
+      params.set('period', period);
+      params.set('time_zone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
     this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!history && !bookmarked) params.set('day', $('day').value);
     if (bookmarked) params.set('bookmarks', '1');
@@ -164,8 +167,9 @@ export class Feed {
     });
     card.append(tags);
     const bottom = el('div', 'story-bottom');
-    const time = el('time', '', story.published_at ? formatTime(story.published_at) : 'Publication date unavailable');
-    if (story.published_at) time.dateTime = story.published_at;
+    const timestamp = story.published_at || story.discovered_at;
+    const time = el('time', '', (story.published_at ? '' : 'Collected ') + formatTime(timestamp));
+    time.dateTime = timestamp;
     time.title = `Collected ${formatTime(story.discovered_at)} · edition ${story.day}`;
     bottom.append(time);
     if (story.milestone !== 'not applicable') bottom.append(el('span', '', story.milestone));

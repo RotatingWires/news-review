@@ -59,6 +59,24 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.store.stories(time_start=21*60, time_end=2*60)['total'], 2)
         self.assertEqual(self.store.stories(tags=["' OR 1=1--"])['total'], 0)
 
+    def test_clock_range_matches_publication_in_browser_timezone_and_undated_fallback(self):
+        for number in range(1, 6):
+            self.insert(number, 'Radio', 1)
+        publications = ['2026-10-15T14:00:00+00:00', '2026-10-15T16:00:45+00:00',
+                        '2026-10-15T16:01:00+00:00', '2026-01-15T15:30:00+00:00']
+        with self.store.connect() as db:
+            for number, published in enumerate(publications, 1):
+                db.execute('UPDATE stories SET published_at=? WHERE url=?', (published, f'https://example.com/{number}'))
+            db.execute("UPDATE stories SET discovered_at='2026-10-15T15:00:00+00:00' WHERE url='https://example.com/5'")
+        start, end = time_range('10am - 12pm')
+        result = self.store.stories(time_start=start, time_end=end, time_zone='America/New_York')
+        self.assertEqual({item['headline'] for item in result['items']}, {'Story 1', 'Story 2', 'Story 4', 'Story 5'})
+        self.assertEqual(self.store.stories(time_start=start, time_end=end, time_zone='UTC')['total'], 0)
+        self.assertEqual(self.store.stories(start='2026-10-15', end='2026-10-15', time_start=start, time_end=end,
+                                          time_zone='America/New_York')['total'], 4)
+        with self.assertRaises(ValueError):
+            self.store.stories(time_start=start, time_end=end, time_zone='Not/AZone')
+
     def test_reset_removes_archive_and_preserves_all_preferences(self):
         self.insert(1, 'Radio', 10)
         self.insert(2, 'Radio', 11)

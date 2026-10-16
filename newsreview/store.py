@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sqlite3
 import secrets
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .defaults import SETTINGS, SOURCES
 from .health import source_health
@@ -152,7 +153,20 @@ class Store:
         return result
 
     def stories(self, *, day="", query="", start="", end="", tag="", tags=None,
-                time_start=None, time_end=None, bookmarks=False, show_hidden=False, page=1):
+                time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, page=1):
+        zone = None
+        if time_start is not None and time_zone:
+            if not isinstance(time_zone, str) or len(time_zone) > 100:
+                raise ValueError('Invalid search timezone')
+            try:
+                zone = ZoneInfo(time_zone)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise ValueError('Search timezone is unavailable; install system timezone data or the Python tzdata package') from exc
+
+        def clock_minutes(timestamp):
+            local = datetime.fromisoformat(timestamp).astimezone(zone)
+            return local.hour * 60 + local.minute
+
         clauses, args = ["1=1"], []
         if not show_hidden:
             clauses.append("(s.status NOT IN ('filtered','duplicate') OR s.bookmarked=1)")
@@ -166,7 +180,7 @@ class Store:
             clauses.append(f"EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value IN ({placeholders}))")
             args.extend(selected_tags)
         if time_start is not None:
-            minutes = "(CAST(strftime('%H',s.discovered_at,'localtime') AS INTEGER)*60 + CAST(strftime('%M',s.discovered_at,'localtime') AS INTEGER))"
+            minutes = "newsreview_clock(COALESCE(s.published_at,s.discovered_at))"
             if time_start <= time_end:
                 clauses.append(f"({minutes}>=? AND {minutes}<=?)")
             else:
@@ -180,6 +194,7 @@ class Store:
             clauses.append("s.bookmarked=1")
         where = " AND ".join(clauses)
         with self.connect() as db:
+            db.create_function("newsreview_clock", 1, clock_minutes, deterministic=True)
             total = db.execute(f"SELECT COUNT(*) FROM stories s WHERE {where}", args).fetchone()[0]
             rows = db.execute(f"""SELECT s.*,src.name AS source_name,src.category AS source_category,
                 (SELECT COUNT(*) FROM stories d WHERE d.duplicate_of=s.id) AS related_count

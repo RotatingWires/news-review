@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.5: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.6: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -103,7 +103,7 @@ A small model must still follow instructions and produce valid structured output
 - **Search:** a keyword searches across all stored days, matching headlines, summaries, source excerpts, and tags. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
 - **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
 - **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
-- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times filter the discovery timestamp in the **server's local timezone**, not publication time. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
+- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
 - Keyword, date, and time filters combine and search across the archive. Press Enter or Search to apply them; changing a range also applies it on blur.
 - **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
@@ -385,6 +385,12 @@ deploy/             example systemd unit
 
 ## Release notes
 
+### v0.4.6
+
+- Match time searches to tile publication times in the browser timezone, falling back to collection time for undated stories; date ranges still use edition dates.
+- Show collection time on undated tiles so their time-search behavior is visible.
+- Cover noon boundaries, historical daylight-saving offsets, differing collection/publication times, undated fallback, invalid zones, and browser time-only search.
+
 ### v0.4.5
 
 - Make the full topic row, including its text and unused space, toggle its checkbox once; keep direct checkbox activation working.
@@ -474,3 +480,5 @@ Notifications and errors appear in the fixed bottom-left status bar. Hover over 
 Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
 
 The Daily Feed topic menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
+
+Time search uses standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.

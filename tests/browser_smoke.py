@@ -52,7 +52,7 @@ def run():
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                page = browser.new_page(viewport={'width': 1440, 'height': 1050})
+                page = browser.new_page(viewport={'width': 1440, 'height': 1050}, timezone_id='America/New_York')
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.goto(f'http://127.0.0.1:{server.server_port}')
@@ -159,6 +159,14 @@ def run():
                 page.locator('#topic-button').click()
                 yesterday = date.today() - timedelta(days=1)
                 date_text = f'{yesterday.month}/{yesterday.day}/{yesterday.year} - {date.today().month}/{date.today().day}/{date.today().year}'
+                with store.connect() as db:
+                    db.execute("UPDATE stories SET discovered_at='2026-10-16T02:00:00+00:00'")
+                    db.execute("UPDATE stories SET published_at='2026-10-15T15:00:00+00:00', discovered_at='2026-10-16T02:00:00+00:00' WHERE url='https://example.com/0'")
+                page.emulate_media(reduced_motion='reduce')
+                page.get_by_label('Date/time range', exact=True).fill('10am - 12pm')
+                page.get_by_label('Date/time range', exact=True).press('Enter')
+                expect(page.locator('.story')).to_have_count(1)
+                expect(page.locator('.story h3')).to_contain_text('Experimental HTTP method')
                 page.get_by_label('Date/time range', exact=True).fill(date_text)
                 page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(5)
