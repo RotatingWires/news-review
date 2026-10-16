@@ -1,3 +1,6 @@
+> [!WARNING]
+> This project is fully vibecoded, probably inefficient, but it does what I wanted lol
+
 # NewsReview
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let your own local model review the stories. The initial source list and interests are tuned to technology, security, homelabbing/self-hosting, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
