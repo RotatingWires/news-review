@@ -11,7 +11,22 @@ export class Feed {
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
     $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
     document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') this.closeTopics(true); });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !$('topic-menu').hidden) {
+        event.preventDefault(); this.closeTopics(true); $('topic-button').focus();
+      }
+    });
+    document.querySelector('.topic-filter').addEventListener('keydown', event => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      this.closeTopics(false);
+      const items = [$('topic-all'), ...$('topic-options').querySelectorAll('input')];
+      const current = items.indexOf(document.activeElement);
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+        : current < 0 ? 0 : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items[index].focus();
+    });
+    document.addEventListener('focusin', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
     $('previous-day').onclick = () => this.moveDay(-1);
     $('next-day').onclick = () => this.moveDay(1);
     $('today').onclick = () => { this.clearFilters(); $('day').value = app.overview.today; this.reload(); };
@@ -98,9 +113,9 @@ export class Feed {
   }
 
   editionTitle() {
-    if ($('day').value === this.app.overview.today) return 'Today’s edition';
+    if ($('day').value === this.app.overview.today) return 'Today’s Edition';
     const value = new Date($('day').value + 'T12:00:00Z');
-    return Number.isNaN(value.getTime()) ? 'Daily edition' : value.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    return Number.isNaN(value.getTime()) ? 'Daily Edition' : value.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   }
 
   tile(story) {

@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.2: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.3: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -385,6 +385,14 @@ deploy/             example systemd unit
 
 ## Release notes
 
+### v0.4.3
+
+- Match the Daily Feed topic control to the shared Win95 dropdown styling, retaining multiple checkboxes and adding keyboard navigation/dismissal.
+- Place story counts below the edition heading and capitalize Daily Feed and Today’s Edition consistently.
+- Keep story content selectable on daily/bookmark feeds while preventing page chrome, settings labels, and bookmark controls from being highlighted; form text stays editable and copyable.
+- Add the decorative titlebar minimize/maximize/close symbols used by TaskList and TaskList Stats.
+- Verify count positioning, menu keyboard controls, text-selection scope, and titlebar symbols in browser QA.
+
 ### v0.4.2
 
 - Consolidate collection/review messages and the activity light in the bottom-left status bar; keep Review pending beside Check sources.
@@ -453,3 +461,5 @@ The app fills the viewport. Its top and bottom bars stay visible while the centr
 Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds and errors after twelve; connection errors persist until a successful server response. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
 
 Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
+
+The Daily Feed topic menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.

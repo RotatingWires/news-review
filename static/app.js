@@ -151,7 +151,7 @@ class App {
       if (view === 'settings') await this.settings.load();
       else {
         this.feed.page = 1;
-        $('feed-title').textContent = view === 'bookmarks' ? 'Bookmarks' : 'Daily feed';
+        $('feed-title').textContent = view === 'bookmarks' ? 'Bookmarks' : 'Daily Feed';
         $('feed-intro').textContent = view === 'bookmarks' ? 'Your saved stories, across every edition.' : 'Stories from your sources, reviewed for your interests.';
         await this.feed.load();
       }

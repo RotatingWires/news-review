@@ -58,6 +58,24 @@ def run():
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
+                expect(page.locator('#feed-title')).to_have_text('Daily Feed')
+                expect(page.locator('#results-heading')).to_have_text('Today’s Edition')
+                heading = page.locator('#results-heading').bounding_box()
+                count = page.locator('#story-count').bounding_box()
+                assert count['y'] >= heading['y'] + heading['height']
+                assert count['x'] == heading['x']
+                assert page.locator('.title-buttons').inner_text() == '_ □ ×'
+                assert page.locator('body').evaluate('el => getComputedStyle(el).userSelect') == 'none'
+                assert page.locator('.story').first.evaluate('el => getComputedStyle(el).userSelect') == 'text'
+                assert page.locator('.bookmark').first.evaluate('el => getComputedStyle(el).userSelect') == 'none'
+                assert page.locator('#guidance').evaluate('el => getComputedStyle(el).userSelect') == 'text'
+                assert page.locator('#topic-button .dropdown-arrow').count() == 1
+                page.keyboard.press('Control+a')
+                selected = page.evaluate('getSelection().toString()')
+                assert 'Experimental HTTP method' in selected
+                assert 'Daily Feed' not in selected
+                assert '☆' not in selected
+                page.evaluate('getSelection().removeAllRanges()')
                 assert page.locator('#collector-status').count() == 0
                 assert page.locator('footer .status-dot').count() == 1
                 page.screenshot(path='/tmp/newsreview-desktop.png', full_page=True)
@@ -82,7 +100,7 @@ def run():
                 page.locator('#restore-backup').click()
                 expect(page.locator('#status-message')).to_contain_text('Restored', timeout=15000)
                 page.locator('#transfer-dialog .dialog-actions').get_by_role('button', name='OK', exact=True).click()
-                page.get_by_role('button', name='Daily feed', exact=True).click()
+                page.get_by_role('button', name='Daily Feed', exact=True).click()
                 def inspect_bookmark_request(route):
                     assert page.locator('.bookmark').first.inner_text() == '☆'
                     assert 'Saving bookmark' in page.locator('#status-message').inner_text()
@@ -95,7 +113,7 @@ def run():
                 page.get_by_role('button', name='Bookmarks', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
                 assert 'HTTP' in page.locator('.story h3').inner_text()
-                page.get_by_role('button', name='Daily feed', exact=True).click()
+                page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('.story')).to_have_count(4)
                 page.get_by_label('Previous day', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
@@ -109,6 +127,10 @@ def run():
                 expect(page.locator('.story')).to_have_count(4)
 
                 assert page.locator('#topic-button').bounding_box()['width'] <= 170
+                page.locator('#topic-button').press('ArrowDown')
+                expect(page.locator('#topic-all')).to_be_focused()
+                page.locator('#topic-all').press('Escape')
+                expect(page.locator('#topic-menu')).to_be_hidden()
                 page.locator('#topic-button').click()
                 assert page.locator('#topic-menu').bounding_box()['width'] <= 230
                 page.get_by_role('checkbox', name='Protocols', exact=True).check()
@@ -200,7 +222,7 @@ def run():
                 expect(page.locator('#status-message')).not_to_contain_text('Cannot reach the NewsReview server', timeout=15000)
                 expect(page.locator('#source-refresh-status')).to_contain_text('No newer collection was recorded')
 
-                page.get_by_role('button', name='Daily feed', exact=True).click()
+                page.get_by_role('button', name='Daily Feed', exact=True).click()
                 page.wait_for_selector('.story')
                 page.set_viewport_size({'width': 390, 'height': 844})
                 chrome = page.locator('.window').evaluate('el => [el.querySelector("header").getBoundingClientRect().top, el.querySelector("footer").getBoundingClientRect().bottom]')
@@ -230,7 +252,7 @@ def run():
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
                 assert len(store.sources()) == 27
-                page.get_by_role('button', name='Daily feed', exact=True).click()
+                page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors
                 browser.close()

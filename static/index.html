@@ -13,10 +13,10 @@
 <body>
   <a class="skip" href="#main">Skip to stories</a>
   <div class="window">
-  <div class="titlebar"><span class="titlebar-name"><img src="/icon.svg" alt="" width="20" height="20"> NewsReview</span><span class="titlebar-caption">Personal news reader</span></div>
+  <div class="titlebar"><span class="titlebar-name"><img src="/icon.svg" alt="" width="20" height="20"> NewsReview</span><span class="titlebar-caption">Personal news reader</span><span class="title-buttons" aria-hidden="true">_ □ ×</span></div>
   <header class="masthead">
     <nav aria-label="Main navigation">
-      <button id="daily-nav" class="nav-button active" aria-current="page">Daily feed</button>
+      <button id="daily-nav" class="nav-button active" aria-current="page">Daily Feed</button>
       <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
       <button id="settings-nav" class="nav-button">Settings</button>
       <button id="help-nav" class="nav-button">Help</button>
@@ -28,7 +28,7 @@
   <main id="main" tabindex="-1">
     <section id="reader">
       <div class="edition-header">
-        <div><h1 id="feed-title">Daily feed</h1><p class="intro" id="feed-intro">Stories from your sources, reviewed for your interests.</p></div>
+        <div><h1 id="feed-title">Daily Feed</h1><p class="intro" id="feed-intro">Stories from your sources, reviewed for your interests.</p></div>
         <div class="button-row"><button id="review-pending" class="text-button">Review pending</button><button id="collect" class="primary">↻ Check sources</button></div>
       </div>
 
@@ -42,12 +42,12 @@
         <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
       </div>
       <div class="filter-bar">
-        <div class="topic-filter"><button id="topic-button" aria-expanded="false" aria-controls="topic-menu"><span id="topic-label">Topics: All topics</span><span class="topic-arrow" aria-hidden="true">▾</span></button><fieldset id="topic-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
+        <div class="topic-filter custom-dropdown"><button id="topic-button" class="dropdown-trigger" aria-expanded="false" aria-controls="topic-menu" aria-haspopup="true"><span id="topic-label" class="dropdown-label">Topics: All topics</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button><fieldset id="topic-menu" class="dropdown-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
         <label>Date/time range<input type="text" id="period" form="search" placeholder="9/1/26 - 10/1/26, 10am - 3pm" autocomplete="off" spellcheck="false" maxlength="200"></label>
         <label class="checkbox"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
         <button id="clear-search" class="text-button" hidden>Clear search</button>
       </div>
-      <div class="section-heading"><h2 id="results-heading">Today’s edition</h2><span id="story-count"></span></div>
+      <div class="results-heading"><h2 id="results-heading">Today’s Edition</h2><span id="story-count"></span></div>
       <div id="stories" class="story-grid" aria-live="polite" aria-busy="true"></div>
       <div id="empty" class="empty" hidden><h2 id="empty-title">No stories in this edition.</h2><p id="empty-description"></p><button id="empty-action" class="primary">Check sources</button></div>
       <div class="pagination"><button id="page-prev" hidden>← Previous page</button><span id="page-label"></span><button id="page-next" hidden>Next page →</button></div>
