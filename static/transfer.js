@@ -1,4 +1,4 @@
-import { $, api, revisionHeaders } from './shared.js';
+import { $, notify, revisionHeaders } from './shared.js';
 
 const MAX_UPLOAD = 256 * 1024 * 1024;
 
@@ -16,10 +16,10 @@ export class Transfer {
       $('backup-file').value = '';
       $('confirm-restore').checked = false;
       $('backup-file-info').textContent = 'Maximum ZIP size: 256 MiB. Maximum database size: 1 GiB.';
-      $('transfer-status').textContent = '';
       this.sync();
       $('transfer-dialog').showModal();
     };
+    $('choose-backup').onclick = () => $('backup-file').click();
     $('backup-file').onchange = () => {
       const file = $('backup-file').files[0];
       $('confirm-restore').checked = false;
@@ -45,7 +45,7 @@ export class Transfer {
 
   async export() {
     this.lock(true);
-    $('transfer-status').textContent = 'Preparing a consistent ZIP backup...';
+    notify('Preparing a consistent ZIP backup...');
     try {
       const response = await fetch('/api/export', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok || !response.headers.get('Content-Type')?.startsWith('application/zip')) throw new Error(await errorMessage(response));
@@ -57,9 +57,9 @@ export class Transfer {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      $('transfer-status').textContent = 'Export download started.';
+      notify('Export download started.');
     } catch (error) {
-      $('transfer-status').textContent = `Export error: ${error.message}`;
+      notify(`Export error: ${error.message}`, true);
     } finally { this.lock(false); }
   }
 
@@ -78,11 +78,11 @@ export class Transfer {
     const file = $('backup-file').files[0];
     if (this.busy || !file || !$('confirm-restore').checked) return;
     if (!file.name.toLowerCase().endsWith('.zip') || file.size > MAX_UPLOAD) {
-      $('transfer-status').textContent = 'Choose a NewsReview ZIP no larger than 256 MiB.';
+      notify('Choose a NewsReview ZIP no larger than 256 MiB.', true);
       return;
     }
     this.lock(true);
-    $('transfer-status').textContent = 'Validating the ZIP and restoring data. A recovery backup is saved first...';
+    notify('Validating the ZIP and restoring data. A recovery backup is saved first...');
     let restored = false;
     try {
       const response = await fetch('/api/import/backup', { method: 'POST', credentials: 'same-origin',
@@ -92,13 +92,13 @@ export class Transfer {
       if (!result.restored) throw new Error('The server did not confirm the restore.');
       restored = true;
       await this.reloadDataset();
-      $('transfer-status').textContent = `Restored ${result.totals.stories} stories and ${result.totals.sources} source records. Recovery backup: data/backups/${result.recoveryBackup}`;
+      notify(`Restored ${result.totals.stories} stories and ${result.totals.sources} source records. Recovery backup: data/backups/${result.recoveryBackup}`);
       $('confirm-restore').checked = false;
     } catch (error) {
       let message = restored ? `Backup restored, but the display could not be refreshed: ${error.message}` : `Restore could not be confirmed: ${error.message}`;
       try { await this.reloadDataset(); message += ' Current server data has been reloaded.'; }
       catch { $('stories').replaceChildren(); message += ' Could not reload server data; reconnect before continuing.'; }
-      $('transfer-status').textContent = message;
+      notify(message, true);
     } finally { this.lock(false); }
   }
 }

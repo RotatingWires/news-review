@@ -1,4 +1,4 @@
-import { $, api, busy, el, externalLink, formatTime, toast } from './shared.js';
+import { $, api, busy, el, externalLink, formatTime, notify } from './shared.js';
 
 export class Settings {
   constructor(app) {
@@ -12,13 +12,13 @@ export class Settings {
       const interests = { topics, guidance: $('guidance').value, exclusions: $('exclusions').value.split('\n').map(x => x.trim()).filter(Boolean) };
       await api('settings', 'PUT', { interests });
       this.values.interests = interests;
-      toast('Interests saved. Future reviews will use these preferences.');
+      notify('Interests saved. Future reviews will use these preferences.');
     });
     $('ai-form').onsubmit = event => this.submit(event, async () => {
       const ai = this.aiValues();
       await api('settings', 'PUT', { ai });
       this.values.ai = ai;
-      toast(ai.model ? 'Local AI settings saved.' : 'AI review paused. Collection remains available.');
+      notify(ai.model ? 'Local AI settings saved.' : 'AI review paused. Collection remains available.');
     });
     $('ai-provider').onchange = () => {
       const compatible = $('ai-provider').value === 'compatible';
@@ -39,11 +39,11 @@ export class Settings {
         items_per_source: Number($('items-per-source').value), max_reviews: Number($('max-reviews').value), lookback_days: Number($('lookback').value) };
       await api('settings', 'PUT', { collection });
       this.values.collection = collection;
-      toast('Collection settings saved.');
+      notify('Collection settings saved.');
     });
     $('retry-failed').onclick = () => busy($('retry-failed'), async () => {
       const result = await api('requeue', 'POST', { failed_only: true });
-      toast(`${result.count} failed reviews reset. Use Review pending to process them.`);
+      notify(`${result.count} failed reviews reset. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
     $('reassess').onclick = () => {
@@ -53,7 +53,7 @@ export class Settings {
     $('confirm-reassess').onclick = () => busy($('confirm-reassess'), async () => {
       const result = await api('requeue', 'POST', { failed_only: false });
       $('confirm-dialog').close();
-      toast(`${result.count} stories queued. Use Review pending to process them.`);
+      notify(`${result.count} stories queued. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
     $('clear-history').onclick = () => {
@@ -76,7 +76,7 @@ export class Settings {
         await this.refreshSources();
         await this.app.feed.load();
         await this.load();
-        toast(`Selected data reset (${result.deleted_stories} stories removed). Unchecked categories were kept.`);
+        notify(`Selected data reset (${result.deleted_stories} stories removed). Unchecked categories were kept.`);
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();
@@ -86,7 +86,7 @@ export class Settings {
       try {
         const result = await api('discover', 'POST', { url: $('source-url').value }, 90000);
         $('source-feed').value = result.feed_url;
-        toast('Feed discovered. Save the source to keep it.');
+        notify('Feed discovered. Save the source to keep it.');
       } catch (error) { $('source-error').textContent = error.message; throw error; }
     });
     $('preview-source').onclick = () => busy($('preview-source'), async () => {
@@ -110,7 +110,7 @@ export class Settings {
         await api(id ? 'sources/' + id : 'sources', id ? 'PUT' : 'POST', source);
         $('source-dialog').close();
         await this.refreshSources();
-        toast('Source saved.');
+        notify('Source saved.');
       } catch (error) { $('source-error').textContent = error.message; throw error; }
     });
   }

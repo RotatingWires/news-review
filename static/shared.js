@@ -5,15 +5,32 @@ export function el(tag, className = '', text = '') {
   if (text) node.textContent = text;
   return node;
 }
-let toastTimer;
+let noticeTimer;
+let connectionError = '';
+let defaultStatus = 'Ready.';
+let notice = null;
 let dataRevision = null;
 export function revisionHeaders() { return dataRevision ? { 'X-NewsReview-Revision': dataRevision } : {}; }
-export function toast(message, error = false) {
-  $('toast').textContent = message;
-  $('toast').className = error ? 'error-toast' : '';
-  $('toast').hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 9000 : 4500);
+function renderStatus() {
+  const message = connectionError || notice?.message || defaultStatus;
+  $('status-message').textContent = message;
+  $('status-message').title = message;
+  $('status-message').classList.toggle('status-error', Boolean(connectionError || notice?.error));
+}
+export function setConnectionStatus(message) {
+  if (!message && connectionError && notice?.message === connectionError) {
+    notice = null;
+    clearTimeout(noticeTimer);
+  }
+  connectionError = message || '';
+  renderStatus();
+}
+export function setDefaultStatus(message) { defaultStatus = message; renderStatus(); }
+export function notify(message, error = false) {
+  notice = { message, error };
+  clearTimeout(noticeTimer);
+  renderStatus();
+  noticeTimer = setTimeout(() => { notice = null; renderStatus(); }, error ? 12000 : 8000);
 }
 export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   const controller = new AbortController();
@@ -49,7 +66,7 @@ export async function busy(button, work) {
   button.disabled = true;
   button.textContent = 'Working…';
   try { return await work(); }
-  catch (error) { toast(error.message, true); }
+  catch (error) { notify(error.message, true); }
   finally { button.disabled = false; button.textContent = text; }
 }
 export function externalLink(url, text, className = '') {

@@ -1,4 +1,4 @@
-import { $, api, el, externalLink, formatTime, toast, busy } from './shared.js';
+import { $, api, el, externalLink, formatTime, notify, busy } from './shared.js';
 
 export class Feed {
   constructor(app) {
@@ -61,7 +61,7 @@ export class Feed {
 
   reload() { this.page = 1; this.loadSafe(); }
   async loadSafe() {
-    try { await this.load(); } catch (error) { toast(error.message, true); }
+    try { await this.load(); } catch (error) { notify(error.message, true); }
   }
 
   async load() {
@@ -115,7 +115,7 @@ export class Feed {
       story.bookmarked = next;
       if (this.app.view === 'bookmarks' && !next) await this.load();
       else card.replaceWith(this.tile(story));
-      toast(next ? 'Saved to bookmarks.' : 'Bookmark removed.');
+      notify(next ? 'Saved to bookmarks.' : 'Bookmark removed.');
     });
     top.append(el('span', 'source-name', story.source_name || 'Source'), bookmark);
     const heading = el('h3');
@@ -151,7 +151,6 @@ export class Feed {
       model.title = `Reviewed by ${story.provider} · ${formatTime(story.reviewed_at)}`;
       bottom.append(model);
     }
-    bottom.append(externalLink(story.url, 'Read story ↗', 'read-link'));
     card.append(bottom);
     if (story.related_count) {
       const related = el('details', 'related');
@@ -163,7 +162,7 @@ export class Feed {
         try {
           const links = await api('related/' + story.id);
           links.forEach(item => related.append(externalLink(item.url, `${item.source_name}: ${item.headline}`)));
-        } catch (error) { loaded = false; toast(error.message, true); }
+        } catch (error) { loaded = false; notify(error.message, true); }
       };
       card.append(related);
     }

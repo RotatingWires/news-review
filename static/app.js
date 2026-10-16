@@ -2,7 +2,7 @@ import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
 
-import { $, api, busy, toast, formatTime } from './shared.js';
+import { $, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus } from './shared.js';
 
 class App {
   constructor() {
@@ -14,12 +14,13 @@ class App {
     this.transfer = new Transfer(this);
     this.pollTimer = null;
     this.unconfirmedRefresh = null;
+    this.connectionError = false;
   }
 
   async init() {
     document.addEventListener('newsreview-connection', event => {
-      $('connection-status').hidden = !event.detail.error;
-      $('connection-status').textContent = event.detail.error || '';
+      this.connectionError = Boolean(event.detail.error);
+      setConnectionStatus(event.detail.error);
     });
     try {
       const saved = localStorage.getItem('newsreview-theme');
@@ -61,14 +62,14 @@ class App {
         $('settings').hidden = true;
         $('reader').hidden = false;
         $('login-dialog').showModal();
-      } catch (error) { toast(error.message, true); }
+      } catch (error) { notify(error.message, true); }
     };
     try {
       const session = await api('session');
       $('logout').hidden = !session.password_required;
       if (!session.authenticated) { $('login-dialog').showModal(); return; }
       await this.load();
-    } catch (error) { toast(error.message, true); $('collector-status').textContent = error.message; this.poll(); }
+    } catch (error) { notify(error.message, true); $('collector-status').textContent = error.message; this.poll(); }
   }
 
   async load() {
@@ -87,6 +88,7 @@ class App {
     document.querySelector('.status-bar').setAttribute('aria-busy', String(state.running));
     const pending = this.overview.counts.pending || 0;
     $('collector-status').textContent = state.running ? state.message : `${state.message} · ${pending} awaiting review`;
+    setDefaultStatus($('collector-status').textContent);
     $('collect').disabled = state.running;
     $('review-pending').disabled = state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
@@ -131,7 +133,7 @@ class App {
         $('collector-status').textContent = error.message;
       }
       this.poll();
-    }, this.overview?.collector.running ? 2500 : !$('connection-status').hidden ? 5000 : 30000);
+    }, this.overview?.collector.running ? 2500 : this.connectionError ? 5000 : 30000);
   }
 
   async show(view) {
@@ -152,7 +154,7 @@ class App {
         $('feed-intro').textContent = view === 'bookmarks' ? 'Your saved stories, across every edition.' : 'Stories from your sources, reviewed for your interests.';
         await this.feed.load();
       }
-    } catch (error) { toast(error.message, true); }
+    } catch (error) { notify(error.message, true); }
   }
 
   async collect(kind, button) {
@@ -161,7 +163,7 @@ class App {
       try {
         await api('collect', 'POST', { kind });
         if (kind === 'collect') this.unconfirmedRefresh = null;
-        toast(kind === 'collect' ? 'Collection started in the background.' : 'Reviewing queued stories.');
+        notify(kind === 'collect' ? 'Collection started in the background.' : 'Reviewing queued stories.');
       } catch (error) {
         if (error.connection) {
           if (kind === 'collect') this.unconfirmedRefresh = previousRun;
@@ -176,7 +178,7 @@ class App {
         if (this.view === 'settings') await this.settings.refreshSources();
         else await this.feed.load();
       }
-    } catch (error) { if (!error.connection) toast(error.message, true); }
+    } catch (error) { if (!error.connection) notify(error.message, true); }
     finally { this.poll(); }
   }
 }

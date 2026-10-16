@@ -66,17 +66,24 @@ def run():
                 page.locator('#help-dialog .dialog-body').evaluate('el => { el.scrollTop = el.scrollHeight; }')
                 assert positions == page.locator('#help-dialog').evaluate('el => [el.querySelector(".dialog-heading").getBoundingClientRect().top, el.querySelector(".dialog-actions").getBoundingClientRect().bottom]')
                 page.locator('#help-dialog .dialog-actions button').click()
+                page.get_by_role('button', name='Settings', exact=True).click()
+                page.get_by_role('button', name='Collection & history', exact=True).click()
                 page.get_by_role('button', name='Import/Export...', exact=True).click()
                 with page.expect_download() as download_info:
                     page.locator('#export-backup').click()
                 backup_path = Path(directory) / 'browser-export.zip'
                 download_info.value.save_as(backup_path)
-                page.locator('#backup-file').set_input_files(str(backup_path))
+                with page.expect_file_chooser() as chooser:
+                    page.locator('#choose-backup').click()
+                chooser.value.set_files(str(backup_path))
                 page.locator('#confirm-restore').check()
                 page.locator('#restore-backup').click()
-                expect(page.locator('#transfer-status')).to_contain_text('Restored', timeout=15000)
-                page.locator('#transfer-dialog .dialog-actions').get_by_role('button', name='Close', exact=True).click()
+                expect(page.locator('#status-message')).to_contain_text('Restored', timeout=15000)
+                page.locator('#transfer-dialog .dialog-actions').get_by_role('button', name='OK', exact=True).click()
+                page.get_by_role('button', name='Daily feed', exact=True).click()
                 page.locator('.bookmark').first.click()
+                expect(page.locator('#status-message')).to_contain_text('Saved to bookmarks')
+                assert page.locator('.read-link').count() == 0
                 page.get_by_role('button', name='Bookmarks', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
                 assert 'HTTP' in page.locator('.story h3').inner_text()
@@ -93,7 +100,9 @@ def run():
                 page.get_by_role('button', name='Clear search').click()
                 expect(page.locator('.story')).to_have_count(4)
 
+                assert page.locator('#topic-button').bounding_box()['width'] <= 170
                 page.locator('#topic-button').click()
+                assert page.locator('#topic-menu').bounding_box()['width'] <= 230
                 page.get_by_role('checkbox', name='Protocols', exact=True).check()
                 expect(page.locator('.story')).to_have_count(1)
                 page.get_by_role('checkbox', name='Radio & SDR', exact=True).check()
@@ -113,13 +122,16 @@ def run():
                 expect(page.locator('.story')).to_have_count(4)
 
                 page.get_by_role('button', name='Settings', exact=True).click()
+                page.get_by_role('button', name='Interests', exact=True).click()
                 page.wait_for_selector('#guidance')
                 page.locator('#guidance').fill('Favor RF projects and protocol changes.')
-                page.get_by_role('button', name='Save interests').click()
-                expect(page.locator('#toast')).to_contain_text('Interests saved')
+                page.locator('#interests-form').get_by_role('button', name='Save', exact=True).click()
+                expect(page.locator('#status-message')).to_contain_text('Interests saved')
                 assert store.settings()['interests']['guidance'] == 'Favor RF projects and protocol changes.', repr(store.settings()['interests']['guidance'])
                 page.get_by_role('button', name='Sources', exact=True).click()
                 page.get_by_role('button', name='+ Add source', exact=True).click()
+                assert page.locator('#source-dialog .dialog-actions button').all_text_contents() == ['Cancel', 'Save']
+                assert page.locator('#source-category').bounding_box()['width'] <= 225
                 page.get_by_label('Name', exact=True).fill('Fixture source')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/')
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
@@ -140,8 +152,8 @@ def run():
                 page.locator('#ai-model').fill('fixture')
                 page.get_by_role('button', name='Test with a sample article').click()
                 expect(page.locator('#model-test-result')).to_contain_text('validation passed')
-                page.get_by_role('button', name='Save Settings').click()
-                expect(page.locator('#toast')).to_contain_text('AI settings saved')
+                page.locator('#ai-form').get_by_role('button', name='Save', exact=True).click()
+                expect(page.locator('#status-message')).to_contain_text('AI settings saved')
                 assert store.settings()['ai']['model'] == 'fixture'
 
                 # Keep this test entirely on the fixture server when testing Refresh.
@@ -154,10 +166,10 @@ def run():
                 expect(page.locator('.source-state.healthy')).to_have_count(2)
                 page.context.set_offline(True)
                 page.get_by_role('button', name='Refresh sources', exact=True).click()
-                expect(page.locator('#connection-status')).to_contain_text('Cannot reach the NewsReview server')
+                expect(page.locator('#status-message')).to_contain_text('Cannot reach the NewsReview server')
                 expect(page.locator('#source-refresh-status')).to_contain_text('not confirmed')
                 page.context.set_offline(False)
-                expect(page.locator('#connection-status')).to_be_hidden(timeout=15000)
+                expect(page.locator('#status-message')).not_to_contain_text('Cannot reach the NewsReview server', timeout=15000)
                 expect(page.locator('#source-refresh-status')).to_contain_text('No newer collection was recorded')
 
                 page.get_by_role('button', name='Daily feed', exact=True).click()
@@ -186,7 +198,7 @@ def run():
                 page.locator('#reset-bookmarks').check()
                 page.get_by_label('Type RESET SELECTED to confirm', exact=True).fill('RESET SELECTED')
                 page.get_by_role('button', name='Reset selected data', exact=True).click()
-                expect(page.locator('#toast')).to_contain_text('Selected data reset')
+                expect(page.locator('#status-message')).to_contain_text('Selected data reset')
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
                 assert len(store.sources()) == 27

@@ -20,12 +20,10 @@
       <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
       <button id="settings-nav" class="nav-button">Settings</button>
       <button id="help-nav" class="nav-button">Help</button>
-      <button id="transfer-nav" class="nav-button">Import/Export...</button>
       <button id="theme" class="nav-button" aria-label="Switch color theme" title="Switch color theme">Dark theme</button>
       <button id="logout" class="nav-button" hidden>Sign out</button>
     </nav>
   </header>
-  <div id="connection-status" role="alert" hidden></div>
 
   <main id="main" tabindex="-1">
     <section id="reader">
@@ -68,7 +66,7 @@
           <div id="interest-rows" class="interest-rows"></div><button id="add-interest" type="button">+ Add interest</button>
           <label>Editorial guidance<textarea id="guidance" rows="5" maxlength="6000"></textarea></label>
           <label>Exclude <span class="muted">One topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
-          <button class="primary" type="submit">Save interests</button>
+          <button class="primary" type="submit">Save</button>
         </form>
       </section>
 
@@ -88,7 +86,7 @@
           <label>Request timeout (seconds)<input id="ai-timeout" type="number" min="10" max="600" required></label>
           <label>Maximum article characters<input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
           <p id="ai-help" class="callout full"></p>
-          <div class="button-row full"><button class="primary" type="submit">Save Settings</button><button id="test-model" type="button">Test with a sample article</button></div>
+          <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
         </form>
         <p class="muted">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
@@ -102,9 +100,10 @@
           <label>Newest articles per source<input id="items-per-source" type="number" min="1" max="50" required></label>
           <label>Maximum AI reviews per run<input id="max-reviews" type="number" min="1" max="500" required></label>
           <label>Collect articles from the last (days)<input id="lookback" type="number" min="1" max="30" required></label>
-          <div class="full"><button class="primary" type="submit">Save collection settings</button></div>
+          <div class="full"><button class="primary" type="submit">Save</button></div>
         </form>
         <div class="maintenance"><h3>Review queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button id="retry-failed">Reset failed reviews</button><button id="reassess">Reassess history…</button></div></div>
+        <div class="maintenance"><h3>Import/Export</h3><p>Download a ZIP backup or restore a saved NewsReview archive.</p><button id="transfer-nav" type="button">Import/Export...</button></div>
         <h3>Recent runs</h3><div id="run-history"></div>
         <div class="maintenance"><h3>Fresh start</h3><p>Choose which history and preferences to clear. Bookmarked stories can be kept while other history is removed.</p><button id="clear-history" class="danger">Fresh start...</button></div>
       </section>
@@ -112,9 +111,8 @@
     </section>
   </main>
 
-  <footer><span>NewsReview <span id="version"></span></span><span>A record worth keeping.</span></footer>
+  <footer><span id="status-message" role="status" aria-live="polite">Ready.</span><span class="status-version">NewsReview <span id="version"></span></span></footer>
   </div>
-  <div id="toast" role="status" hidden></div>
 
   <dialog id="source-dialog"><form id="source-form" class="dialog-layout">
     <div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div>
@@ -129,12 +127,12 @@
       <p class="muted">Use a page listing articles or forum threads. Preview before saving. JavaScript-only or restricted pages may need a custom adapter.</p>
       <output id="source-preview" class="callout" hidden></output>
       <label>Warn after this many days without activity<input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
-      <label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
+      <label class="source-category-label">Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
       <datalist id="source-categories"><option>News</option><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio &amp; SDR</option><option>PBX &amp; VoIP</option></datalist>
       <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
       <p id="source-error" class="error" role="alert"></p>
     </div>
-    <div class="dialog-actions"><button class="primary" type="submit">Save</button><button type="button" data-close="source-dialog">Cancel</button></div>
+    <div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Save</button></div>
   </form></dialog>
   <dialog id="confirm-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Reassess saved history?</h2><button data-close="confirm-dialog" aria-label="Close">×</button></div>
@@ -184,7 +182,7 @@
       <p>Combine dates and times with a comma: 9/1/26 - 10/1/26, 10am - 3pm. A date range or time range alone also works. Times use the server timezone; overnight ranges are supported. Topics match any checked selection.</p>
       <p>The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
       <h3>Backups and fresh starts</h3>
-      <p>Import/Export downloads a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>
+      <p>Open Settings, Collection &amp; history, then Import/Export to download a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>
       <p>Fresh start in Settings lets you clear selected data, including history, bookmarks, interests, guidance, sources, or settings. Unchecked categories are preserved. Keeping Bookmarks unchecked preserves saved stories when clearing other history.</p>
     </div>
     <div class="dialog-actions"><button data-close="help-dialog">OK</button></div>
@@ -192,14 +190,16 @@
   <dialog id="transfer-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Import/Export</h2><button data-close="transfer-dialog" aria-label="Close">×</button></div>
     <div class="dialog-body">
-      <h3>Export</h3><p>Download a complete NewsReview ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, and run history. It includes committed database changes while the app runs. Store it privately; the ZIP is not encrypted.</p>
-      <h3>Restore a backup</h3><p>Choose a NewsReview export ZIP. Restoring replaces the current dataset rather than merging it. The server validates it and saves a private recovery ZIP before changing anything. Your login password and browser theme are not replaced.</p>
-      <label>Choose ZIP backup<input id="backup-file" type="file" accept=".zip,application/zip"></label>
+      <p>Download a complete NewsReview ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, and run history. It includes committed database changes while the app runs. Store it privately; the ZIP is not encrypted.</p>
+      <div><button id="export-backup" type="button">Download Export</button></div>
+      <p>Choose a NewsReview export ZIP. Restoring replaces the current dataset rather than merging it. The server validates it and saves a private recovery ZIP before changing anything. Your login password and browser theme are not replaced.</p>
+      <div><button id="choose-backup" type="button">Choose File to Import...</button></div>
+      <input id="backup-file" type="file" accept=".zip,application/zip" hidden>
       <p id="backup-file-info" class="muted">Maximum ZIP size: 256 MiB. Maximum database size: 1 GiB.</p>
       <label class="checkbox"><input type="checkbox" id="confirm-restore"> I understand that restoring replaces all current NewsReview data and preferences.</label>
-      <p id="transfer-status" role="status"></p>
+      <div><button id="restore-backup" class="danger" disabled>Restore backup</button></div>
     </div>
-    <div class="dialog-actions"><button id="export-backup">Download Export</button><button id="restore-backup" class="danger" disabled>Restore backup</button><button data-close="transfer-dialog">Close</button></div>
+    <div class="dialog-actions"><button data-close="transfer-dialog">OK</button></div>
   </div></dialog>
 </body>
 </html>
