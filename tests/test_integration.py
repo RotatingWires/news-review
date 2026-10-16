@@ -177,9 +177,9 @@ class IntegrationTests(unittest.TestCase):
             'category': 'Radio', 'enabled': False})
         self.store.save_settings({'ai': self.model_config()})
         self.start_api()
-        self.assertEqual(self.request('/api/collect', 'POST', {'kind': 'review', 'unchecked_only': True})[0], 400)
-        self.assertEqual(self.request('/api/collect', 'POST', {'unchecked_only': 'yes'})[0], 400)
-        self.assertEqual(self.request('/api/collect', 'POST', {'unchecked_only': True})[0], 202)
+        self.assertEqual(self.request('/api/jobs/start', 'POST', {'kind': 'review', 'unchecked_only': True})[0], 400)
+        self.assertEqual(self.request('/api/jobs/start', 'POST', {'unchecked_only': 'yes'})[0], 400)
+        self.assertEqual(self.request('/api/jobs/start', 'POST', {'unchecked_only': True})[0], 202)
         self.collector.worker.join(10)
         self.assertFalse(self.collector.status()['running'])
         sources = {source['id']: source for source in self.store.sources()}
@@ -254,6 +254,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/stories', headers={'Cookie': cookie})[0], 200)
         self.assertEqual(self.request('/api/collect', 'POST', {}, {'Cookie': cookie, 'Origin': 'https://evil.example'})[0], 403)
         self.assertEqual(self.request('/api/collect', 'POST', {}, {'Cookie': cookie, 'Sec-Fetch-Site': 'cross-site'})[0], 403)
+        self.assertEqual(self.request('/api/jobs/start', 'POST', {}, {'Cookie': cookie, 'Sec-Fetch-Site': 'cross-site'})[0], 403)
         for _ in range(3):
             self.request('/api/login', 'POST', {'password': 'wrong'})
         self.assertEqual(self.request('/api/login', 'POST', {'password': 'wrong'})[0], 429)

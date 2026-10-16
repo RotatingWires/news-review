@@ -341,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/test-model" and self.command == "POST":
             config = validation.settings({"ai": data}, store.settings())["ai"]
             self.send(200, self.server.collector.reviewer.test(config))
-        elif path == "/api/collect" and self.command == "POST":
+        elif path in ("/api/jobs/start", "/api/collect") and self.command == "POST":
             kind = data.get("kind", "collect")
             if kind not in ("collect", "review"):
                 raise ValueError("Unknown job type")

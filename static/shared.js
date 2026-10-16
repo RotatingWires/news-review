@@ -15,14 +15,19 @@ function renderStatus() {
   const message = connectionError || notice?.message || defaultStatus;
   $('status-message').textContent = message;
   $('status-message').title = message;
-  $('status-message').classList.toggle('status-error', Boolean(connectionError || notice?.error));
+  const error = Boolean(connectionError || notice?.error);
+  $('status-message').classList.toggle('status-error', error);
+  document.querySelector('.footer-status').classList.toggle('has-error', error);
+  $('dismiss-status').hidden = !error;
 }
 export function setConnectionStatus(message) {
-  if (!message && connectionError && notice?.message === connectionError) {
-    notice = null;
-    clearTimeout(noticeTimer);
-  }
   connectionError = message || '';
+  renderStatus();
+}
+export function dismissStatus() {
+  notice = null;
+  connectionError = '';
+  clearTimeout(noticeTimer);
   renderStatus();
 }
 export function setDefaultStatus(message) { defaultStatus = message; renderStatus(); }
@@ -30,7 +35,7 @@ export function notify(message, error = false) {
   notice = { message, error };
   clearTimeout(noticeTimer);
   renderStatus();
-  noticeTimer = setTimeout(() => { notice = null; renderStatus(); }, error ? 12000 : 8000);
+  if (!error) noticeTimer = setTimeout(() => { notice = null; renderStatus(); }, 8000);
 }
 export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   const controller = new AbortController();
@@ -46,9 +51,12 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   } catch (cause) {
     const message = response ? `NewsReview returned an unreadable response (HTTP ${response.status}). Check that this URL reaches the NewsReview server.`
       : `Cannot reach the NewsReview server at ${location.host}${cause.name === 'AbortError' ? ' (request timed out)' : ''}. Check that it is running and the address/port are correct. Collection may still be running; reconnect to confirm its status.`;
-    const error = new Error(message);
+    const actionMessage = !response && method !== 'GET'
+      ? `Could not send ${method} /api/${path}. The request may be blocked by the browser, an extension, or the network${cause.name === 'AbortError' ? ' (request timed out)' : ''}. If DevTools shows ERR_BLOCKED_BY_CLIENT, allow this app in your blocker. The action was not confirmed; check server status before retrying.`
+      : message;
+    const error = new Error(actionMessage);
     error.connection = true;
-    document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: message } }));
+    document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: actionMessage } }));
     throw error;
   } finally { clearTimeout(timer); }
   document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: result.code === 'storage_unavailable' ? result.error : null } }));

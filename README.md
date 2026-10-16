@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.9: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.10: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -102,7 +102,7 @@ A small model must still follow instructions and produce valid structured output
 
 The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
 
-Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds and errors after twelve; connection errors persist until a successful server response. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
+Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds. Failed-action messages stay until dismissed or replaced by a later action; successful background reads do not erase them. Errors wrap in the footer so long messages are readable. Live connection warnings clear on successful server responses, while any failed-action notice remains available. Use Dismiss to clear the displayed warning; another failed connection check can show it again. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
 
 Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
 
@@ -187,7 +187,7 @@ A broad forum feed can contain troubleshooting, casual discussion, and unrelated
 - New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
 - The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not satisfy or suppress the scheduled daily full collection; normal manual full collection still does.
 
-The API equivalent is `POST /api/collect` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. A review-only job cannot be combined with `unchecked_only`. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
+The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. A review-only job cannot be combined with `unchecked_only`. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
 
 ### Health and refresh results
 
@@ -371,6 +371,10 @@ Stop the old process before updating. The Python package and launch command are 
 
 Point `--data-dir` at your existing data directory. If `newsreview.db` does not exist but `tech-news.db` does, startup makes a consistent SQLite backup into the new filename and preserves your sources, interests, settings, bookmarks, and archive. The original is left untouched as a recovery copy. Once the new database exists, the old file is never imported again, including after a history reset. Keep a separate backup and remove the old recovery file yourself when no longer needed. Do not run old and new versions against that directory simultaneously.
 
+## Browser-blocked requests
+
+If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the browser side, commonly by a content blocker or a browser request-blocking rule. In the reported case, GET requests to overview/sources worked but POST `/api/collect` was blocked immediately. NewsReview now starts jobs through `/api/jobs/start`; `/api/collect` remains available for older API clients. If blocking persists, allow the NewsReview origin in the responsible extension or remove the matching DevTools blocking rule. A generic fetch failure cannot reliably identify the extension or prove whether a write reached the server, so NewsReview reports it as unconfirmed, checks current status, and never automatically resends the write.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -438,6 +442,13 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.10
+
+- Move browser job starts to `/api/jobs/start` to avoid the `/api/collect` name being mistaken for tracking traffic; preserve the old API alias.
+- Keep failed-action messages visible across successful background reads, wrap long errors in the footer, and add Dismiss.
+- Explain browser/extension blocking without claiming an unconfirmed write failed on the server; keep checking status without replaying it.
+- Test selective request blocking, persistent notices, dismissal, legacy-route blocking, and new-route authentication/origin checks.
 
 ### v0.4.9
 

@@ -3,7 +3,7 @@ import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
 
-import { $, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus } from './shared.js';
+import { $, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus } from './shared.js';
 
 class App {
   constructor() {
@@ -39,6 +39,7 @@ class App {
     $('daily-nav').onclick = () => this.show('daily');
     $('bookmarks-nav').onclick = () => this.show('bookmarks');
     $('settings-nav').onclick = () => this.show('settings');
+    $('dismiss-status').onclick = dismissStatus;
     $('help-nav').onclick = () => $('help-dialog').showModal();
     $('collect').onclick = () => this.collect('collect', $('collect'));
     $('review-pending').onclick = () => this.collect('review', $('review-pending'));
@@ -163,7 +164,7 @@ class App {
     const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
       try {
-        await api('collect', 'POST', { kind, unchecked_only: uncheckedOnly });
+        await api('jobs/start', 'POST', { kind, unchecked_only: uncheckedOnly });
         if (kind === 'collect') this.unconfirmedRefresh = null;
         notify(kind === 'collect' ? uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.' : 'Reviewing queued stories.');
       } catch (error) {
