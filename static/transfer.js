@@ -41,6 +41,7 @@ export class Transfer {
     document.querySelector('.window').inert = value;
     $('transfer-dialog').querySelectorAll('button,input').forEach(control => { control.disabled = value; });
     this.sync();
+    this.app.poll();
   }
 
   async export() {

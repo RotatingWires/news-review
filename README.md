@@ -14,7 +14,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.11: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.12: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -110,6 +110,14 @@ Notifications and errors appear in the fixed bottom-left status bar. Hover over 
 Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
 
 The Daily Feed topic menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
+
+### When the browser refreshes
+
+NewsReview does **not** poll `/api/overview` while idle. Opening the app or changing the main view reads current state. Returning focus to the window or bringing a hidden tab back refreshes the overview and visible feed; paired focus/visibility events are combined into one refresh. Unsaved interest/model/collection forms are preserved unless a reset or restored dataset requires a reload.
+
+While a visible tab knows a collection/review job is running, it checks progress every **2.5 seconds** and reloads the relevant content when the job finishes. Connection failures retry read requests every **5 seconds** until recovery. Hidden tabs pause these checks; a read already in flight may finish. Checks also pause during ZIP transfer and resume afterward if needed. Idle checks stop again once the job or connection recovery finishes.
+
+The daily scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you return to the tab, change the main view, or reload the page. Other-tab bookmark/source changes are picked up on return; there is no continuous background synchronization.
 
 ## Reading and searching
 
@@ -210,7 +218,7 @@ Each source records its last check, last success, consecutive failures, entry co
 
 The default inactivity warning interval is **14 days**, editable per source (1–365). Warnings cover checks older than that interval, an old newest publication date, an empty result, or no newly observed stories when dates are unavailable. An inactive/stale warning is an observation, not proof a publisher has shut down. Increase the interval for monthly/occasional publishers. An automatic switch from a configured broken feed to a usable website page is marked as a warning, with the original feed error visible.
 
-Browser-to-app connection failures are separate from publisher/source errors. A persistent bottom-left status message identifies an unreachable server, unexpected non-JSON responses, or a missing runtime database. Read requests reconnect periodically; write requests are never replayed automatically. If the start request loses its response, the UI says the refresh was **not confirmed**, then checks server status rather than claiming it failed or succeeded.
+Browser-to-app connection failures are separate from publisher/source errors. A persistent bottom-left status message identifies an unreachable server, unexpected non-JSON responses, or a missing runtime database. While the tab is visible, failed connections retry read requests every five seconds; write requests are never replayed automatically. If the start request loses its response, the UI says the refresh was **not confirmed**, then checks server status rather than claiming it failed or succeeded.
 
 ### Feed availability
 
@@ -413,9 +421,10 @@ Optional real-browser verification requires Playwright and its Chromium browser 
 
 ```bash
 python3 -m tests.browser_smoke
+python3 -m tests.browser_polling
 ```
 
-This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, new-source counts and refresh completion, offline/reconnect handling, a fixture model connection, ZIP transfer, selective history reset, relevance colors, text-selection scope, custom menus, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
+This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, new-source counts and refresh completion, offline/reconnect handling, a fixture model connection, ZIP transfer, selective history reset, relevance colors, text-selection scope, custom menus, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The polling suite uses Playwright’s test clock and local fixture job state to verify idle silence, active progress/completion, focus refresh, unsaved settings, and connection recovery. The live source audit is a separate opt-in command described above.
 
 GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local verification for the initial release uses Python 3.14; a real installed user model still needs its own connection and quality check.
 
@@ -455,6 +464,14 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.12
+
+- Stop idle overview polling; refresh when returning focus/visibility or changing the main view.
+- Poll known active jobs every 2.5 seconds and retry failed connections every five seconds while visible; pause checks for hidden tabs and ZIP transfers.
+- Stop checks again after job completion/recovery, combine focus events, prevent overlapping refreshes, and preserve unsaved settings on return.
+- Keep server-side scheduled collection independent of the browser and document when idle tabs catch up.
+- Add dedicated browser clock coverage for idle silence, external-job discovery on return, progress/completion, and connection recovery.
 
 ### v0.4.11
 

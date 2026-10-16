@@ -14,6 +14,8 @@ class App {
     this.settings = new Settings(this);
     this.transfer = new Transfer(this);
     this.pollTimer = null;
+    this.resumeTimer = null;
+    this.syncInFlight = false;
     this.unconfirmedRefresh = null;
     this.connectionError = false;
     syncDropdowns();
@@ -21,9 +23,20 @@ class App {
 
   async init() {
     document.addEventListener('newsreview-connection', event => {
+      const wasDisconnected = this.connectionError;
       this.connectionError = Boolean(event.detail.error);
       setConnectionStatus(event.detail.error);
+      if (this.connectionError || wasDisconnected) this.poll();
     });
+    const resume = () => {
+      clearTimeout(this.resumeTimer);
+      if (document.hidden) { clearTimeout(this.pollTimer); return; }
+      if (!this.overview && !this.connectionError) return;
+      this.resumeTimer = setTimeout(() => this.syncView(true), 100);
+    };
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', () => { if (this.connectionError) resume(); });
     try {
       const saved = localStorage.getItem('newsreview-theme');
       document.documentElement.dataset.theme = saved || 'light';
@@ -61,6 +74,7 @@ class App {
         await api('logout', 'POST', {});
         this.authenticated = false;
         clearTimeout(this.pollTimer);
+        clearTimeout(this.resumeTimer);
         $('stories').replaceChildren();
         $('settings').hidden = true;
         $('reader').hidden = false;
@@ -108,35 +122,51 @@ class App {
     }
     $('source-refresh-status').textContent = refreshStatus;
     this.settings.renderRuns();
+    this.poll();
   }
 
   poll() {
     clearTimeout(this.pollTimer);
-    this.pollTimer = setTimeout(async () => {
-      try {
-        if (!this.authenticated) {
-          const session = await api('session');
-          if (!session.authenticated) { if (!$('login-dialog').open) $('login-dialog').showModal(); return; }
-          this.authenticated = true;
-        }
-        const firstConnection = !this.overview;
-        const lastRun = this.overview?.runs[0]?.id;
-        const lastRevision = this.overview?.revision;
-        const wasRunning = this.overview?.collector.running;
-        await this.refreshOverview();
-        if (lastRevision && lastRevision !== this.overview.revision) this.feed.clearFilters();
-        if (firstConnection || lastRevision !== this.overview.revision || lastRun !== this.overview.runs[0]?.id || (wasRunning && !this.overview.collector.running)) {
-          if (this.view !== 'settings') await this.feed.load();
-          else if (lastRevision !== this.overview.revision) await this.settings.load();
-          else await this.settings.refreshSources();
-        }
-        if (this.view === 'settings' && !$('panel-sources').hidden) await this.settings.refreshSources();
-      } catch (error) {
-        if ($('login-dialog').open) { this.authenticated = false; return; }
-        setDefaultStatus(error.message);
+    this.pollTimer = null;
+    if (document.hidden || this.syncInFlight || this.transfer.busy) return;
+    const delay = this.connectionError ? 5000 : this.overview?.collector.running ? 2500 : null;
+    if (delay === null || (!this.authenticated && !this.connectionError)) return;
+    this.pollTimer = setTimeout(() => this.syncView(), delay);
+  }
+
+  async syncView(force = false) {
+    if (document.hidden || this.syncInFlight || this.transfer.busy) return;
+    if (!this.authenticated && !this.connectionError) return;
+    this.syncInFlight = true;
+    clearTimeout(this.pollTimer);
+    try {
+      if (!this.authenticated) {
+        const session = await api('session');
+        if (!session.authenticated) { if (!$('login-dialog').open) $('login-dialog').showModal(); return; }
+        this.authenticated = true;
       }
+      const firstConnection = !this.overview;
+      const lastRun = this.overview?.runs[0]?.id;
+      const lastRevision = this.overview?.revision;
+      const wasRunning = this.overview?.collector.running;
+      await this.refreshOverview();
+      const replaced = lastRevision && lastRevision !== this.overview.revision;
+      if (replaced) this.feed.clearFilters();
+      const changed = firstConnection || replaced || lastRun !== this.overview.runs[0]?.id || (wasRunning && !this.overview.collector.running);
+      if (this.view !== 'settings' && (force || changed)) await this.feed.load();
+      else if (this.view === 'settings') {
+        // Returning to the page must not overwrite unsaved preference forms.
+        if (replaced) await this.settings.load();
+        else if (changed || (force && !$('panel-sources').hidden) || this.overview.collector.running)
+          await this.settings.refreshSources();
+      }
+    } catch (error) {
+      if ($('login-dialog').open) this.authenticated = false;
+      setDefaultStatus(error.message);
+    } finally {
+      this.syncInFlight = false;
       this.poll();
-    }, this.overview?.collector.running ? 2500 : this.connectionError ? 5000 : 30000);
+    }
   }
 
   async show(view) {
@@ -150,6 +180,7 @@ class App {
     $('settings').hidden = view !== 'settings';
     $('reader').hidden = view === 'settings';
     try {
+      await this.refreshOverview();
       if (view === 'settings') await this.settings.load();
       else {
         this.feed.page = 1;
