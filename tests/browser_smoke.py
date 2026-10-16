@@ -37,7 +37,7 @@ def run():
                                        'published_at': None, 'category': category}, today)
             with store.connect() as db:
                 story_id = db.execute('SELECT id FROM stories WHERE url=?', (f'https://example.com/{index}',)).fetchone()[0]
-            store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category], score=90-index), set()),
+            store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=90-index), set()),
                                 {**store.settings()['ai'], 'model': 'fixture-model'}, store.settings()['interests'], summary, 'article')
         store.insert_story(source, {'headline': 'Yesterday’s protocol update', 'url': 'https://example.com/yesterday',
                                    'excerpt': 'A source excerpt from the previous day.', 'published_at': None, 'category': 'Protocols'}, (date.today() - timedelta(days=1)).isoformat())
@@ -59,6 +59,8 @@ def run():
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
                 expect(page.locator('#feed-title')).to_have_text('Daily Feed')
+                assert page.locator('.titlebar-caption').evaluate('el => getComputedStyle(el).fontSize') == '14px'
+                assert page.locator('#story-count').evaluate('el => getComputedStyle(el).fontSize') == '14px'
                 expect(page.locator('#results-heading')).to_have_text('Today’s Edition')
                 heading = page.locator('#results-heading').bounding_box()
                 count = page.locator('#story-count').bounding_box()
@@ -133,6 +135,13 @@ def run():
                 expect(page.locator('#topic-menu')).to_be_hidden()
                 page.locator('#topic-button').click()
                 assert page.locator('#topic-menu').bounding_box()['width'] <= 230
+                assert page.locator('#topic-menu').evaluate('el => el.scrollHeight <= el.clientHeight')
+                assert page.locator('#topic-options').evaluate('el => el.scrollHeight > el.clientHeight')
+                assert page.locator('#topic-options').evaluate('el => el.scrollWidth <= el.clientWidth')
+                page.locator('#topic-options').evaluate('el => { el.scrollTop = el.scrollHeight; }')
+                expect(page.locator('#topic-all')).to_be_visible()
+                page.locator('#topic-options').evaluate('el => { el.scrollTop = 0; }')
+                page.screenshot(path='/tmp/newsreview-topics.png')
                 page.get_by_role('checkbox', name='Protocols', exact=True).check()
                 expect(page.locator('.story')).to_have_count(1)
                 page.get_by_role('checkbox', name='Radio & SDR', exact=True).check()
