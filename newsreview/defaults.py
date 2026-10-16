@@ -1,4 +1,4 @@
-"""First-run defaults. Existing installations are never overwritten on startup."""
+"""First-run defaults and explicitly approved, non-overwriting source additions."""
 
 SOURCES = [
     ("BetaNews", "https://betanews.com/", "https://betanews.com/feed/", "Technology"),
@@ -27,6 +27,18 @@ SOURCES = [
     ("Asterisk Blog", "https://www.asterisk.org/blog/", "https://www.asterisk.org/feed/", "PBX & VoIP"),
     ("Hackaday · Ham Radio", "https://hackaday.com/tag/ham-radio/", "https://hackaday.com/tag/ham-radio/feed/", "Radio & SDR"),
 ]
+
+# One-time approved additions for both new and existing installations.
+SOURCE_ADDITIONS_048 = [
+    ("selfh.st", "https://selfh.st/", "https://selfh.st/rss/", "Self-Hosting"),
+    ("ServeTheHome", "https://www.servethehome.com/", "https://www.servethehome.com/feed/", "Homelab"),
+    ("VirtualizationHowto", "https://www.virtualizationhowto.com/", "https://www.virtualizationhowto.com/feed/", "Homelab"),
+    ("PortSwigger Research", "https://portswigger.net/research", "https://portswigger.net/research/rss", "Security"),
+    ("SANS Internet Storm Center", "https://isc.sans.edu/", "https://isc.sans.edu/rssfeed_full.xml", "Security"),
+    ("KrebsOnSecurity", "https://krebsonsecurity.com/", "https://krebsonsecurity.com/feed/", "Security"),
+    ("Cybernews", "https://cybernews.com/news/", "", "Security"),
+]
+SOURCES.extend(SOURCE_ADDITIONS_048)
 
 INTERESTS = {
     "guidance": "Favor substantive technical developments, interesting engineering, useful projects, and niche news. Explain what changed and why it matters. Routine phone refreshes, rumors, funding announcements and marketing are low priority. Distinguish proposals, approved standards, experimental support and shipped features.",

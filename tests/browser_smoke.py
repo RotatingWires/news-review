@@ -215,7 +215,7 @@ def run():
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
                 expect(page.locator('#source-feed')).to_have_value(re.compile('/feed$'))
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(26)
+                expect(page.locator('.source-row')).to_have_count(33)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
@@ -225,7 +225,7 @@ def run():
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(27)
+                expect(page.locator('.source-row')).to_have_count(34)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.get_by_role('button', name='Server type', exact=True).click()
                 page.get_by_role('option', name='Compatible local chat server (e.g. LM Studio)', exact=True).click()
@@ -288,7 +288,7 @@ def run():
                 expect(page.locator('#status-message')).to_contain_text('Selected data reset')
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 27
+                assert len(store.sources()) == 34
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors

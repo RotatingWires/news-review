@@ -77,12 +77,37 @@ class SourceTests(unittest.TestCase):
         self.store.insert_story(source_id, {'headline': 'An archived protocol article', 'url': 'https://example.com/old',
             'excerpt': 'Text', 'published_at': None, 'category': 'Protocols'}, '2026-10-15')
         reopened = Store(self.store.path)
-        self.assertEqual(len(reopened.sources()), 25)
+        self.assertEqual(len(reopened.sources()), 32)
         self.assertEqual(reopened.stories()['items'][0]['source_name'], 'Daniel Stenberg')
         self.assertEqual(reopened.stories()['total'], 1)
         restored = reopened.save_source({'name': 'Manually restored', 'url': 'https://daniel.haxx.se/blog/', 'feed_url': '', 'category': 'News', 'enabled': True})
         self.assertEqual(restored, source_id)
-        self.assertEqual(len(Store(self.store.path).sources()), 26, 'One-time migration must not repeatedly remove a manually restored source')
+        self.assertEqual(len(Store(self.store.path).sources()), 33, 'One-time migration must not repeatedly remove a manually restored source')
+
+    def test_approved_sources_upgrade_once_preserving_configuration_and_removals(self):
+        from newsreview.defaults import SOURCE_ADDITIONS_048
+        additions = {item[1] for item in SOURCE_ADDITIONS_048}
+        with self.store.connect() as db:
+            db.execute("DELETE FROM settings WHERE key='source_additions_048'")
+            for url in additions:
+                db.execute('DELETE FROM sources WHERE url=?', (url,))
+        name, url, feed, category = SOURCE_ADDITIONS_048[0]
+        source_id = self.store.save_source({'name': 'My existing self-host source', 'url': url,
+            'feed_url': feed, 'category': 'Custom', 'enabled': False})
+        preferences = self.store.settings()
+        upgraded = Store(self.store.path)
+        self.assertEqual(len(upgraded.sources()), 32)
+        self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
+        existing = next(item for item in upgraded.sources() if item['id'] == source_id)
+        self.assertEqual(existing['name'], 'My existing self-host source')
+        self.assertEqual(existing['category'], 'Custom')
+        self.assertFalse(existing['enabled'])
+        self.assertEqual(upgraded.settings(), preferences)
+        with upgraded.connect() as db:
+            db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (source_id,))
+        self.assertEqual(len(Store(self.store.path).sources()), 31)
+        upgraded.reset({'sources': True})
+        self.assertEqual(Store(self.store.path).sources(), [])
 
     def test_source_modes_and_intervals_are_validated(self):
         config = {'name': 'Website', 'url': 'https://example.com/', 'category': 'News', 'mode': 'page', 'stale_days': 30}

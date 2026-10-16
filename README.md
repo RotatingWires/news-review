@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.7: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.8: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -117,7 +117,7 @@ No sample articles are inserted into your real database. The first edition start
 
 ## Sources
 
-The following **25 sources** are seeded once on a fresh database:
+The following **32 sources** are seeded once on a fresh database:
 
 | Group | Sources |
 | --- | --- |
@@ -125,10 +125,12 @@ The following **25 sources** are seeded once on a fresh database:
 | Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix |
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
+| Homelab and self-hosting | selfh.st, ServeTheHome, VirtualizationHowto |
+| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews |
 
 Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
-[SOURCES.md](SOURCES.md) links to the 13 current approved additions separately from the original 12 websites.
+[SOURCES.md](SOURCES.md) links to the 20 current approved additions separately from the original 12 websites.
 
 ### Add or edit a source
 
@@ -385,6 +387,13 @@ deploy/             example systemd unit
 
 ## Release notes
 
+### v0.4.8
+
+- Add selfh.st, ServeTheHome, VirtualizationHowto, PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, and Cybernews.
+- Add these approved sources once to existing installations without overwriting matching source configuration; preserve later removal/disable decisions.
+- Verify six RSS feeds and Cybernews HTML news-listing collection; update approved-source documentation and backup marker validation.
+- Leave existing interests and web-development source configuration unchanged; do not add MDN Blog or WebKit.
+
 ### v0.4.7
 
 - Add a square AI relevance indicator immediately left of each bookmark, matching its size on both feeds.
@@ -491,3 +500,5 @@ The Daily Feed topic menu uses the same Win95 arrow and popup styling as other d
 Time search uses standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
 
 Each story has a relevance square beside its bookmark: green **75–100**, yellow **40–74**, red **0–39**, or gray **awaiting AI review**. The key sits below the story count on both feeds. Hover over a square for its score; accessible labels include the same information. Scores reflect the interests used during the last successful review, not certainty or factual reliability. Pending/reassessment stories stay gray until reviewed. Changing interests does not rescore the archive automatically; use Reassess history when desired. This display uses stored scores and adds no statistics tracking.
+
+The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.

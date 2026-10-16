@@ -89,9 +89,11 @@ def _check_text(value, limit, name, *, nullable=False):
 
 def _validate_rows(database):
     settings = {r['key']: json.loads(r['value']) for r in database.execute('SELECT * FROM settings')}
-    if set(settings) - {*SETTINGS, 'sources_seeded', 'history_cleared_at', 'data_revision'} or not set(SETTINGS) <= set(settings):
+    if set(settings) - {*SETTINGS, 'sources_seeded', 'history_cleared_at', 'data_revision', 'source_additions_048'} or not set(SETTINGS) <= set(settings):
         raise ValueError('Backup settings are incomplete or unsupported')
     validation.settings({key: settings[key] for key in SETTINGS}, SETTINGS)
+    if 'source_additions_048' in settings and settings['source_additions_048'] is not True:
+        raise ValueError('Backup has an invalid source-addition marker')
     if settings.get('sources_seeded') is not True:
         raise ValueError('Backup is missing its source initialization marker')
     if 'history_cleared_at' in settings:

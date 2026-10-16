@@ -8,7 +8,7 @@ import sqlite3
 import secrets
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .defaults import SETTINGS, SOURCES
+from .defaults import SETTINGS, SOURCES, SOURCE_ADDITIONS_048
 from .health import source_health
 
 
@@ -71,6 +71,9 @@ class Store:
             if not db.execute("SELECT 1 FROM settings WHERE key='sources_seeded'").fetchone():
                 db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCES)
                 db.execute("INSERT INTO settings VALUES ('sources_seeded', 'true')")
+            if not db.execute("SELECT 1 FROM settings WHERE key='source_additions_048'").fetchone():
+                db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCE_ADDITIONS_048)
+                db.execute("INSERT INTO settings VALUES ('source_additions_048', 'true')")
             if version < 2:
                 # Retain historical source names/relationships, but remove these
                 # requested sources from active configuration on existing installs.
