@@ -61,10 +61,11 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   }
   return result;
 }
-export async function busy(button, work) {
+export async function busy(button, work, progress = null) {
   const text = button.textContent;
   button.disabled = true;
-  button.textContent = 'Working…';
+  if (progress) notify(progress);
+  else button.textContent = 'Working…';
   try { return await work(); }
   catch (error) { notify(error.message, true); }
   finally { button.disabled = false; button.textContent = text; }

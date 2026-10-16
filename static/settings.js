@@ -1,3 +1,4 @@
+import { syncDropdowns } from './dropdowns.js';
 import { $, api, busy, el, externalLink, formatTime, notify } from './shared.js';
 
 export class Settings {
@@ -154,6 +155,7 @@ export class Settings {
       $('max-reviews').value = collection.max_reviews;
       $('lookback').value = collection.lookback_days;
       this.renderRuns();
+      syncDropdowns();
     } finally {
       $('settings-fields').disabled = false;
       $('settings').setAttribute('aria-busy', 'false');
@@ -178,6 +180,7 @@ export class Settings {
     remove.onclick = () => row.remove();
     row.append(input, preference, remove);
     $('interest-rows').append(row);
+    syncDropdowns(row);
     if (!topic.name) input.focus();
   }
 
@@ -233,6 +236,7 @@ export class Settings {
     $('source-category').value = source?.category || 'News';
     $('source-enabled').checked = source ? Boolean(source.enabled) : true;
     $('source-error').textContent = '';
+    syncDropdowns($('source-dialog'));
     $('source-dialog').showModal();
     $('source-name').focus();
   }

@@ -29,9 +29,8 @@
     <section id="reader">
       <div class="edition-header">
         <div><h1 id="feed-title">Daily feed</h1><p class="intro" id="feed-intro">Stories from your sources, reviewed for your interests.</p></div>
-        <button id="collect" class="primary">↻ Check sources</button>
+        <div class="button-row"><button id="review-pending" class="text-button">Review pending</button><button id="collect" class="primary">↻ Check sources</button></div>
       </div>
-      <div class="status-bar"><span class="status-dot" aria-hidden="true"></span><span id="collector-status" role="status">Loading your feed…</span><button id="review-pending" class="text-button">Review pending</button></div>
 
       <div class="browse-bar">
         <div id="day-controls" class="day-controls">
@@ -89,7 +88,7 @@
           <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
         </form>
-        <p class="muted">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
+        <p class="muted ai-subnotes">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
       </section>
 
       <section id="panel-collection" class="settings-panel" hidden>
@@ -111,7 +110,7 @@
     </section>
   </main>
 
-  <footer><span id="status-message" role="status" aria-live="polite">Ready.</span><span class="status-version">NewsReview <span id="version"></span></span></footer>
+  <footer><span class="footer-status"><span class="status-dot" aria-hidden="true"></span><span id="status-message" role="status" aria-live="polite">Ready.</span></span><span class="status-version">NewsReview <span id="version"></span></span></footer>
   </div>
 
   <dialog id="source-dialog"><form id="source-form" class="dialog-layout">

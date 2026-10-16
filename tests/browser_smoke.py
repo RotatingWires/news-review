@@ -58,6 +58,8 @@ def run():
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
+                assert page.locator('#collector-status').count() == 0
+                assert page.locator('footer .status-dot').count() == 1
                 page.screenshot(path='/tmp/newsreview-desktop.png', full_page=True)
 
                 page.get_by_role('button', name='Help', exact=True).click()
@@ -81,8 +83,14 @@ def run():
                 expect(page.locator('#status-message')).to_contain_text('Restored', timeout=15000)
                 page.locator('#transfer-dialog .dialog-actions').get_by_role('button', name='OK', exact=True).click()
                 page.get_by_role('button', name='Daily feed', exact=True).click()
+                def inspect_bookmark_request(route):
+                    assert page.locator('.bookmark').first.inner_text() == '☆'
+                    assert 'Saving bookmark' in page.locator('#status-message').inner_text()
+                    route.continue_()
+                page.route('**/api/bookmarks/*', inspect_bookmark_request)
                 page.locator('.bookmark').first.click()
                 expect(page.locator('#status-message')).to_contain_text('Saved to bookmarks')
+                page.unroute('**/api/bookmarks/*', inspect_bookmark_request)
                 assert page.locator('.read-link').count() == 0
                 page.get_by_role('button', name='Bookmarks', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
@@ -132,6 +140,17 @@ def run():
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 assert page.locator('#source-dialog .dialog-actions button').all_text_contents() == ['Cancel', 'Save']
                 assert page.locator('#source-category').bounding_box()['width'] <= 225
+                category_box = page.locator('#source-category').bounding_box()
+                arrow_box = page.locator('.editable-dropdown .dropdown-arrow').bounding_box()
+                assert abs((category_box['y'] + category_box['height']/2) - (arrow_box['y'] + arrow_box['height']/2)) < 1
+                page.get_by_role('button', name='Choose default category', exact=True).click()
+                page.get_by_role('option', name='Hardware', exact=True).click()
+                expect(page.locator('#source-category')).to_have_value('Hardware')
+                page.screenshot(path='/tmp/newsreview-source-dialog.png')
+                page.locator('#source-category').fill('Custom radio category')
+                page.get_by_role('button', name='Choose default category', exact=True).click()
+                page.get_by_role('button', name='Choose default category', exact=True).press('Escape')
+                expect(page.locator('#source-dialog')).to_be_visible()
                 page.get_by_label('Name', exact=True).fill('Fixture source')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/')
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
@@ -141,17 +160,26 @@ def run():
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
-                page.get_by_label('Collection method', exact=True).select_option('page')
+                page.get_by_role('button', name='Collection method', exact=True).click()
+                page.get_by_role('option', name='Website page — no RSS needed', exact=True).click()
                 page.get_by_role('button', name='Preview stories', exact=True).click()
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
                 expect(page.locator('.source-row')).to_have_count(27)
                 page.get_by_role('button', name='Local AI', exact=True).click()
+                page.get_by_role('button', name='Server type', exact=True).click()
+                page.get_by_role('option', name='Compatible local chat server (e.g. LM Studio)', exact=True).click()
+                expect(page.locator('#ai-provider')).to_have_value('compatible')
+                page.get_by_role('button', name='Server type', exact=True).press('ArrowDown')
+                page.keyboard.press('Home')
+                page.keyboard.press('Enter')
+                expect(page.locator('#ai-provider')).to_have_value('ollama')
                 page.locator('#ai-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.locator('#ai-model').fill('fixture')
                 page.get_by_role('button', name='Test with a sample article').click()
                 expect(page.locator('#model-test-result')).to_contain_text('validation passed')
+                page.screenshot(path='/tmp/newsreview-ai-settings.png')
                 page.locator('#ai-form').get_by_role('button', name='Save', exact=True).click()
                 expect(page.locator('#status-message')).to_contain_text('AI settings saved')
                 assert store.settings()['ai']['model'] == 'fixture'

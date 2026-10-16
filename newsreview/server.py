@@ -233,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
     def static(self, path):
         name = "index.html" if path == "/" else path.lstrip("/")
         # Explicit flat asset allowlist: never serve runtime data, source or dotfiles.
-        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "icon.svg"}:
+        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "dropdowns.js", "icon.svg"}:
             self.send(404, {"error": "Not found"})
             return
         content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"

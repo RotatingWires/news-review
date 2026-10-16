@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.1: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.2: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -377,12 +377,21 @@ static/
   feed.js           tiles, search, dates, pagination and bookmarks
   settings.js       interests, sources, local AI and scheduling controls
   transfer.js       browser ZIP download/upload and restore confirmation
+  dropdowns.js      shared Win95 single-select and editable category menus
   icon.svg          application icon
 tests/              unit/integration tests and optional browser/live-feed audits
 deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.2
+
+- Consolidate collection/review messages and the activity light in the bottom-left status bar; keep Review pending beside Check sources.
+- Preserve bookmark icons during requests and show saving/removing progress in the status bar.
+- Use shared Win95 dropdowns for source methods, local-model providers, interest ranks, and editable source categories, with centered arrow buttons and keyboard navigation.
+- Retain checkboxes for the multi-topic filter; match disabled Restore backup text to Fresh start and space AI subnotes below its buttons.
+- Verify custom dropdown selection, keyboard navigation, arbitrary categories, bookmark progress, and the existing backup/recovery workflows in Chromium.
 
 ### v0.4.1
 
@@ -442,3 +451,5 @@ Restore and reset change a dataset revision: other tabs refresh before making fu
 The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
 
 Notifications and errors appear in the fixed bottom-left status bar. Hover over a truncated message to read its full text. Routine notifications clear after eight seconds and errors after twelve; connection errors persist until a successful server response. The idle message shows collection/review status. Source health and run details remain in Settings. Settings save buttons use **Save**; source dialogs place **Cancel** before **Save**.
+
+Collection/review messages and their blinking activity light appear only in the footer. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.

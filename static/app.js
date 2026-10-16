@@ -1,3 +1,4 @@
+import { syncDropdowns } from './dropdowns.js';
 import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
@@ -15,6 +16,7 @@ class App {
     this.pollTimer = null;
     this.unconfirmedRefresh = null;
     this.connectionError = false;
+    syncDropdowns();
   }
 
   async init() {
@@ -69,7 +71,7 @@ class App {
       $('logout').hidden = !session.password_required;
       if (!session.authenticated) { $('login-dialog').showModal(); return; }
       await this.load();
-    } catch (error) { notify(error.message, true); $('collector-status').textContent = error.message; this.poll(); }
+    } catch (error) { notify(error.message, true); setDefaultStatus(error.message); this.poll(); }
   }
 
   async load() {
@@ -85,10 +87,9 @@ class App {
     $('version').textContent = 'v' + this.overview.version;
     const state = this.overview.collector;
     document.querySelector('.status-dot').classList.toggle('collecting', state.running);
-    document.querySelector('.status-bar').setAttribute('aria-busy', String(state.running));
+    document.querySelector('footer').setAttribute('aria-busy', String(state.running));
     const pending = this.overview.counts.pending || 0;
-    $('collector-status').textContent = state.running ? state.message : `${state.message} · ${pending} awaiting review`;
-    setDefaultStatus($('collector-status').textContent);
+    setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
     $('collect').disabled = state.running;
     $('review-pending').disabled = state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
@@ -130,7 +131,7 @@ class App {
         if (this.view === 'settings' && !$('panel-sources').hidden) await this.settings.refreshSources();
       } catch (error) {
         if ($('login-dialog').open) { this.authenticated = false; return; }
-        $('collector-status').textContent = error.message;
+        setDefaultStatus(error.message);
       }
       this.poll();
     }, this.overview?.collector.running ? 2500 : this.connectionError ? 5000 : 30000);

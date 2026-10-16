@@ -116,7 +116,7 @@ export class Feed {
       if (this.app.view === 'bookmarks' && !next) await this.load();
       else card.replaceWith(this.tile(story));
       notify(next ? 'Saved to bookmarks.' : 'Bookmark removed.');
-    });
+    }, story.bookmarked ? 'Removing bookmark…' : 'Saving bookmark…');
     top.append(el('span', 'source-name', story.source_name || 'Source'), bookmark);
     const heading = el('h3');
     heading.append(externalLink(story.url, story.headline));

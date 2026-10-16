@@ -1,0 +1,114 @@
+import { el } from './shared.js';
+
+const controls = new WeakMap();
+let serial = 0;
+let opened = null;
+
+function closeMenu(focus = false) {
+  if (!opened) return;
+  const { menu, trigger } = opened;
+  menu.hidden = true;
+  trigger.setAttribute('aria-expanded', 'false');
+  opened = null;
+  if (focus) trigger.focus();
+}
+
+document.addEventListener('click', event => {
+  if (opened && !opened.wrapper.contains(event.target)) closeMenu();
+});
+document.addEventListener('focusin', event => {
+  if (opened && !opened.wrapper.contains(event.target)) closeMenu();
+});
+document.addEventListener('close', () => closeMenu(), true);
+
+function build(field) {
+  const combo = field.tagName === 'INPUT';
+  const options = combo ? [...field.list.options] : [...field.options];
+  const label = field.getAttribute('aria-label') || field.closest('label')?.firstChild.textContent.trim() || 'Choose option';
+  if (!field.hasAttribute('aria-label')) field.setAttribute('aria-label', label);
+  const wrapper = el('span', 'custom-dropdown' + (combo ? ' editable-dropdown' : ''));
+  const trigger = el('button', 'dropdown-trigger');
+  trigger.type = 'button';
+  trigger.setAttribute('aria-label', combo ? 'Choose default category' : label);
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', 'false');
+  const text = el('span', 'dropdown-label');
+  const arrow = el('span', 'dropdown-arrow', '▼');
+  arrow.setAttribute('aria-hidden', 'true');
+  if (!combo) trigger.append(text);
+  trigger.append(arrow);
+  const menu = el('span', 'dropdown-menu');
+  menu.id = 'dropdown-' + ++serial;
+  menu.hidden = true;
+  menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-label', label);
+  trigger.setAttribute('aria-controls', menu.id);
+  field.before(wrapper);
+  if (combo) {
+    field.removeAttribute('list');
+    wrapper.append(field);
+  } else {
+    field.classList.add('native-dropdown');
+    field.tabIndex = -1;
+    field.setAttribute('aria-hidden', 'true');
+    wrapper.append(field);
+  }
+  wrapper.append(trigger, menu);
+  const sync = () => {
+    if (!combo) text.textContent = field.selectedOptions[0]?.textContent || '';
+    for (const choice of menu.children) choice.setAttribute('aria-selected', String(choice.dataset.value === field.value));
+  };
+  options.forEach(option => {
+    const choice = el('button', 'dropdown-option');
+    choice.type = 'button';
+    choice.setAttribute('role', 'option');
+    choice.dataset.value = option.value;
+    const check = el('span', 'dropdown-check', '✓');
+    check.setAttribute('aria-hidden', 'true');
+    choice.append(check, el('span', '', option.textContent || option.value));
+    choice.onclick = event => {
+      event.preventDefault();
+      field.value = option.value;
+      sync();
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      closeMenu();
+      (combo ? field : trigger).focus();
+    };
+    menu.append(choice);
+  });
+  const open = () => {
+    closeMenu();
+    opened = { wrapper, trigger, menu };
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    sync();
+  };
+  trigger.onclick = event => { event.preventDefault(); opened?.trigger === trigger ? closeMenu() : open(); };
+  wrapper.onkeydown = event => {
+    if (event.key === 'Escape' && opened?.trigger === trigger) {
+      event.preventDefault(); event.stopPropagation(); closeMenu(true); return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || (combo && event.target === field && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    if (opened?.trigger !== trigger) open();
+    const items = [...menu.children];
+    let index = items.indexOf(document.activeElement);
+    if (event.key === 'Home') index = 0;
+    else if (event.key === 'End') index = items.length - 1;
+    else if (index < 0) index = Math.max(0, items.findIndex(item => item.dataset.value === field.value));
+    else index = (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[index]?.focus();
+  };
+  field.addEventListener('change', sync);
+  field.addEventListener('input', sync);
+  controls.set(field, sync);
+  sync();
+}
+
+export function syncDropdowns(root = document) {
+  root.querySelectorAll('select, #source-category').forEach(field => {
+    if (!controls.has(field)) build(field);
+    else controls.get(field)();
+  });
+}
