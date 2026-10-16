@@ -13,16 +13,31 @@ export function toast(message, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 9000 : 4500);
 }
-export async function api(path, method = 'GET', data) {
-  const response = await fetch('/api/' + path, {
-    method, credentials: 'same-origin',
-    headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: data === undefined ? undefined : JSON.stringify(data),
-  });
-  const result = await response.json();
+export async function api(path, method = 'GET', data, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response, result;
+  try {
+    response = await fetch('/api/' + path, {
+      method, credentials: 'same-origin', signal: controller.signal,
+      headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: data === undefined ? undefined : JSON.stringify(data),
+    });
+    result = await response.json();
+  } catch (cause) {
+    const message = response ? `NewsReview returned an unreadable response (HTTP ${response.status}). Check that this URL reaches the NewsReview server.`
+      : `Cannot reach the NewsReview server at ${location.host}${cause.name === 'AbortError' ? ' (request timed out)' : ''}. Check that it is running and the address/port are correct. Collection may still be running; reconnect to confirm its status.`;
+    const error = new Error(message);
+    error.connection = true;
+    document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: message } }));
+    throw error;
+  } finally { clearTimeout(timer); }
+  document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: result.code === 'storage_unavailable' ? result.error : null } }));
   if (!response.ok) {
     if (response.status === 401 && path !== 'login' && !$('login-dialog').open) $('login-dialog').showModal();
-    throw new Error(result.error || `Request failed (${response.status})`);
+    const error = new Error(result.error || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return result;
 }

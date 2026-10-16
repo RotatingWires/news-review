@@ -23,6 +23,7 @@
       <button id="logout" class="nav-button" hidden>Sign out</button>
     </nav>
   </header>
+  <div id="connection-status" role="alert" hidden></div>
 
   <main id="main" tabindex="-1">
     <section id="reader">
@@ -71,8 +72,9 @@
       </section>
 
       <section id="panel-sources" class="settings-panel" hidden>
-        <div class="section-heading"><div><h2>Your sources</h2><p class="muted">Add a website and discover its RSS/Atom feed, or enter the feed directly.</p></div><button id="add-source" class="primary">+ Add source</button></div>
-        <p class="callout">Source errors are shown here after collection. Feed addresses can change; edit a source to repair it. Disable a source to stop collection while preserving its history.</p>
+        <div class="section-heading"><div><h2>Your sources</h2><p class="muted">Collect from RSS/Atom or directly from a news listing page.</p></div><div class="button-row"><button id="refresh-sources">Refresh sources</button><button id="add-source" class="primary">+ Add source</button></div></div>
+        <p id="source-refresh-status" role="status" class="callout">Ready to check sources.</p>
+        <p class="callout">Health reflects the last check, newest reported publication, and observed activity. Inactivity is a warning, not proof a site is dead. Edit the warning interval for slow publishers. Forum feeds include discussions; use a narrower category feed to reduce noise.</p>
         <div id="source-list" class="source-list"></div>
       </section>
 
@@ -113,7 +115,24 @@
   </div>
   <div id="toast" role="status" hidden></div>
 
-  <dialog id="source-dialog"><form id="source-form"><div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div><input type="hidden" id="source-id"><label>Name<input id="source-name" maxlength="100" required></label><label>Website URL<input id="source-url" type="url" required></label><div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button></div><label>Feed URL <span class="muted">— blank to discover during collection</span><input id="source-feed" type="url"></label><label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label><datalist id="source-categories"><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio & SDR</option><option>PBX & VoIP</option></datalist><label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label><p id="source-error" class="error" role="alert"></p><div class="button-row"><button class="primary" type="submit">Save source</button><button type="button" data-close="source-dialog">Cancel</button></div></form></dialog>
+  <dialog id="source-dialog"><form id="source-form">
+    <div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div>
+    <input type="hidden" id="source-id">
+    <label>Name<input id="source-name" maxlength="100" required></label>
+    <label>Website URL<input id="source-url" type="url" required></label>
+    <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — prefer feed, otherwise read website</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
+    <div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button><button id="preview-source" type="button">Preview stories</button></div>
+    <label>Feed URL <span class="muted">— optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
+    <label>Article URL contains <span class="muted">— optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
+    <p class="muted">Website mode reads article cards, headline links, and structured article lists from this page. Preview before saving. JavaScript-only or restricted pages may need a custom adapter.</p>
+    <output id="source-preview" class="callout" hidden></output>
+    <label>Warn after this many days without activity<input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
+    <label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
+    <datalist id="source-categories"><option>News</option><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio &amp; SDR</option><option>PBX &amp; VoIP</option></datalist>
+    <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
+    <p id="source-error" class="error" role="alert"></p>
+    <div class="button-row"><button class="primary" type="submit">Save source</button><button type="button" data-close="source-dialog">Cancel</button></div>
+  </form></dialog>
   <dialog id="confirm-dialog"><h2>Reassess saved history?</h2><p>Queue every saved story for review using your current interests and model. Existing summaries remain visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p><div class="button-row"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div></dialog>
   <dialog id="clear-history-dialog"><form id="clear-history-form"><h2>Delete all history?</h2><p>All stories, bookmarks, summaries, and run history will be permanently removed from the active database. Your sources, interests, editorial guidance, exclusions, AI settings, and collection settings will stay.</p><label>Type DELETE HISTORY to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="DELETE HISTORY"></label><p id="clear-history-error" class="error" role="alert"></p><div class="button-row"><button class="danger" type="submit">Delete history permanently</button><button type="button" data-close="clear-history-dialog">Cancel</button></div></form></dialog>
   <dialog id="login-dialog"><form id="login-form"><p class="eyebrow">YOUR PERSONAL EDITION</p><h2>Welcome back.</h2><label>Server password<input id="password" type="password" autocomplete="current-password" required></label><p id="login-error" class="error" role="alert"></p><button class="primary" type="submit">Sign in</button></form></dialog>

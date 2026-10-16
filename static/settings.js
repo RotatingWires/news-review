@@ -29,7 +29,7 @@ export class Settings {
       $('model-test-result').hidden = false;
       $('model-test-result').textContent = 'Asking your server to review a fictional sample article…';
       try {
-        const result = await api('test-model', 'POST', this.aiValues());
+        const result = await api('test-model', 'POST', this.aiValues(), Number($('ai-timeout').value) * 1000 + 15000);
         $('model-test-result').textContent = `Connection and output validation passed. Sample summary: ${result.summary}`;
       } catch (error) { $('model-test-result').textContent = error.message; throw error; }
     });
@@ -76,18 +76,32 @@ export class Settings {
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();
+    $('refresh-sources').onclick = () => this.app.collect('collect', $('refresh-sources'));
     $('discover-feed').onclick = () => busy($('discover-feed'), async () => {
       $('source-error').textContent = '';
       try {
-        const result = await api('discover', 'POST', { url: $('source-url').value });
+        const result = await api('discover', 'POST', { url: $('source-url').value }, 90000);
         $('source-feed').value = result.feed_url;
         toast('Feed discovered. Save the source to keep it.');
       } catch (error) { $('source-error').textContent = error.message; throw error; }
     });
+    $('preview-source').onclick = () => busy($('preview-source'), async () => {
+      $('source-error').textContent = '';
+      $('source-preview').hidden = false;
+      $('source-preview').textContent = 'Checking the source…';
+      try {
+        const result = await api('preview-source', 'POST', this.sourceValues(), 120000);
+        if (result.feed_url && !$('source-feed').value) $('source-feed').value = result.feed_url;
+        $('source-preview').replaceChildren(el('strong', '', `Detected: ${result.method === 'page' ? 'Website page' : 'RSS/Atom'} · ${result.entries.length} sample stories`));
+        const list = el('ul');
+        result.entries.forEach(story => { const item = el('li'); item.append(externalLink(story.url, story.headline)); list.append(item); });
+        $('source-preview').append(list);
+        if (result.note) $('source-preview').append(el('p', '', result.note));
+      } catch (error) { $('source-error').textContent = error.message; $('source-preview').hidden = true; throw error; }
+    });
     $('source-form').onsubmit = event => this.submit(event, async () => {
       const id = $('source-id').value;
-      const source = { name: $('source-name').value, url: $('source-url').value,
-        feed_url: $('source-feed').value, category: $('source-category').value, enabled: $('source-enabled').checked };
+      const source = this.sourceValues();
       try {
         await api(id ? 'sources/' + id : 'sources', id ? 'PUT' : 'POST', source);
         $('source-dialog').close();
@@ -98,6 +112,12 @@ export class Settings {
   }
 
   submit(event, work) { event.preventDefault(); return busy(event.submitter, work); }
+
+  sourceValues() {
+    return { name: $('source-name').value, url: $('source-url').value, feed_url: $('source-feed').value,
+      category: $('source-category').value, enabled: $('source-enabled').checked, mode: $('source-mode').value,
+      link_pattern: $('source-pattern').value, stale_days: Number($('source-stale-days').value) };
+  }
 
   tab(name) {
     ['interests', 'sources', 'ai', 'collection'].forEach(id => {
@@ -176,9 +196,12 @@ export class Settings {
       const info = el('div', 'source-info');
       const title = el('strong');
       title.append(externalLink(source.url, source.name));
-      info.append(title, el('small', '', `${source.category} · ${source.feed_url || 'Automatic feed discovery'}`));
-      const state = el('span', 'source-state' + (source.last_error ? ' failed' : ''), !source.enabled ? 'Disabled' : source.last_error ? source.last_error : source.last_checked ? 'Checked ' + formatTime(source.last_checked) : 'Not checked yet');
-      info.append(state);
+      info.append(title, el('small', '', `${source.category} · ${source.mode === 'page' ? 'Website page' : source.feed_url || 'Automatic feed / website discovery'}`));
+      const status = source.health.status;
+      info.append(el('span', 'source-state ' + status, status === 'healthy' ? 'Healthy' : status === 'unchecked' ? 'Not checked' : status === 'disabled' ? 'Disabled' : status === 'broken' ? 'Broken — repeated failures' : status === 'error' ? 'Check failed' : 'Needs attention'));
+      source.health.warnings.forEach(warning => info.append(el('small', 'source-warning', warning)));
+      if (source.last_checked) info.append(el('small', '', `Checked ${formatTime(source.last_checked)} · Last success ${formatTime(source.last_success)} · ${source.last_count ?? 'Unknown'} entries · ${source.last_method || 'Method unknown'}`));
+      if (source.newest_published) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newest_published)));
       const edit = el('button', '', 'Edit');
       edit.setAttribute('aria-label', `Edit ${source.name}`);
       edit.onclick = () => this.editSource(source);
@@ -199,6 +222,10 @@ export class Settings {
     $('source-name').value = source?.name || '';
     $('source-url').value = source?.url || '';
     $('source-feed').value = source?.feed_url || '';
+    $('source-mode').value = source?.mode || 'auto';
+    $('source-pattern').value = source?.link_pattern || '';
+    $('source-stale-days').value = source?.stale_days || 14;
+    $('source-preview').hidden = true;
     $('source-category').value = source?.category || 'News';
     $('source-enabled').checked = source ? Boolean(source.enabled) : true;
     $('source-error').textContent = '';

@@ -27,10 +27,15 @@ def source(value):
     if not isinstance(value, dict):
         raise ValueError("Expected a source object")
     feed = text(value.get("feed_url", ""), "Feed URL", 2048, empty=True)
+    mode = value.get('mode', 'auto')
+    if mode not in ('auto', 'feed', 'page'):
+        raise ValueError('Choose Automatic, RSS/Atom, or Website page')
     return {"name": text(value.get("name"), "Source name", 100),
             "url": valid_url(value.get("url")), "feed_url": valid_url(feed) if feed else "",
             "category": text(value.get("category"), "Category", 60),
-            "enabled": boolean(value.get("enabled", True), "Enabled")}
+            "enabled": boolean(value.get("enabled", True), "Enabled"), 'mode': mode,
+            'link_pattern': text(value.get('link_pattern', ''), 'Article URL filter', 200, empty=True),
+            'stale_days': integer(value.get('stale_days', 14), 'Inactivity warning days', 1, 365)}
 
 
 def settings(value, current):

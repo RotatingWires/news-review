@@ -1,6 +1,6 @@
 # Approved source additions
 
-These are the 15 approved additions, excluding the original 12 technology websites.
+These are the 13 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
 
 ## Standards, engineering, and open source
 
@@ -8,9 +8,7 @@ These are the 15 approved additions, excluding the original 12 technology websit
 - [W3C News](https://www.w3.org/news/)
 - [web.dev](https://web.dev/discover/)
 - [Mozilla Hacks](https://hacks.mozilla.org/)
-- [Daniel Stenberg's blog](https://daniel.haxx.se/blog/)
 - [Cloudflare Blog](https://blog.cloudflare.com/)
-- [LWN](https://lwn.net/headlines/)
 - [Phoronix](https://www.phoronix.com/)
 
 ## Radio, SDR, and ham radio

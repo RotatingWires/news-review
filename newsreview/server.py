@@ -20,6 +20,8 @@ from . import __version__
 from . import validation
 from .feeds import discover
 from .search import date_range, time_range
+from .sources import read_source
+from .store import StorageUnavailable
 
 logger = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -145,6 +147,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.mutate(path, self.body())
             else:
                 self.read(path, parse_qs(urlsplit(self.path).query))
+        except StorageUnavailable as exc:
+            self.send(503, {'error': str(exc), 'code': 'storage_unavailable'})
         except (ValueError, KeyError, TypeError) as exc:
             self.send(400, {"error": str(exc)[:500]})
         except sqlite3.IntegrityError:
@@ -254,6 +258,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/discover" and self.command == "POST":
             url = validation.valid_url(data.get("url"))
             self.send(200, {"feed_url": discover(self.server.collector.fetcher, url)})
+        elif path == '/api/preview-source' and self.command == 'POST':
+            source = validation.source(data)
+            result = read_source(self.server.collector.fetcher, source)
+            self.send(200, {**result, 'entries': result['entries'][:8]})
         elif path == "/api/test-model" and self.command == "POST":
             config = validation.settings({"ai": data}, store.settings())["ai"]
             self.send(200, self.server.collector.reviewer.test(config))

@@ -6,7 +6,9 @@ import logging
 import re
 import threading
 
-from .feeds import discover, extract_article, parse_feed
+from .feeds import extract_article
+from .sources import read_source
+from .store import StorageUnavailable
 from .network import Fetcher
 from .reviewer import Reviewer, candidates_for
 
@@ -34,6 +36,9 @@ class Collector:
             self.state.update(values)
 
     def start(self, kind="collect", *, scheduled=False):
+        # Validate storage synchronously so /api/collect cannot acknowledge a job
+        # which can only fail because its data folder was removed.
+        self.store.settings()
         if not self.lock.acquire(blocking=False):
             return False
         if scheduled and not self.schedule_due(datetime.now().astimezone()):
@@ -60,16 +65,19 @@ class Collector:
                         break
                     self.update(message=f"Checking {source['name']} ({number}/{len(sources)})")
                     try:
-                        feed_url = source["feed_url"] or discover(self.fetcher, source["url"])
-                        text, final_url, _ = self.fetcher.request(feed_url)
-                        entries = parse_feed(text, final_url)
+                        result = read_source(self.fetcher, source)
+                        entries = result['entries']
                         # Sort newest first, while retaining source order for undated items.
                         entries.sort(key=lambda i: i["published_at"] or "", reverse=True)
                         eligible = [i for i in entries if not i["published_at"] or datetime.fromisoformat(i["published_at"]) >= cutoff]
+                        added = 0
                         for item in eligible[:config["items_per_source"]]:
                             item["category"] = source["category"]
-                            details["added"] += self.store.insert_story(source["id"], item, now.date().isoformat())
-                        self.store.source_checked(source["id"], feed_url=feed_url)
+                            added += self.store.insert_story(source["id"], item, now.date().isoformat())
+                        details['added'] += added
+                        newest = max((i['published_at'] for i in entries if i['published_at']), default=None)
+                        self.store.source_checked(source['id'], feed_url=result['feed_url'], count=len(entries), newest=newest,
+                                                  added=added, method=result['method'], note=result['note'])
                     except Exception as exc:
                         logger.warning("Source %s failed: %s", source["name"], exc)
                         self.store.source_checked(source["id"], str(exc)[:500])
@@ -127,8 +135,11 @@ class Collector:
             logger.exception("Collection failed")
             if run_id:
                 details["errors"].append(str(exc)[:500])
-                self.store.finish_run(run_id, "failed", details)
-            self.update(message="Collection failed. See run history and server log.")
+                try:
+                    self.store.finish_run(run_id, "failed", details)
+                except StorageUnavailable:
+                    pass
+            self.update(message=str(exc) if isinstance(exc, StorageUnavailable) else "Collection failed. See run history and server log.")
         finally:
             self.update(running=False)
             self.lock.release()
@@ -149,9 +160,12 @@ class Collector:
         # Schedule in the server's local timezone. Persistent run history prevents
         # repeated daily runs after a restart. An overdue run catches up at startup.
         while not self.stop_event.wait(20):
-            now = datetime.now().astimezone()
-            if self.schedule_due(now):
-                self.start(scheduled=True)
+            try:
+                now = datetime.now().astimezone()
+                if self.schedule_due(now):
+                    self.start(scheduled=True)
+            except StorageUnavailable as exc:
+                self.update(message=str(exc))
 
     def stop(self):
         self.stop_event.set()

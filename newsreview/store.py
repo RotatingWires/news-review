@@ -7,6 +7,11 @@ from pathlib import Path
 import sqlite3
 
 from .defaults import SETTINGS, SOURCES
+from .health import source_health
+
+
+class StorageUnavailable(RuntimeError):
+    pass
 
 
 def utcnow():
@@ -17,10 +22,11 @@ class Store:
     def __init__(self, path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.initialized = False
         with self.connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version > 1:
+            if version > 2:
                 raise RuntimeError("Database is newer than this app; upgrade the application.")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS sources (
@@ -45,18 +51,43 @@ class Store:
                 CREATE TABLE IF NOT EXISTS runs (
                     id INTEGER PRIMARY KEY, kind TEXT NOT NULL, started_at TEXT NOT NULL,
                     finished_at TEXT, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}');
-                PRAGMA user_version=1;
             """)
+            columns = {r['name'] for r in db.execute('PRAGMA table_info(sources)')}
+            additions = {
+                'mode': "TEXT NOT NULL DEFAULT 'auto'", 'link_pattern': "TEXT NOT NULL DEFAULT ''",
+                'stale_days': 'INTEGER NOT NULL DEFAULT 14', 'removed': 'INTEGER NOT NULL DEFAULT 0',
+                'last_success': 'TEXT', 'first_checked': 'TEXT', 'newest_published': 'TEXT',
+                'last_new_story': 'TEXT', 'last_count': 'INTEGER', 'last_method': 'TEXT',
+                'consecutive_failures': 'INTEGER NOT NULL DEFAULT 0', 'collection_note': "TEXT NOT NULL DEFAULT ''",
+            }
+            for name, definition in additions.items():
+                if name not in columns:
+                    db.execute(f'ALTER TABLE sources ADD COLUMN {name} {definition}')
             for key, value in SETTINGS.items():
                 db.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, json.dumps(value)))
             if not db.execute("SELECT 1 FROM settings WHERE key='sources_seeded'").fetchone():
                 db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCES)
                 db.execute("INSERT INTO settings VALUES ('sources_seeded', 'true')")
+            if version < 2:
+                # Retain historical source names/relationships, but remove these
+                # requested sources from active configuration on existing installs.
+                db.execute("UPDATE sources SET removed=1,enabled=0 WHERE url IN ('https://daniel.haxx.se/blog/','https://lwn.net/')")
+                db.execute("""UPDATE sources SET first_checked=last_checked,
+                    last_success=CASE WHEN last_error IS NULL THEN last_checked ELSE NULL END,
+                    consecutive_failures=CASE WHEN last_error IS NULL THEN 0 ELSE 1 END""")
+            db.execute('PRAGMA user_version=2')
             db.execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", (utcnow(),))
+        self.initialized = True
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=10)
+        if self.initialized and not self.path.is_file():
+            raise StorageUnavailable('The NewsReview database or data folder was removed while the server was running. Stop and restart NewsReview to initialize a fresh database, or restore your backup. Use Fresh start in Settings to clear history without removing preferences.')
+        uri = self.path.resolve().as_uri() + ('?mode=rw' if self.initialized else '?mode=rwc')
+        try:
+            db = sqlite3.connect(uri, uri=True, timeout=10)
+        except sqlite3.OperationalError as exc:
+            raise StorageUnavailable('NewsReview cannot open its database. Check that the data folder exists and is writable, then restart the server.') from exc
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=10000")
@@ -78,20 +109,31 @@ class Store:
 
     def sources(self):
         with self.connect() as db:
-            return [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name COLLATE NOCASE")]
+            return [{**dict(r), 'health': source_health(dict(r))} for r in db.execute("SELECT * FROM sources WHERE removed=0 ORDER BY name COLLATE NOCASE")]
 
     def save_source(self, data, source_id=None):
-        values = (data["name"], data["url"], data["feed_url"], data["category"], int(data["enabled"]))
+        values = (data["name"], data["url"], data["feed_url"], data["category"], int(data["enabled"]),
+                  data.get('mode', 'auto'), data.get('link_pattern', ''), data.get('stale_days', 14))
         with self.connect() as db:
             if source_id is None:
-                return db.execute("INSERT INTO sources(name,url,feed_url,category,enabled) VALUES (?,?,?,?,?)", values).lastrowid
-            if not db.execute("UPDATE sources SET name=?,url=?,feed_url=?,category=?,enabled=? WHERE id=?", (*values, source_id)).rowcount:
+                retired = db.execute('SELECT id FROM sources WHERE url=? AND removed=1', (data['url'],)).fetchone()
+                if retired:
+                    source_id = retired[0]
+                else:
+                    return db.execute("INSERT INTO sources(name,url,feed_url,category,enabled,mode,link_pattern,stale_days) VALUES (?,?,?,?,?,?,?,?)", values).lastrowid
+            if not db.execute("UPDATE sources SET name=?,url=?,feed_url=?,category=?,enabled=?,mode=?,link_pattern=?,stale_days=?,removed=0 WHERE id=?", (*values, source_id)).rowcount:
                 raise ValueError("Source not found")
         return source_id
 
-    def source_checked(self, source_id, error=None, feed_url=None):
+    def source_checked(self, source_id, error=None, feed_url=None, *, count=None, newest=None, added=0, method=None, note=''):
         with self.connect() as db:
-            db.execute("UPDATE sources SET last_checked=?,last_error=?,feed_url=COALESCE(?,feed_url) WHERE id=?", (utcnow(), error, feed_url, source_id))
+            now = utcnow()
+            db.execute("""UPDATE sources SET last_checked=?,first_checked=COALESCE(first_checked,?),last_error=?,
+                feed_url=COALESCE(?,feed_url),consecutive_failures=CASE WHEN ? IS NULL THEN 0 ELSE consecutive_failures+1 END,
+                last_success=CASE WHEN ? IS NULL THEN ? ELSE last_success END,last_count=?,
+                newest_published=CASE WHEN ? IS NULL THEN ? ELSE newest_published END,
+                last_new_story=CASE WHEN ?>0 THEN ? ELSE last_new_story END,last_method=COALESCE(?,last_method),collection_note=? WHERE id=?""",
+                (now, now, error, feed_url, error, error, now, count, error, newest, added, now, method, note, source_id))
 
     def insert_story(self, source_id, item, day):
         with self.connect() as db:
@@ -200,7 +242,8 @@ class Store:
             db.execute("UPDATE stories SET duplicate_of=NULL")
             db.execute("DELETE FROM stories")
             db.execute("DELETE FROM runs")
-            db.execute("UPDATE sources SET last_checked=NULL,last_error=NULL")
+            db.execute("""UPDATE sources SET last_checked=NULL,last_error=NULL,last_success=NULL,first_checked=NULL,
+                newest_published=NULL,last_new_story=NULL,last_count=NULL,last_method=NULL,consecutive_failures=0,collection_note=''""")
             db.execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(utcnow()),))
             return count
 

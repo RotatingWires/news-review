@@ -203,6 +203,13 @@ footer { justify-content: space-between; margin-top: 6px; }
 .source-info strong, .source-info small { display: block; overflow-wrap: anywhere; }
 .source-info small, .source-state { color: var(--muted); font-size: 12px; }
 .source-state.failed { color: var(--error); }
+.source-state { display: block; font-weight: bold; }
+.source-state.error, .source-state.broken { color: var(--error); }
+.source-state.warning, .source-info .source-warning { color: var(--error); }
+.settings-panel .section-heading { flex-wrap: wrap; align-items: flex-start; }
+#connection-status { background: var(--note); color: var(--error); padding: 10px; border: 1px solid var(--shadow); margin: 8px; }
+#source-preview { overflow-wrap: anywhere; }
+#source-preview ul { margin-bottom: 0; padding-left: 20px; }
 .maintenance { border-top: 1px solid var(--shadow); margin-top: 20px; padding: 16px 0; }
 .run { background: var(--surface); border: 1px solid var(--shadow); padding: 8px; margin-bottom: 8px; font-size: 13px; }
 .run summary { cursor: pointer; }

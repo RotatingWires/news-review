@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import threading
@@ -43,6 +44,12 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 </channel></rss>''', 'application/rss+xml')
         elif self.path == '/article':
             self.respond('<article><p>' + ('A browser added experimental support for a new HTTP feature in a development build. ' * 8) + '</p></article>')
+        elif self.path == '/listing':
+            today = datetime.now(timezone.utc).isoformat()
+            self.respond(f'''<html><nav><a href="/unwanted">Navigation should never be a story</a></nav><main>
+                <article><header><h2><a href="/article">New radio protocol reaches experimental testing</a></h2></header>
+                <time datetime="{today}"></time><p>A useful source excerpt from the article card.</p></article>
+                <article><h2><a href="/excerpt">Another practical radio project is available</a></h2></article></main></html>''')
         elif self.path == '/excerpt':
             self.respond('Subscription required', status=403)
         else:
@@ -244,6 +251,44 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.store.settings(), settings)
         self.assertEqual(self.request('/api/stories')[1]['total'], 0)
         self.assertEqual(self.request('/api/overview')[1]['runs'], [])
+
+    def test_no_feed_site_preview_collection_and_fallback(self):
+        for existing in self.store.sources():
+            self.store.save_source({**existing, 'enabled': False}, existing['id'])
+        source = {'name': 'Website source', 'url': self.root + '/listing', 'feed_url': '', 'category': 'Radio', 'enabled': True,
+                  'mode': 'auto', 'link_pattern': '', 'stale_days': 30}
+        source_id = self.store.save_source(source)
+        self.start_api()
+        status, preview, _ = self.request('/api/preview-source', 'POST', source)
+        self.assertEqual(status, 200)
+        self.assertEqual(preview['method'], 'page')
+        self.assertEqual(len(preview['entries']), 2)
+        self.assertEqual(self.store.stories()['total'], 0, 'Preview must not add stories')
+        self.collect()
+        self.assertEqual(self.store.stories()['total'], 2)
+        saved = next(s for s in self.store.sources() if s['id'] == source_id)
+        self.assertEqual(saved['last_method'], 'page')
+        self.assertEqual(saved['health']['status'], 'healthy')
+        self.store.save_source({**source, 'feed_url': self.root + '/missing'}, source_id)
+        self.collect()
+        saved = next(s for s in self.store.sources() if s['id'] == source_id)
+        self.assertEqual(saved['health']['status'], 'warning')
+        self.assertIn('Feed unavailable', saved['collection_note'])
+        self.store.save_source({**source, 'mode': 'feed', 'feed_url': self.root + '/missing'}, source_id)
+        self.collect()
+        self.assertEqual(next(s for s in self.store.sources() if s['id'] == source_id)['health']['status'], 'error')
+
+    def test_deleted_data_folder_returns_actionable_error_and_restart_recovers(self):
+        self.start_api()
+        shutil.rmtree(self.directory.name)
+        for path, method, body in [('/api/sources', 'GET', None), ('/api/overview', 'GET', None), ('/api/collect', 'POST', {})]:
+            status, result, _ = self.request(path, method, body)
+            self.assertEqual(status, 503)
+            self.assertEqual(result['code'], 'storage_unavailable')
+            self.assertIn('restart', result['error'])
+        self.assertFalse(self.store.path.exists(), 'Requests must not create an empty SQLite database behind the app')
+        fresh = Store(self.store.path)
+        self.assertEqual(len(fresh.sources()), 25)
 
 
 if __name__ == '__main__':

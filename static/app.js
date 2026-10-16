@@ -1,7 +1,7 @@
 import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 
-import { $, api, busy, toast } from './shared.js';
+import { $, api, busy, toast, formatTime } from './shared.js';
 
 class App {
   constructor() {
@@ -11,9 +11,14 @@ class App {
     this.feed = new Feed(this);
     this.settings = new Settings(this);
     this.pollTimer = null;
+    this.unconfirmedRefresh = null;
   }
 
   async init() {
+    document.addEventListener('newsreview-connection', event => {
+      $('connection-status').hidden = !event.detail.error;
+      $('connection-status').textContent = event.detail.error || '';
+    });
     try {
       const saved = localStorage.getItem('newsreview-theme');
       document.documentElement.dataset.theme = saved || 'light';
@@ -60,7 +65,7 @@ class App {
       $('logout').hidden = !session.password_required;
       if (!session.authenticated) { $('login-dialog').showModal(); return; }
       await this.load();
-    } catch (error) { toast(error.message, true); $('collector-status').textContent = 'Could not connect to the app server.'; }
+    } catch (error) { toast(error.message, true); $('collector-status').textContent = error.message; this.poll(); }
   }
 
   async load() {
@@ -81,26 +86,43 @@ class App {
     $('review-pending').disabled = state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
+    $('refresh-sources').disabled = state.running;
+    const last = this.overview.runs.find(run => run.kind === 'collect');
+    let refreshStatus = state.running ? state.message : last
+      ? `${state.message} · Last collection: ${last.status} · Started ${formatTime(last.started_at)} · ${last.details.errors?.length || 0} errors. See each source and run history for details.`
+      : state.message;
+    if (this.unconfirmedRefresh !== null) {
+      if (state.running || (last && last.id > this.unconfirmedRefresh)) this.unconfirmedRefresh = null;
+      else refreshStatus = 'No newer collection was recorded. Press Refresh sources to retry. ' + refreshStatus;
+    }
+    $('source-refresh-status').textContent = refreshStatus;
     this.settings.renderRuns();
   }
 
   poll() {
     clearTimeout(this.pollTimer);
     this.pollTimer = setTimeout(async () => {
-      if (!this.authenticated) return;
       try {
+        if (!this.authenticated) {
+          const session = await api('session');
+          if (!session.authenticated) { if (!$('login-dialog').open) $('login-dialog').showModal(); return; }
+          this.authenticated = true;
+        }
+        const firstConnection = !this.overview;
+        const lastRun = this.overview?.runs[0]?.id;
         const wasRunning = this.overview?.collector.running;
         await this.refreshOverview();
-        if (wasRunning && !this.overview.collector.running) {
+        if (firstConnection || lastRun !== this.overview.runs[0]?.id || (wasRunning && !this.overview.collector.running)) {
           if (this.view !== 'settings') await this.feed.load();
           else await this.settings.refreshSources();
         }
+        if (this.view === 'settings' && !$('panel-sources').hidden) await this.settings.refreshSources();
       } catch (error) {
         if ($('login-dialog').open) { this.authenticated = false; return; }
         $('collector-status').textContent = error.message;
       }
       this.poll();
-    }, this.overview?.collector.running ? 2500 : 30000);
+    }, this.overview?.collector.running ? 2500 : !$('connection-status').hidden ? 5000 : 30000);
   }
 
   async show(view) {
@@ -125,11 +147,28 @@ class App {
   }
 
   async collect(kind, button) {
+    const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
-      await api('collect', 'POST', { kind });
-      toast(kind === 'collect' ? 'Collection started in the background.' : 'Reviewing queued stories.');
+      try {
+        await api('collect', 'POST', { kind });
+        if (kind === 'collect') this.unconfirmedRefresh = null;
+        toast(kind === 'collect' ? 'Collection started in the background.' : 'Reviewing queued stories.');
+      } catch (error) {
+        if (error.connection) {
+          if (kind === 'collect') this.unconfirmedRefresh = previousRun;
+          $('source-refresh-status').textContent = 'Refresh request was not confirmed. Reconnecting to check whether the server started it.';
+        }
+        throw error;
+      }
     });
-    try { await this.refreshOverview(); this.poll(); } catch (error) { toast(error.message, true); }
+    try {
+      await this.refreshOverview();
+      if (!this.overview.collector.running) {
+        if (this.view === 'settings') await this.settings.refreshSources();
+        else await this.feed.load();
+      }
+    } catch (error) { if (!error.connection) toast(error.message, true); }
+    finally { this.poll(); }
   }
 }
 

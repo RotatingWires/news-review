@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.2.0: Describe the change`.
+- Commits use the existing project convention: `v0.3.0: Describe the change`.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -116,37 +116,69 @@ No sample articles are inserted into your real database. The first edition start
 
 ## Sources
 
-The following **27 sources** are seeded once on a fresh database:
+The following **25 sources** are seeded once on a fresh database:
 
 | Group | Sources |
 | --- | --- |
 | Original technology sources | BetaNews, Ars Technica, BleepingComputer, TechCrunch, MacRumors, Android Authority, Engadget, MIT Technology Review, PCWorld, The Register, Tom's Hardware, CNET |
-| Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Daniel Stenberg, Cloudflare Blog, LWN, Phoronix |
+| Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix |
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
 
-Defaults are defined in `newsreview/defaults.py`. Changes to those defaults do not overwrite an existing installation's sources or settings.
+Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
-[SOURCES.md](SOURCES.md) links to the 15 approved additions separately from the original 12 websites.
+[SOURCES.md](SOURCES.md) links to the 13 current approved additions separately from the original 12 websites.
 
 ### Add or edit a source
 
-Open **Settings → Sources → Add source**. Enter its name, website URL, and default category. Click **Find RSS/Atom feed**, or paste a known feed URL. A blank feed URL triggers discovery during collection. Save it, then check sources.
+Open **Settings → Sources → Add source**. Enter its name, website/listing URL, and default category, then choose a collection method:
 
-The collector supports RSS 2.0, common RDF/RSS feeds, and Atom. Discovery follows RSS/Atom links advertised in the page's HTML. Most ordinary feeds require no new code. A website with no usable feed needs a purpose-built adapter; this version does not guess articles by indiscriminately crawling every link. Forum category feeds can be entered as sources in exactly the same way as publisher feeds.
+| Method | Behavior |
+| --- | --- |
+| Automatic | Use the specified feed or discover an advertised feed; fall back to reading the website listing if the feed is absent or fails. |
+| RSS/Atom feed only | Use the specified/discovered feed and report failure rather than switching to page extraction. |
+| Website page | Read the listing page directly; no feed is needed, and any saved feed URL is ignored. |
 
-**RSS finds the stories; article webpages provide review text.** During AI review the collector visits each article URL and attempts to extract readable text, even when the feed has only a headline. This is an HTTP download, not a JavaScript browser session. A site that requires JavaScript, authentication, or a subscription may still be unreadable. In that case the model uses the available feed excerpt; if there is no usable article text or excerpt, the app keeps the headline/link and reports the review error. It does not summarize a headline as if it had read the article. Without a model configured, feed collection still works, but article extraction waits for the review stage.
+Click **Preview stories** to see the detected method and up to eight candidate headlines/links without adding anything to history. Save the source, then **Refresh sources**. The source editor also offers **Find RSS/Atom feed** for feed discovery.
+
+The collector supports RSS 2.0, common RDF/RSS feeds, and Atom. Feed discovery follows RSS/Atom links advertised in the page's HTML. Website mode extracts structured article lists (JSON-LD), article-card headline links, and heading links. It prefers the main content area where available, excludes navigation/footer/author/category links and external hosts, and removes duplicate URLs. Article-card headline links take precedence over date archives and incidental links inside the card. Website URLs should point to a news/category listing rather than a single article.
+
+**Article URL contains** is an optional literal substring filter for website extraction, such as `/news/`, `/posts/`, or `/threads/`. It is not a regular expression or CSS selector, and does not affect feed entries. Preview it to make sure you are collecting the intended articles. Only links on the listing's exact hostname are followed; subdomains are separate sources. Website mode reads one downloaded page, not an entire site, and does not paginate or execute JavaScript. Ambiguous layouts, JavaScript-only pages, authentication, paywalls, and bot restrictions can still require a custom adapter or a different public listing/feed. Missing publication dates remain unknown.
+
+**Feeds or website listings find stories; article webpages provide review text.** During AI review the collector visits each article URL and attempts to extract readable text, even when the feed has only a headline. This is an HTTP download, not a JavaScript browser session. A site that requires JavaScript, authentication, or a subscription may still be unreadable. In that case the model uses the available source excerpt; if there is no usable article text or excerpt, the app keeps the headline/link and reports the review error. It does not summarize a headline as if it had read the article. Without a model configured, collection still works, but article extraction waits for the review stage.
 
 Edit a source to change its feed, default category, or enabled state. Disabling stops collection and preserves all existing stories. Sources are not deleted through the UI, keeping historical source references stable. RadioReference starts with its general forum feed; you can replace it with a narrower public forum/category feed to reduce support-thread noise.
 
+### RadioReference and other forum feeds
+
+Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. The local model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
+
+A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific scanner/SDR/manufacturer/category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
+
+### Health and refresh results
+
+The Sources tab shows a persistent refresh status while collection/review runs, followed by its recorded result. **Refresh sources** uses the same background job as **Check sources**: collect candidates, then review a bounded batch if a model is configured. Individual failures remain attached to their sources and in run history; they do not prevent other sources from finishing.
+
+Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Needs attention**, **Check failed**, **Broken — repeated failures** (three or more consecutive failed checks), and **Disabled**. A successful check resets the failure counter.
+
+The default inactivity warning interval is **14 days**, editable per source (1–365). Warnings cover checks older than that interval, an old newest publication date, an empty result, or no newly observed stories when dates are unavailable. An inactive/stale warning is an observation, not proof a publisher has shut down. Increase the interval for monthly/occasional publishers. An automatic switch from a configured broken feed to a usable website page is marked as a warning, with the original feed error visible.
+
+Browser-to-app connection failures are separate from publisher/source errors. A persistent banner identifies an unreachable server, unexpected non-JSON responses, or a missing runtime database. Read requests reconnect periodically; write requests are never replayed automatically. If the start request loses its response, the UI says the refresh was **not confirmed**, then checks server status rather than claiming it failed or succeeded.
+
 ### Feed availability
 
-The first-version live audit retrieved usable feeds from **26 of the 27 sources**. Asterisk's website/feed returned **HTTP 403** from this environment; it remains configured and enabled, with the error visible after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time. Feed addresses can also change.
+The first-version audit retrieved usable feeds from all retained default sources except Asterisk, whose website/feed returned **HTTP 403** in that environment. It remains configured and enabled, with the error visible after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time. Feed addresses can also change. The v0.3.0 website extractor was additionally checked against public Hackaday and GNU Radio listing pages.
 
 To run a live audit without changing the database:
 
 ```bash
 python3 -m tests.check_sources
+```
+
+To preview a website listing without saving data:
+
+```bash
+python3 -m tests.check_sources --website https://example.com/news/ --contains /news/ --details
 ```
 
 An individual source failure is recorded next to that source and in run history. Other sources continue.
@@ -172,7 +204,7 @@ The daily scheduler skips the rest of the reset day, including after a restart, 
 ## Collection and AI pipeline
 
 1. Snapshot the saved source, collection, model, and editorial settings for the job.
-2. Read each enabled feed, newest first. Initial limits are eight entries per source from the last three days; undated entries remain eligible. Limits select the newest feed entries, not eight guaranteed new entries per run.
+2. Read each enabled source using its saved Automatic/feed/page method. Sort by publication date when available; undated website entries retain page order. Initial limits are eight entries per source from the last three days; undated entries remain eligible. Limits select the newest available candidates, not eight guaranteed new entries per run.
 3. Normalize URLs by removing fragments and known tracking parameters. A unique URL constraint prevents repeated insertion. Preserve original headlines, excerpts, and publication dates separately from discovery/edition dates.
 4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured local model and interest snapshot.
@@ -187,7 +219,7 @@ An article's publication time can differ from its edition day. Undated articles 
 
 ### Queue, retries, and scheduling
 
-- **Check sources** fetches feeds and then reviews up to the saved limit.
+- **Check sources / Refresh sources** fetches feeds or website listings and then reviews up to the saved limit.
 - **Review pending** skips feed collection and processes the existing queue.
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
 - Each failed review increments an attempt count. After three attempts, use **Reset failed reviews** once the underlying issue is fixed.
@@ -212,7 +244,7 @@ data/
 
 The directory is Git-ignored. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`PRAGMA user_version` tracks schema version 1. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+`PRAGMA user_version` tracks schema version 2. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
 The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, significance, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
@@ -287,6 +319,8 @@ To restore: stop the app, move the entire existing data directory aside as a rec
 
 Before an update, make a backup, pull the code, and restart. Runtime data is ignored by Git, and saved defaults are not reset. There is no browser service worker caching old application files.
 
+**Do not delete the data folder while the app is running.** This removes its database, preferences, and logs outside the application's lifecycle. If this happened, stop and restart NewsReview to create a fresh database, or restore a backup before restarting. The running server now returns an actionable HTTP 503 instead of silently recreating an empty SQLite file or reporting a generic internal error. Use **Fresh start** in Settings when you only want to clear reading history and retain configuration.
+
 ### Upgrade from the first version
 
 Stop the old process before updating. The Python package and launch command are now `newsreview`; environment variables use `NEWSREVIEW_` (update the previous `TECHNEWS_` names in your shell/service configuration). The default port is now **8714**, so update reverse-proxy targets or bookmarks that used **8713**. Services use the `newsreview.service` template and new checkout path. Browser sessions and theme preferences start fresh under the new name/port.
@@ -309,7 +343,7 @@ Optional real-browser verification requires Playwright and its Chromium browser 
 python3 -m tests.browser_smoke
 ```
 
-This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, adding/discovering a source, a fixture model connection, confirmed history deletion, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
+This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, refresh completion, offline/reconnect handling, a fixture model connection, confirmed history deletion, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The live source audit is a separate opt-in command described above.
 
 GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local verification for the initial release uses Python 3.14; a real installed user model still needs its own connection and quality check.
 
@@ -325,6 +359,9 @@ newsreview/
   search.py         TaskList-compatible date/time range parsing
   network.py        bounded HTTP transport and news-source URL checks
   feeds.py          RSS/Atom parsing/discovery and article extraction
+  listings.py       website article-card/headline/structured-list extraction
+  sources.py        Automatic/feed/page collection strategy
+  health.py         observed source health and inactivity warnings
   reviewer.py       local model adapters, editorial prompt, output validation
   collector.py      collection/review worker and daily scheduler
   validation.py     source/settings input validation
@@ -343,6 +380,15 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.3.0
+
+- Remove Daniel Stenberg and LWN from fresh and existing active source lists, preserving archived stories.
+- Add no-RSS website collection, feed-first automatic fallback, article URL filters, and preview before saving.
+- Track source success, failures, activity, publication age, entry counts, and actual collection method; show adjustable stale/inactive/broken warnings.
+- Add Sources-tab refresh progress/results, persistent connection/storage errors, and safe read-only reconnection without replaying writes.
+- Detect a data folder/database deleted during runtime and explain how to restart or restore; do not silently create an empty database during requests.
+- Expand deterministic regression/browser coverage and document forum-feed behavior and website-extraction limits.
 
 ### v0.2.0
 

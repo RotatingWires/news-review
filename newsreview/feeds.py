@@ -153,7 +153,7 @@ def discover(fetcher, url):
         parser = PageParser()
         parser.feed(text)
         if not parser.feeds:
-            raise ValueError("No RSS/Atom link found. Enter a feed URL manually; this site may need a custom adapter.")
+            raise ValueError("No advertised RSS/Atom feed found. Use Automatic or Website page mode to collect from a news listing, or enter a known feed URL.")
         return canonical_url(urljoin(final_url, parser.feeds[0]))
 
 

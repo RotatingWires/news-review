@@ -109,7 +109,16 @@ def run():
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
                 expect(page.locator('#source-feed')).to_have_value(re.compile('/feed$'))
                 page.get_by_role('button', name='Save source', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(28)
+                expect(page.locator('.source-row')).to_have_count(26)
+                page.get_by_role('button', name='+ Add source', exact=True).click()
+                page.get_by_label('Name', exact=True).fill('Website without RSS')
+                page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
+                page.get_by_label('Collection method', exact=True).select_option('page')
+                page.get_by_role('button', name='Preview stories', exact=True).click()
+                expect(page.locator('#source-preview')).to_contain_text('Website page')
+                expect(page.locator('#source-preview a')).to_have_count(2)
+                page.get_by_role('button', name='Save source', exact=True).click()
+                expect(page.locator('.source-row')).to_have_count(27)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.locator('#ai-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.locator('#ai-model').fill('fixture')
@@ -118,6 +127,22 @@ def run():
                 page.get_by_role('button', name='Save AI settings').click()
                 expect(page.locator('#toast')).to_contain_text('AI settings saved')
                 assert store.settings()['ai']['model'] == 'fixture'
+
+                # Keep this test entirely on the fixture server when testing Refresh.
+                for configured in store.sources():
+                    if not configured['url'].startswith(f'http://127.0.0.1:{fixture.server_port}'):
+                        store.save_source({**configured, 'enabled': False}, configured['id'])
+                page.get_by_role('button', name='Sources', exact=True).click()
+                page.get_by_role('button', name='Refresh sources', exact=True).click()
+                expect(page.locator('#source-refresh-status')).to_contain_text('Last collection: complete', timeout=15000)
+                expect(page.locator('.source-state.healthy')).to_have_count(2)
+                page.context.set_offline(True)
+                page.get_by_role('button', name='Refresh sources', exact=True).click()
+                expect(page.locator('#connection-status')).to_contain_text('Cannot reach the NewsReview server')
+                expect(page.locator('#source-refresh-status')).to_contain_text('not confirmed')
+                page.context.set_offline(False)
+                expect(page.locator('#connection-status')).to_be_hidden(timeout=15000)
+                expect(page.locator('#source-refresh-status')).to_contain_text('No newer collection was recorded')
 
                 page.get_by_role('button', name='Daily feed', exact=True).click()
                 page.wait_for_selector('.story')
@@ -129,25 +154,26 @@ def run():
                 page.screenshot(path='/tmp/newsreview-dark.png', full_page=True)
                 page.get_by_role('button', name='Settings', exact=True).click()
                 page.get_by_role('button', name='Collection & history', exact=True).click()
+                history_count = store.stories()['total']
                 page.get_by_role('button', name='Delete all history…', exact=True).click()
                 page.locator('#clear-history-dialog').get_by_role('button', name='Cancel', exact=True).click()
-                assert store.stories()['total'] == 5
+                assert store.stories()['total'] == history_count
                 page.get_by_role('button', name='Delete all history…', exact=True).click()
                 page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('wrong')
                 page.get_by_role('button', name='Delete history permanently', exact=True).click()
-                assert store.stories()['total'] == 5
+                assert store.stories()['total'] == history_count
                 preferences = store.settings()
                 page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('DELETE HISTORY')
                 page.get_by_role('button', name='Delete history permanently', exact=True).click()
                 expect(page.locator('#toast')).to_contain_text('History cleared')
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 28
+                assert len(store.sources()) == 27
                 page.get_by_role('button', name='Daily feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors
                 browser.close()
-                print('Browser QA passed: feed, bookmarks, navigation, keyword/date/time search, multi-topic filter, interests, source discovery, local AI, confirmed history reset, mobile layout, Win95 themes; no browser errors.')
+                print('Browser QA passed: feed/search/bookmarks, interests, feed discovery, website preview, source health, refresh completion, offline/reconnect recovery, local AI, confirmed reset, mobile layout and Win95 themes; no browser errors.')
                 print('Screenshots: /tmp/newsreview-{desktop,mobile,dark}.png')
         finally:
             collector.stop()
