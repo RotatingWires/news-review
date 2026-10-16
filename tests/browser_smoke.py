@@ -37,7 +37,7 @@ def run():
                                        'published_at': None, 'category': category}, today)
             with store.connect() as db:
                 story_id = db.execute('SELECT id FROM stories WHERE url=?', (f'https://example.com/{index}',)).fetchone()[0]
-            store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=90-index), set()),
+            store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=[90, 60, 25, 75][index]), set()),
                                 {**store.settings()['ai'], 'model': 'fixture-model'}, store.settings()['interests'], summary, 'article')
         store.insert_story(source, {'headline': 'Yesterday’s protocol update', 'url': 'https://example.com/yesterday',
                                    'excerpt': 'A source excerpt from the previous day.', 'published_at': None, 'category': 'Protocols'}, (date.today() - timedelta(days=1)).isoformat())
@@ -58,6 +58,17 @@ def run():
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
+                expect(page.locator('.relevance-indicator.relevance-high')).to_have_count(2)
+                expect(page.locator('.relevance-indicator.relevance-medium')).to_have_count(1)
+                expect(page.locator('.relevance-indicator.relevance-low')).to_have_count(1)
+                expect(page.locator('#relevance-key .relevance-key-item')).to_have_count(4)
+                indicator = page.locator('.relevance-indicator').first.bounding_box()
+                bookmark = page.locator('.bookmark').first.bounding_box()
+                assert indicator['width'] == indicator['height'] == bookmark['width'] == bookmark['height']
+                assert indicator['x'] + indicator['width'] < bookmark['x']
+                count_box = page.locator('#story-count').bounding_box()
+                assert page.locator('#relevance-key').bounding_box()['y'] >= count_box['y'] + count_box['height']
+                expect(page.locator('.relevance-indicator').first).to_have_attribute('title', 'Highly relevant: AI interest score 90/100')
                 expect(page.locator('#feed-title')).to_have_text('Daily Feed')
                 assert page.locator('.titlebar-caption').evaluate('el => getComputedStyle(el).fontSize') == '14px'
                 assert page.locator('#story-count').evaluate('el => getComputedStyle(el).fontSize') == '14px'
@@ -120,6 +131,7 @@ def run():
                 page.get_by_label('Previous day', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
                 assert 'Yesterday' in page.locator('.story h3').inner_text()
+                expect(page.locator('.relevance-indicator.relevance-pending')).to_have_count(1)
                 page.get_by_role('button', name='Today', exact=True).click()
                 page.get_by_label('Search history').fill('FreePBX')
                 page.get_by_role('button', name='Search', exact=True).click()

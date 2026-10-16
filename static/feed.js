@@ -1,11 +1,27 @@
 import { $, api, el, externalLink, formatTime, notify, busy } from './shared.js';
 
+const RELEVANCE = [
+  { name: 'high', minimum: 75, label: 'Highly relevant', range: '75–100' },
+  { name: 'medium', minimum: 40, label: 'Somewhat relevant', range: '40–74' },
+  { name: 'low', minimum: 0, label: 'Low relevance', range: '0–39' },
+];
+const UNREVIEWED = { name: 'pending', label: 'Awaiting review' };
+
 export class Feed {
   constructor(app) {
     this.app = app;
     this.page = 1;
     this.requestId = 0;
     this.selectedTopics = new Set();
+    const key = $('relevance-key');
+    key.append(el('span', 'relevance-key-heading', 'Relevance:'));
+    [...RELEVANCE, UNREVIEWED].forEach(tier => {
+      const item = el('span', 'relevance-key-item');
+      const swatch = el('span', 'relevance-swatch relevance-' + tier.name);
+      swatch.setAttribute('aria-hidden', 'true');
+      item.append(swatch, document.createTextNode(tier.label + (tier.range ? ` (${tier.range})` : '')));
+      key.append(item);
+    });
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
     ['day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
@@ -143,7 +159,17 @@ export class Feed {
       else card.replaceWith(this.tile(story));
       notify(next ? 'Saved to bookmarks.' : 'Bookmark removed.');
     }, story.bookmarked ? 'Removing bookmark…' : 'Saving bookmark…');
-    top.append(el('span', 'source-name', story.source_name || 'Source'), bookmark);
+    const tier = story.status !== 'pending' && Number.isInteger(story.score)
+      ? RELEVANCE.find(value => story.score >= value.minimum) || UNREVIEWED : UNREVIEWED;
+    const relevance = el('span', 'relevance-indicator relevance-' + tier.name);
+    const description = tier === UNREVIEWED ? 'Awaiting AI review; no current relevance score'
+      : `${tier.label}: AI interest score ${story.score}/100`;
+    relevance.title = description;
+    relevance.setAttribute('role', 'img');
+    relevance.setAttribute('aria-label', description);
+    const controls = el('span', 'story-controls');
+    controls.append(relevance, bookmark);
+    top.append(el('span', 'source-name', story.source_name || 'Source'), controls);
     const heading = el('h3');
     heading.append(externalLink(story.url, story.headline));
     card.append(top, heading);
