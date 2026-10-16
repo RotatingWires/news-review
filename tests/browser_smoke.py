@@ -133,6 +133,11 @@ def run():
                 assert 'Yesterday' in page.locator('.story h3').inner_text()
                 expect(page.locator('.relevance-indicator.relevance-pending')).to_have_count(1)
                 page.get_by_role('button', name='Today', exact=True).click()
+                page.get_by_label('Search history').fill('Android Authority')
+                page.get_by_role('button', name='Search', exact=True).click()
+                expect(page.locator('.story')).to_have_count(5)
+                page.get_by_role('button', name='Clear search').click()
+                expect(page.locator('.story')).to_have_count(4)
                 page.get_by_label('Search history').fill('FreePBX')
                 page.get_by_role('button', name='Search', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
@@ -214,8 +219,16 @@ def run():
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/')
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
                 expect(page.locator('#source-feed')).to_have_value(re.compile('/feed$'))
+                page.locator('#source-feed').fill(f'http://127.0.0.1:{fixture.server_port}/stale-feed')
+                page.get_by_role('button', name='Preview stories', exact=True).click()
+                expect(page.locator('#source-preview')).to_contain_text('Website fallback could not be read')
+                page.locator('#source-url').fill(f'http://127.0.0.1:{fixture.server_port}/listing')
+                page.get_by_role('button', name='Preview stories', exact=True).click()
+                expect(page.locator('#source-preview')).to_contain_text('RSS/Atom + website')
+                page.locator('#source-feed').fill(f'http://127.0.0.1:{fixture.server_port}/feed')
+                page.locator('#source-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(33)
+                expect(page.locator('.source-row')).to_have_count(34)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
@@ -225,7 +238,7 @@ def run():
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(34)
+                expect(page.locator('.source-row')).to_have_count(35)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.get_by_role('button', name='Server type', exact=True).click()
                 page.get_by_role('option', name='Compatible local chat server (e.g. LM Studio)', exact=True).click()
@@ -313,7 +326,7 @@ def run():
                 expect(page.locator('#status-message')).to_contain_text('Selected data reset')
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 34
+                assert len(store.sources()) == 35
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors

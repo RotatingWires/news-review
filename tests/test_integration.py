@@ -42,6 +42,12 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 <description>Experimental radio project supports new decoder features.</description></item>
                 <item><title>Old news</title><link>{root}/old</link><pubDate>2020-01-01T00:00:00Z</pubDate></item>
                 </channel></rss>''', 'application/rss+xml')
+        elif self.path in ('/stale-feed', '/undated-feed', '/empty-feed'):
+            items = '' if self.path == '/empty-feed' else f"""<item><title>A useful original feed story</title><link>{root}/article</link><description>Feed-only excerpt.</description>{'<pubDate>2020-01-01T00:00:00Z</pubDate>' if self.path != '/undated-feed' else ''}</item>
+                <item><title>A second original feed story</title><link>{root}/old</link><pubDate>2020-01-01T00:00:00Z</pubDate></item>"""
+            if self.path == '/undated-feed':
+                items = items.replace('<pubDate>2020-01-01T00:00:00Z</pubDate>', '')
+            self.respond(f'<rss><channel>{items}</channel></rss>', 'application/rss+xml')
         elif self.path == '/article':
             self.respond('<article><p>' + ('A browser added experimental support for a new HTTP feature in a development build. ' * 8) + '</p></article>')
         elif self.path == '/listing':
@@ -325,6 +331,52 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.store.stories()['total'], 2)
         self.assertEqual(self.request('/api/stories?period=1%2F1%2F2000+-+1%2F2%2F2000%2C+9am+-+3pm')[1]['total'], 0)
 
+    def test_stale_automatic_feed_checks_website_and_retains_usable_entries(self):
+        from newsreview.sources import read_source
+        config = {'name': 'Stale feed', 'url': self.root + '/listing', 'feed_url': self.root + '/stale-feed',
+                  'mode': 'auto', 'stale_days': 14, 'link_pattern': ''}
+        result = read_source(self.fetcher, config)
+        self.assertEqual(result['method'], 'feed+page')
+        self.assertEqual(len(result['entries']), 3, 'Overlapping article URLs must appear once')
+        self.assertIn(self.root + '/old', {entry['url'] for entry in result['entries']})
+        self.assertIn(self.root + '/excerpt', {entry['url'] for entry in result['entries']})
+        self.assertEqual(result['feed_url'], config['feed_url'])
+        article = next(item for item in result['entries'] if item['url'] == self.root + '/article')
+        self.assertTrue(article['published_at'].startswith(str(datetime.now(timezone.utc).year)))
+        self.assertEqual(article['excerpt'], 'A useful source excerpt from the article card.')
+        self.assertIn('Website listing also checked', result['note'])
+        strict = read_source(self.fetcher, {**config, 'mode': 'feed', 'url': self.root + '/missing'})
+        self.assertEqual(strict['method'], 'feed')
+        self.assertEqual(strict['note'], '')
+        fresh = read_source(self.fetcher, {**config, 'feed_url': self.root + '/feed', 'url': self.root + '/missing'})
+        self.assertEqual(fresh['note'], '')
+        boundary = datetime(2020, 1, 15, tzinfo=timezone.utc)
+        at_limit = read_source(self.fetcher, config, now=boundary)
+        self.assertEqual(at_limit['method'], 'feed+page')
+        below_limit = read_source(self.fetcher, {**config, 'stale_days': 15, 'url': self.root + '/missing'}, now=boundary)
+        self.assertEqual(below_limit['note'], '')
+        failed_page = read_source(self.fetcher, {**config, 'url': self.root + '/missing'})
+        self.assertEqual(len(failed_page['entries']), 2)
+        self.assertEqual(failed_page['method'], 'feed')
+        self.assertIn('Retaining available feed entries', failed_page['note'])
+        undated = read_source(self.fetcher, {**config, 'feed_url': self.root + '/undated-feed', 'first_checked': '2020-01-01T00:00:00+00:00'})
+        self.assertEqual(undated['method'], 'feed+page')
+        empty = read_source(self.fetcher, {**config, 'feed_url': self.root + '/empty-feed'})
+        self.assertEqual(empty['method'], 'feed+page')
+        self.start_api()
+        status, preview, _ = self.request('/api/preview-source', 'POST', {**config, 'category': 'Radio', 'enabled': True})
+        self.assertEqual(status, 200)
+        self.assertEqual(preview['method'], 'feed+page')
+        self.assertEqual(self.store.stories()['total'], 0)
+        for source in self.store.sources():
+            self.store.save_source({**source, 'enabled': False}, source['id'])
+        source_id = self.store.save_source({**config, 'category': 'Radio', 'enabled': True})
+        self.collect()
+        self.assertEqual(self.store.stories()['total'], 2, 'Normal lookback still excludes stale feed-only stories')
+        saved = next(item for item in self.store.sources() if item['id'] == source_id)
+        self.assertEqual(saved['last_method'], 'feed+page')
+        self.assertTrue(saved['newest_published'].startswith(str(datetime.now(timezone.utc).year)))
+
     def test_no_feed_site_preview_collection_and_fallback(self):
         for existing in self.store.sources():
             self.store.save_source({**existing, 'enabled': False}, existing['id'])
@@ -361,7 +413,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('restart', result['error'])
         self.assertFalse(self.store.path.exists(), 'Requests must not create an empty SQLite database behind the app')
         fresh = Store(self.store.path)
-        self.assertEqual(len(fresh.sources()), 32)
+        self.assertEqual(len(fresh.sources()), 33)
 
 
 if __name__ == '__main__':

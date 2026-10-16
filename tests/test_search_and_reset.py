@@ -77,6 +77,19 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.stories(time_start=start, time_end=end, time_zone='Not/AZone')
 
+    def test_keyword_search_matches_source_names_and_combines_filters(self):
+        self.insert(1, 'Radio', 10)
+        self.insert(2, 'Science', 11)
+        source = next(item for item in self.store.sources() if item['id'] == self.source)
+        self.store.save_source({**source, 'name': 'Example 100%_ Source'}, self.source)
+        self.assertEqual(self.store.stories(query='example 100%_ source')['total'], 2)
+        self.assertEqual(self.store.stories(query='100%', tags=['Radio'])['total'], 1)
+        self.assertEqual(self.store.stories(query='100_')['total'], 0, 'SQL wildcards remain literal')
+        self.assertEqual(self.store.stories(query='Example', start='2000-01-01', end='2000-01-02')['total'], 0)
+        with self.store.connect() as db:
+            db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (self.source,))
+        self.assertEqual(self.store.stories(query='Example')['total'], 2, 'Archived source names stay searchable')
+
     def test_reset_removes_archive_and_preserves_all_preferences(self):
         self.insert(1, 'Radio', 10)
         self.insert(2, 'Radio', 11)

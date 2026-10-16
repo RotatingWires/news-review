@@ -39,7 +39,7 @@
           <button id="next-day" class="icon-button" aria-label="Next day">→</button>
           <button id="today" class="text-button">Today</button>
         </div>
-        <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
+        <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, sources, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
       </div>
       <div class="filter-bar">
         <div class="topic-filter custom-dropdown"><button id="topic-button" class="dropdown-trigger" aria-expanded="false" aria-controls="topic-menu" aria-haspopup="true"><span id="topic-label" class="dropdown-label">Topics: All topics</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button><fieldset id="topic-menu" class="dropdown-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
@@ -119,7 +119,8 @@
       <input type="hidden" id="source-id">
       <label>Name<input id="source-name" maxlength="100" required></label>
       <label>Website URL<input id="source-url" type="url" required></label>
-      <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — prefer feed, otherwise read website</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
+      <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — website fallback for stale or failed feeds</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
+      <p class="muted">Automatic also checks the website when the feed is empty or its newest story is older than the warning interval. Website extraction must find readable article links; a blocked or JavaScript-only listing may still need an adapter. RSS/Atom-only mode never checks the website for stale content.</p>
       <div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button><button id="preview-source" type="button">Preview stories</button></div>
       <label>Feed URL <span class="muted">Optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
       <label>Article URL contains <span class="muted">Optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
@@ -172,7 +173,7 @@
       <p>Filtered stories remain in the database but are hidden in the normal feed. Select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
       <h3>Adding sources</h3>
       <p>Open Settings, Sources, then Add source. Use a homepage, news section, or category page that lists multiple articles, rather than a single article URL. Enter a name and category, choose a collection method, and use Preview stories before saving.</p>
-      <p>Automatic prefers a supplied or advertised RSS/Atom feed and falls back to the website listing. RSS/Atom only reports feed failures. Website page reads article cards, headline links, and structured lists directly from downloaded HTML. An optional Article URL contains filter, such as /news/, narrows website candidates.</p>
+      <p>Automatic prefers a supplied or advertised RSS/Atom feed. If it fails, is empty, or becomes stale according to the source warning interval, it also checks the website listing. Website results are merged with usable feed entries; if the website cannot be read, feed entries are kept and the limitation is shown. RSS/Atom only reports feed failures. Website page reads article cards, headline links, and structured lists directly from downloaded HTML. An optional Article URL contains filter, such as /news/, narrows website candidates.</p>
       <h3>Forums and threads</h3>
       <p>Choose a relevant subforum/category page or its feed that lists threads. NewsReview opens the linked threads as story candidates, then your model filters the discussions. A single thread is one discussion, not a continuing list of new stories; new replies do not automatically create new tiles for the same thread URL. Forum discussions are not necessarily verified reporting.</p>
       <h3>What gets downloaded</h3>

@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.10: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.11: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -112,7 +112,7 @@ The Daily Feed topic menu uses the same Win95 arrow and popup styling as other d
 
 - **Daily feed:** an edition contains stories first discovered on the selected day, using the server's local calendar date.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
-- **Search:** a keyword searches across all stored days, matching headlines, summaries, source excerpts, and tags. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
+- **Search:** a keyword searches across all stored days, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
 - **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
 - **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
 - **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
@@ -135,12 +135,12 @@ Each story has a relevance square beside its bookmark: green **75–100**, yello
 
 ## Sources
 
-The following **32 sources** are seeded once on a fresh database:
+The following **33 sources** are seeded once on a fresh database:
 
 | Group | Sources |
 | --- | --- |
 | Original technology sources | BetaNews, Ars Technica, BleepingComputer, TechCrunch, MacRumors, Android Authority, Engadget, MIT Technology Review, PCWorld, The Register, Tom's Hardware, CNET |
-| Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix |
+| Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix, general Hackaday |
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
 | Homelab and self-hosting | selfh.st, ServeTheHome, VirtualizationHowto |
@@ -148,9 +148,11 @@ The following **32 sources** are seeded once on a fresh database:
 
 Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
-[SOURCES.md](SOURCES.md) links to the 20 current approved additions separately from the original 12 websites.
+[SOURCES.md](SOURCES.md) links to the 21 current approved additions separately from the original 12 websites.
 
 The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.
+
+General Hackaday is added once on upgrade to v0.4.11, using `https://hackaday.com/blog/feed/`. The ham-radio source remains separate. Identical article URLs discovered through both are still stored only once. Matching configured URLs and later disable/remove choices are preserved, using the same source-update mechanism as v0.4.8.
 
 ### Add or edit a source
 
@@ -158,7 +160,7 @@ Open **Settings → Sources → Add source**. Enter its name, website/listing UR
 
 | Method | Behavior |
 | --- | --- |
-| Automatic | Use the specified feed or discover an advertised feed; fall back to reading the website listing if the feed is absent or fails. |
+| Automatic | Prefer a specified/advertised feed. Check the website if the feed fails, is empty, or its newest publication exceeds the source warning interval. Merge readable website results with usable stale-feed entries. |
 | RSS/Atom feed only | Use the specified/discovered feed and report failure rather than switching to page extraction. |
 | Website page | Read the listing page directly; no feed is needed, and any saved feed URL is ignored. |
 
@@ -177,6 +179,14 @@ Edit a source to change its feed, default category, or enabled state. Disabling 
 Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. The local model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
 
 A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific scanner/SDR/manufacturer/category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
+
+### Automatic stale-feed checks
+
+Automatic mode checks actual feed freshness on every collection/preview. A feed is stale when its newest dated item is at least the source's **Warn after this many days without activity** interval old (14 days by default). Empty feeds also trigger the website check. For undated feeds, an existing source with no new observed stories over that interval triggers it; new undated feeds are not assumed stale. A fresh feed does not trigger extra website requests just because the previous check was old.
+
+When stale, NewsReview reads the configured website/listing URL with its Article URL contains filter. The preview reports **RSS/Atom + website** when both contribute. It merges normalized URLs, retains feed-only stories, and fills missing website dates/excerpts from matching feed entries. The original feed URL stays configured, so later collections can detect when the feed resumes. Source notes explain the fallback. Standard lookback/per-source limits, archive URL deduplication, and AI review still apply.
+
+If the website cannot be downloaded or parsed, usable feed entries are retained and the source note explains the failed fallback. This is not a browser renderer: JavaScript-only, restricted, or unusual listings still require an adapter. In the live web.dev check, its RSS stopped at October 2, 2026 while a newer October 13 post existed, but its downloaded blog HTML contained only a JavaScript-loaded listing. Automatic mode now checks that page and reports the extraction limitation rather than claiming to recover unseen articles. RSS/Atom-only mode never performs this stale-content website check; Website page mode continues to ignore feeds.
 
 ### Collection buttons and new sources
 
@@ -442,6 +452,14 @@ deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.11
+
+- Match keyword search against source names as well as headline/summary/excerpt/tag text, including historical source records.
+- Check website listings in Automatic mode when feeds are stale or empty, merge usable results, and retain feed entries with an explicit warning if the website cannot be read.
+- Explain staleness thresholds, strict feed-only behavior, combined preview methods, and JavaScript-only limitations in the UI and README.
+- Add general Hackaday with its verified RSS feed, preserving the separate ham-radio source and existing source settings through a one-time upgrade.
+- Expand regression coverage for stale/fresh/undated/empty feeds, merged URL deduplication, fallback failures, source search, and Hackaday persistence.
 
 ### v0.4.10
 

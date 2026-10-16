@@ -99,7 +99,7 @@ class StoreTests(unittest.TestCase):
         return self.store.insert_story(self.source, {"headline": headline, "url": url, "excerpt": "Useful details", "published_at": "2026-10-14T08:00:00+00:00", "category": "Protocols"}, day)
 
     def test_exact_source_list_and_persistent_first_run_defaults(self):
-        self.assertEqual(len(self.store.sources()), 32)
+        self.assertEqual(len(self.store.sources()), 33)
         settings = self.store.settings()
         settings["ai"]["model"] = 'local-test'
         self.store.save_settings({"ai": settings["ai"]})
@@ -108,7 +108,7 @@ class StoreTests(unittest.TestCase):
         reopened = Store(self.store.path)
         self.assertEqual(reopened.settings()["ai"]["model"], 'local-test')
         self.assertEqual(reopened.sources()[0]["enabled"], 0)
-        self.assertEqual(len(reopened.sources()), 32)
+        self.assertEqual(len(reopened.sources()), 33)
 
     def test_unique_url_history_search_bookmark_and_reassessment(self):
         self.assertTrue(self.insert())

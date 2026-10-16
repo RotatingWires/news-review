@@ -38,7 +38,14 @@ SOURCE_ADDITIONS_048 = [
     ("KrebsOnSecurity", "https://krebsonsecurity.com/", "https://krebsonsecurity.com/feed/", "Security"),
     ("Cybernews", "https://cybernews.com/news/", "", "Security"),
 ]
-SOURCES.extend(SOURCE_ADDITIONS_048)
+SOURCE_UPDATES = {
+    'source_additions_048': SOURCE_ADDITIONS_048,
+    'source_additions_0411': [
+        ("Hackaday", "https://hackaday.com/", "https://hackaday.com/blog/feed/", "Engineering"),
+    ],
+}
+for additions in SOURCE_UPDATES.values():
+    SOURCES.extend(additions)
 
 INTERESTS = {
     "guidance": "Favor substantive technical developments, interesting engineering, useful projects, and niche news. Explain what changed and why it matters. Routine phone refreshes, rumors, funding announcements and marketing are low priority. Distinguish proposals, approved standards, experimental support and shipped features.",

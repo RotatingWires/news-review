@@ -8,7 +8,7 @@ import sqlite3
 import secrets
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .defaults import SETTINGS, SOURCES, SOURCE_ADDITIONS_048
+from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
 
 
@@ -71,9 +71,10 @@ class Store:
             if not db.execute("SELECT 1 FROM settings WHERE key='sources_seeded'").fetchone():
                 db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCES)
                 db.execute("INSERT INTO settings VALUES ('sources_seeded', 'true')")
-            if not db.execute("SELECT 1 FROM settings WHERE key='source_additions_048'").fetchone():
-                db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCE_ADDITIONS_048)
-                db.execute("INSERT INTO settings VALUES ('source_additions_048', 'true')")
+            for marker, additions in SOURCE_UPDATES.items():
+                if not db.execute("SELECT 1 FROM settings WHERE key=?", (marker,)).fetchone():
+                    db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", additions)
+                    db.execute("INSERT INTO settings VALUES (?, 'true')", (marker,))
             if version < 2:
                 # Retain historical source names/relationships, but remove these
                 # requested sources from active configuration on existing installs.
@@ -190,9 +191,9 @@ class Store:
                 clauses.append(f"({minutes}>=? OR {minutes}<=?)")
             args.extend([time_start, time_end])
         if query:
-            clauses.append("(s.headline LIKE ? ESCAPE '\\' OR s.summary LIKE ? ESCAPE '\\' OR s.excerpt LIKE ? ESCAPE '\\' OR s.tags LIKE ? ESCAPE '\\')")
+            clauses.append("(s.headline LIKE ? ESCAPE '\\' OR s.summary LIKE ? ESCAPE '\\' OR s.excerpt LIKE ? ESCAPE '\\' OR s.tags LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM sources search_source WHERE search_source.id=s.source_id AND search_source.name LIKE ? ESCAPE '\\'))")
             pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            args.extend([pattern] * 4)
+            args.extend([pattern] * 5)
         if bookmarks:
             clauses.append("s.bookmarked=1")
         where = " AND ".join(clauses)

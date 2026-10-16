@@ -12,7 +12,7 @@ import tempfile
 import zipfile
 
 from . import __version__
-from .defaults import SETTINGS
+from .defaults import SETTINGS, SOURCE_UPDATES
 from .network import valid_url
 from . import validation
 
@@ -89,10 +89,10 @@ def _check_text(value, limit, name, *, nullable=False):
 
 def _validate_rows(database):
     settings = {r['key']: json.loads(r['value']) for r in database.execute('SELECT * FROM settings')}
-    if set(settings) - {*SETTINGS, 'sources_seeded', 'history_cleared_at', 'data_revision', 'source_additions_048'} or not set(SETTINGS) <= set(settings):
+    if set(settings) - {*SETTINGS, 'sources_seeded', 'history_cleared_at', 'data_revision', *SOURCE_UPDATES} or not set(SETTINGS) <= set(settings):
         raise ValueError('Backup settings are incomplete or unsupported')
     validation.settings({key: settings[key] for key in SETTINGS}, SETTINGS)
-    if 'source_additions_048' in settings and settings['source_additions_048'] is not True:
+    if any(marker in settings and settings[marker] is not True for marker in SOURCE_UPDATES):
         raise ValueError('Backup has an invalid source-addition marker')
     if settings.get('sources_seeded') is not True:
         raise ValueError('Backup is missing its source initialization marker')

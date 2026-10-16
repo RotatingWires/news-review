@@ -98,7 +98,7 @@ export class Settings {
       try {
         const result = await api('preview-source', 'POST', this.sourceValues(), 120000);
         if (result.feed_url && !$('source-feed').value) $('source-feed').value = result.feed_url;
-        $('source-preview').replaceChildren(el('strong', '', `Detected: ${result.method === 'page' ? 'Website page' : 'RSS/Atom'} · ${result.entries.length} sample stories`));
+        $('source-preview').replaceChildren(el('strong', '', `Detected: ${({ page: 'Website page', feed: 'RSS/Atom', 'feed+page': 'RSS/Atom + website' })[result.method]} · ${result.entries.length} sample stories`));
         const list = el('ul');
         result.entries.forEach(story => { const item = el('li'); item.append(externalLink(story.url, story.headline)); list.append(item); });
         $('source-preview').append(list);

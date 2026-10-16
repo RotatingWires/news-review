@@ -1,5 +1,6 @@
-"""Feed-first automatic collection plus explicit feed/page collection modes."""
+"""Feed-first collection with website checks for failed or stale Automatic feeds."""
 
+from datetime import datetime, timezone
 from urllib.parse import urljoin
 
 from .feeds import PageParser, parse_feed
@@ -7,7 +8,50 @@ from .listings import parse_listing
 from .network import canonical_url
 
 
-def read_source(fetcher, source):
+def _stale_reason(entries, source, now):
+    days = source.get('stale_days', 14)
+    dates = [datetime.fromisoformat(item['published_at']) for item in entries if item['published_at']]
+    if not entries:
+        return 'Feed returned no story entries'
+    if dates and (now - max(dates)).total_seconds() >= days * 86400:
+        return f"Feed's newest publication is at least {days} days old"
+    if not dates:
+        observed = source.get('last_new_story') or source.get('first_checked')
+        if observed and (now - datetime.fromisoformat(observed)).total_seconds() >= days * 86400:
+            return f'Undated feed has no newly observed stories for at least {days} days'
+    return ''
+
+
+def _feed_result(fetcher, source, entries, feed_url, page, now):
+    result = {'entries': entries, 'method': 'feed', 'feed_url': feed_url, 'note': ''}
+    if source.get('mode', 'auto') != 'auto':
+        return result
+    reason = _stale_reason(entries, source, now)
+    if not reason:
+        return result
+    try:
+        text, final = page if page is not None else fetcher.request(source['url'])[:2]
+        website = parse_listing(text, final, source.get('link_pattern', ''))
+    except ValueError as exc:
+        error = str(exc)[:500].rstrip('.')
+        result['note'] = f'{reason}. Website fallback could not be read: {error}. Retaining available feed entries.'
+        return result
+    # Website order leads previews; preserve feed dates/excerpts when the page
+    # omits them and keep feed-only stories. Existing URL history still deduplicates.
+    merged = {item['url']: dict(item) for item in website}
+    for item in entries:
+        if item['url'] not in merged:
+            merged[item['url']] = dict(item)
+        else:
+            for field in ('published_at', 'excerpt'):
+                merged[item['url']][field] = merged[item['url']][field] or item[field]
+    result.update(entries=list(merged.values()), method='feed+page',
+                  note=f'{reason}. Website listing also checked; combined website and feed entries.')
+    return result
+
+
+def read_source(fetcher, source, *, now=None):
+    now = now or datetime.now(timezone.utc)
     mode = source.get('mode', 'auto')
     feed_url = source.get('feed_url', '')
     page = None
@@ -19,7 +63,6 @@ def read_source(fetcher, source):
                 page = (text, url)
                 try:
                     entries = parse_feed(text, url)
-                    return {'entries': entries, 'method': 'feed', 'feed_url': url, 'note': ''}
                 except ValueError:
                     parser = PageParser()
                     parser.feed(text)
@@ -27,8 +70,10 @@ def read_source(fetcher, source):
                         feed_url = canonical_url(urljoin(url, parser.feeds[0]))
                     else:
                         raise ValueError('No RSS/Atom link advertised by the website')
+                else:
+                    return _feed_result(fetcher, source, entries, url, None, now)
             text, final, _ = fetcher.request(feed_url)
-            return {'entries': parse_feed(text, final), 'method': 'feed', 'feed_url': feed_url, 'note': ''}
+            return _feed_result(fetcher, source, parse_feed(text, final), feed_url, page, now)
         except ValueError as exc:
             if mode == 'feed':
                 raise
