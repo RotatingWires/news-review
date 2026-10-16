@@ -141,7 +141,9 @@ footer {
 #topic-menu { max-height: none; overflow: hidden; margin: 4px 0 0; padding: 8px; width: 225px; min-width: 0; max-width: calc(100vw - 56px); }
 #topic-menu legend { background: var(--face); font-size: 12px; }
 #topic-options { max-height: 210px; overflow: auto; margin-top: 8px; }
-#topic-options label { padding: 5px 3px; font-size: 13px; }
+#topic-options .topic-row { display: flex; width: 100%; margin: 0; padding: 5px 3px; font-size: 13px; cursor: pointer; }
+#topic-options .topic-row:hover { background: var(--title); color: var(--title-text); }
+#topic-options input { cursor: pointer; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .section-heading h2 { margin-bottom: 0; }
 .results-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin-bottom: 10px; }

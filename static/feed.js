@@ -51,16 +51,24 @@ export class Feed {
     this.selectedTopics = new Set([...this.selectedTopics].filter(topic => topics.includes(topic)));
     $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
     $('topic-options').replaceChildren(...topics.map(topic => {
-      const label = el('label', 'checkbox');
+      const label = el('div', 'checkbox topic-row');
       const checkbox = el('input');
       checkbox.type = 'checkbox';
+      checkbox.setAttribute('aria-label', topic);
       checkbox.checked = this.selectedTopics.has(topic);
       checkbox.onchange = () => {
         if (checkbox.checked) this.selectedTopics.add(topic); else this.selectedTopics.delete(topic);
         $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
         this.reload();
       };
-      label.append(checkbox, document.createTextNode(topic));
+      label.onmousedown = event => { if (event.target !== checkbox) event.preventDefault(); };
+      label.onclick = event => {
+        if (event.target === checkbox) return;
+        event.preventDefault();
+        checkbox.focus({ preventScroll: true });
+        checkbox.click();
+      };
+      label.append(checkbox, el('span', 'topic-name', topic));
       return label;
     }));
     if (!topics.length) $('topic-options').append(el('p', 'muted', 'Topics will appear after stories are collected.'));
