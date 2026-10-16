@@ -252,6 +252,41 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/stories')[1]['total'], 0)
         self.assertEqual(self.request('/api/overview')[1]['runs'], [])
 
+    def test_zip_api_confirmation_lock_revision_and_atomic_restore(self):
+        self.collect()
+        self.start_api()
+        with urlopen(self.api_root + '/api/export', timeout=5) as response:
+            self.assertEqual(response.headers.get_content_type(), 'application/zip')
+            archive = response.read()
+        revision = self.store.overview()['revision']
+
+        def upload(headers=None):
+            request = Request(self.api_root + '/api/import/backup', data=archive, method='POST',
+                              headers={'Content-Type': 'application/zip', **(headers or {})})
+            try:
+                response = urlopen(request, timeout=5)
+            except HTTPError as error:
+                response = error
+            with response:
+                return response.status, json.loads(response.read())
+
+        self.assertEqual(upload()[0], 400)
+        self.assertEqual(upload({'X-NewsReview-Confirm': 'RESTORE', 'Origin': 'https://other.example'})[0], 403)
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(upload({'X-NewsReview-Confirm': 'RESTORE'})[0], 409)
+        finally:
+            self.collector.lock.release()
+        self.assertEqual(self.request('/api/reset', 'POST', {'confirmation': 'wrong', 'selections': {'history': True}})[0], 400)
+        self.assertEqual(self.request('/api/reset', 'POST', {'confirmation': 'RESET SELECTED', 'selections': {'history': True}})[0], 200)
+        self.assertEqual(self.store.stories()['total'], 0)
+        self.assertEqual(upload({'X-NewsReview-Confirm': 'RESTORE', 'X-NewsReview-Revision': revision})[0], 409)
+        status, result = upload({'X-NewsReview-Confirm': 'RESTORE'})
+        self.assertEqual(status, 200)
+        self.assertTrue(result['restored'])
+        self.assertEqual(self.store.stories()['total'], 2)
+        self.assertEqual(self.request('/api/stories?period=1%2F1%2F2000+-+1%2F2%2F2000%2C+9am+-+3pm')[1]['total'], 0)
+
     def test_no_feed_site_preview_collection_and_fallback(self):
         for existing in self.store.sources():
             self.store.save_source({**existing, 'enabled': False}, existing['id'])

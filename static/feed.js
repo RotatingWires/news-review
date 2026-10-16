@@ -7,7 +7,7 @@ export class Feed {
     this.requestId = 0;
     this.selectedTopics = new Set();
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
-    ['day', 'date-range', 'time-range', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    ['day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
     $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
     document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
@@ -21,7 +21,7 @@ export class Feed {
   }
 
   clearFilters() {
-    ['query', 'date-range', 'time-range'].forEach(id => { $(id).value = ''; });
+    ['query', 'period'].forEach(id => { $(id).value = ''; });
     this.selectedTopics.clear();
     this.renderTopics(this.app.overview.tags);
     $('show-hidden').checked = false;
@@ -34,7 +34,7 @@ export class Feed {
 
   renderTopics(topics) {
     this.selectedTopics = new Set([...this.selectedTopics].filter(topic => topics.includes(topic)));
-    $('topic-button').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected ▾` : 'Topics: All topics ▾';
+    $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
     $('topic-options').replaceChildren(...topics.map(topic => {
       const label = el('label', 'checkbox');
       const checkbox = el('input');
@@ -42,7 +42,7 @@ export class Feed {
       checkbox.checked = this.selectedTopics.has(topic);
       checkbox.onchange = () => {
         if (checkbox.checked) this.selectedTopics.add(topic); else this.selectedTopics.delete(topic);
-        $('topic-button').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected ▾` : 'Topics: All topics ▾';
+        $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
         this.reload();
       };
       label.append(checkbox, document.createTextNode(topic));
@@ -67,13 +67,12 @@ export class Feed {
   async load() {
     const requestId = ++this.requestId;
     if (!$('day').value) $('day').value = this.app.overview.today;
-    const query = $('query').value.trim(), dates = $('date-range').value.trim(), times = $('time-range').value.trim();
-    const history = Boolean(query || dates || times);
+    const query = $('query').value.trim(), period = $('period').value.trim();
+    const history = Boolean(query || period);
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page });
     if (query) params.set('query', query);
-    if (dates) params.set('date_range', dates);
-    if (times) params.set('time_range', times);
+    if (period) params.set('period', period);
     this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!history && !bookmarked) params.set('day', $('day').value);
     if (bookmarked) params.set('bookmarks', '1');

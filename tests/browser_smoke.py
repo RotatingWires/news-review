@@ -60,6 +60,22 @@ def run():
                 assert page.locator('.story').count() == 4
                 page.screenshot(path='/tmp/newsreview-desktop.png', full_page=True)
 
+                page.get_by_role('button', name='Help', exact=True).click()
+                expect(page.locator('#help-dialog')).to_be_visible()
+                positions = page.locator('#help-dialog').evaluate('el => [el.querySelector(".dialog-heading").getBoundingClientRect().top, el.querySelector(".dialog-actions").getBoundingClientRect().bottom]')
+                page.locator('#help-dialog .dialog-body').evaluate('el => { el.scrollTop = el.scrollHeight; }')
+                assert positions == page.locator('#help-dialog').evaluate('el => [el.querySelector(".dialog-heading").getBoundingClientRect().top, el.querySelector(".dialog-actions").getBoundingClientRect().bottom]')
+                page.locator('#help-dialog .dialog-actions button').click()
+                page.get_by_role('button', name='Import/Export...', exact=True).click()
+                with page.expect_download() as download_info:
+                    page.locator('#export-backup').click()
+                backup_path = Path(directory) / 'browser-export.zip'
+                download_info.value.save_as(backup_path)
+                page.locator('#backup-file').set_input_files(str(backup_path))
+                page.locator('#confirm-restore').check()
+                page.locator('#restore-backup').click()
+                expect(page.locator('#transfer-status')).to_contain_text('Restored', timeout=15000)
+                page.locator('#transfer-dialog .dialog-actions').get_by_role('button', name='Close', exact=True).click()
                 page.locator('.bookmark').first.click()
                 page.get_by_role('button', name='Bookmarks', exact=True).click()
                 expect(page.locator('.story')).to_have_count(1)
@@ -87,11 +103,11 @@ def run():
                 page.locator('#topic-button').click()
                 yesterday = date.today() - timedelta(days=1)
                 date_text = f'{yesterday.month}/{yesterday.day}/{yesterday.year} - {date.today().month}/{date.today().day}/{date.today().year}'
-                page.get_by_label('Date range', exact=True).fill(date_text)
-                page.get_by_label('Date range', exact=True).press('Enter')
+                page.get_by_label('Date/time range', exact=True).fill(date_text)
+                page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(5)
-                page.get_by_label('Time range', exact=True).fill('12am - 11:59pm')
-                page.get_by_label('Time range', exact=True).press('Enter')
+                page.get_by_label('Date/time range', exact=True).fill(date_text + ', 12am - 11:59pm')
+                page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(5)
                 page.get_by_role('button', name='Clear search').click()
                 expect(page.locator('.story')).to_have_count(4)
@@ -108,7 +124,7 @@ def run():
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/')
                 page.get_by_role('button', name='Find RSS/Atom feed').click()
                 expect(page.locator('#source-feed')).to_have_value(re.compile('/feed$'))
-                page.get_by_role('button', name='Save source', exact=True).click()
+                page.get_by_role('button', name='Save', exact=True).click()
                 expect(page.locator('.source-row')).to_have_count(26)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
@@ -117,14 +133,14 @@ def run():
                 page.get_by_role('button', name='Preview stories', exact=True).click()
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
-                page.get_by_role('button', name='Save source', exact=True).click()
+                page.get_by_role('button', name='Save', exact=True).click()
                 expect(page.locator('.source-row')).to_have_count(27)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.locator('#ai-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.locator('#ai-model').fill('fixture')
                 page.get_by_role('button', name='Test with a sample article').click()
                 expect(page.locator('#model-test-result')).to_contain_text('validation passed')
-                page.get_by_role('button', name='Save AI settings').click()
+                page.get_by_role('button', name='Save Settings').click()
                 expect(page.locator('#toast')).to_contain_text('AI settings saved')
                 assert store.settings()['ai']['model'] == 'fixture'
 
@@ -147,6 +163,10 @@ def run():
                 page.get_by_role('button', name='Daily feed', exact=True).click()
                 page.wait_for_selector('.story')
                 page.set_viewport_size({'width': 390, 'height': 844})
+                chrome = page.locator('.window').evaluate('el => [el.querySelector("header").getBoundingClientRect().top, el.querySelector("footer").getBoundingClientRect().bottom]')
+                page.locator('main').evaluate('el => { el.scrollTop = el.scrollHeight; }')
+                assert chrome == page.locator('.window').evaluate('el => [el.querySelector("header").getBoundingClientRect().top, el.querySelector("footer").getBoundingClientRect().bottom]')
+                assert page.evaluate('scrollY === 0')
                 page.screenshot(path='/tmp/newsreview-mobile.png', full_page=True)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
                 page.get_by_role('button', name='Switch color theme').click()
@@ -155,17 +175,18 @@ def run():
                 page.get_by_role('button', name='Settings', exact=True).click()
                 page.get_by_role('button', name='Collection & history', exact=True).click()
                 history_count = store.stories()['total']
-                page.get_by_role('button', name='Delete all history…', exact=True).click()
+                page.get_by_role('button', name='Fresh start...', exact=True).click()
                 page.locator('#clear-history-dialog').get_by_role('button', name='Cancel', exact=True).click()
                 assert store.stories()['total'] == history_count
-                page.get_by_role('button', name='Delete all history…', exact=True).click()
-                page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('wrong')
-                page.get_by_role('button', name='Delete history permanently', exact=True).click()
+                page.get_by_role('button', name='Fresh start...', exact=True).click()
+                page.get_by_label('Type RESET SELECTED to confirm', exact=True).fill('wrong')
+                page.get_by_role('button', name='Reset selected data', exact=True).click()
                 assert store.stories()['total'] == history_count
                 preferences = store.settings()
-                page.get_by_label('Type DELETE HISTORY to confirm', exact=True).fill('DELETE HISTORY')
-                page.get_by_role('button', name='Delete history permanently', exact=True).click()
-                expect(page.locator('#toast')).to_contain_text('History cleared')
+                page.locator('#reset-bookmarks').check()
+                page.get_by_label('Type RESET SELECTED to confirm', exact=True).fill('RESET SELECTED')
+                page.get_by_role('button', name='Reset selected data', exact=True).click()
+                expect(page.locator('#toast')).to_contain_text('Selected data reset')
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
                 assert len(store.sources()) == 27

@@ -6,6 +6,8 @@ export function el(tag, className = '', text = '') {
   return node;
 }
 let toastTimer;
+let dataRevision = null;
+export function revisionHeaders() { return dataRevision ? { 'X-NewsReview-Revision': dataRevision } : {}; }
 export function toast(message, error = false) {
   $('toast').textContent = message;
   $('toast').className = error ? 'error-toast' : '';
@@ -20,7 +22,7 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   try {
     response = await fetch('/api/' + path, {
       method, credentials: 'same-origin', signal: controller.signal,
-      headers: data === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: { ...(method === 'GET' ? {} : revisionHeaders()), ...(data === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
     result = await response.json();
@@ -33,6 +35,7 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
     throw error;
   } finally { clearTimeout(timer); }
   document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: result.code === 'storage_unavailable' ? result.error : null } }));
+  if (path === 'overview' && response.ok) dataRevision = result.revision;
   if (!response.ok) {
     if (response.status === 401 && path !== 'login' && !$('login-dialog').open) $('login-dialog').showModal();
     const error = new Error(result.error || `Request failed (${response.status})`);

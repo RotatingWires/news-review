@@ -11,7 +11,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, ORM, or runtime Python packages.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.3.0: Describe the change`.
+- Commits use the existing project convention: `v0.4.0: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -101,8 +101,9 @@ A small model must still follow instructions and produce valid structured output
 - **Daily feed:** an edition contains stories first discovered on the selected day, using the server's local calendar date.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
 - **Search:** a keyword searches across all stored days, matching headlines, summaries, source excerpts, and tags. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
-- **Date range:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
-- **Time range:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times filter the discovery timestamp in the **server's local timezone**, not publication time. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
+- **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
+- **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
+- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times filter the discovery timestamp in the **server's local timezone**, not publication time. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
 - Keyword, date, and time filters combine and search across the archive. Press Enter or Search to apply them; changing a range also applies it on blur.
 - **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
@@ -193,13 +194,13 @@ Saving affects the next job's AI decisions. A currently running job keeps the se
 
 Filtered stories stay in the database. Their default view is hidden, so you can inspect the decisions or reassess them later. Source retention remains independent of relevance.
 
-### Fresh start: delete all history
+### Fresh start: selective reset
 
-Under **Settings → Collection & history → Fresh start**, select **Delete all history…**, then type `DELETE HISTORY` and confirm. Cancel or close the dialog to keep everything.
+Under **Settings → Collection & history**, click **Fresh start...**, choose the categories to clear, and type `RESET SELECTED`. History and run/source-check history are initially checked. Bookmarks, interest topics/ranks, editorial guidance, exclusions, configured sources, AI settings, and collection settings can each be selected separately.
 
-This removes all stories (including bookmarks, filtered stories, and duplicate coverage), excerpts, extracted text, generated summaries, and collection/review run records from the active database. It clears source check/error timestamps. It preserves sources and enabled states, interests, editorial guidance, exclusions, AI configuration, and collection settings. Deletion is transactional and is rejected while a collector/reviewer is running.
+Clearing history keeps bookmarked stories unless Bookmarks is also selected. Bookmarks alone removes saved flags without deleting stories. Clearing sources retires the configuration while preserving labels on retained stories; defaults are not reseeded. Resetting AI/collection settings restores their defaults. Unchecked preferences remain intact. The operation is transactional and rejected while collection/review runs.
 
-The daily scheduler skips the rest of the reset day, including after a restart, so it does not immediately refill the archive. Manual **Check sources** remains available. The next collection may rediscover recent stories because URL history was also deleted. Backups, logs, and the recovery copy from the initial-name migration are separate files and are not erased by this action. This is an archive reset, not a secure disk wipe; SQLite can reuse the freed space.
+Clearing history or runs suppresses automatic collection for the rest of the day, including after restart. Manual collection remains available. Removed URLs may be collected again. Backups and logs are separate files and are retained. This is not a secure disk wipe.
 
 ## Collection and AI pipeline
 
@@ -367,6 +368,7 @@ newsreview/
   validation.py     source/settings input validation
   server.py         same-origin HTTP API, authentication and static assets
   backup.py         consistent online SQLite backup command
+  transfer.py       validated ZIP snapshots and transactional restoration
 static/
   index.html        reader, settings panels, dialogs
   style.css         responsive Windows 95 light/dark layout
@@ -374,12 +376,23 @@ static/
   shared.js         API, DOM, notification and formatting helpers
   feed.js           tiles, search, dates, pagination and bookmarks
   settings.js       interests, sources, local AI and scheduling controls
+  transfer.js       browser ZIP download/upload and restore confirmation
   icon.svg          application icon
 tests/              unit/integration tests and optional browser/live-feed audits
 deploy/             example systemd unit
 ```
 
 ## Release notes
+
+### v0.4.0
+
+- Add Help after Settings, explaining AI filtering, summaries, listing/feed collection, and forum scope.
+- Add validated ZIP export/restore with automatic recovery backups and stale-tab write protection.
+- Add selective fresh starts with bookmarked-story preservation by default.
+- Fill the viewport, pin application/dialog chrome, and scroll content internally in both themes.
+- Combine date/time search, restore the blinking collection indicator, and refine labels/dropdown spacing.
+- Expand backup/reset/search/browser tests and restore detailed release commit bodies.
+
 
 ### v0.3.0
 
@@ -407,3 +420,15 @@ deploy/             example systemd unit
 - Support local Ollama and compatible model servers with validated summaries, significance, tags and conservative duplicate grouping.
 - Preserve readable source excerpts while AI is unavailable; expose retry/reassessment and run history.
 - Add password protection for LAN serving, light/dark themes, online backups, deployment guidance and automated coverage.
+
+## ZIP import/export and interface help
+
+**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
+
+**Import/Export... → Download Export** snapshots the live database, including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (version, checksum, counts). It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
+
+Choose an export ZIP and check the replacement confirmation to restore. This replaces rather than merges the dataset. Uploads are limited to 256 MiB compressed and 1 GiB of database data. The server rejects extra archive members, damaged checksums, unsupported/newer versions, unexpected schema objects, invalid relationships, or invalid configuration. It imports validated rows into its own schema, without executing imported schema SQL. Before replacing data, it writes a recovery ZIP to `data/backups/before-restore-*.zip`; failure to save it aborts the operation. Keep enough free disk space for the current database, upload, extracted database, and recovery ZIP. Restore is blocked while collection/review runs. Interrupted imported runs are marked interrupted.
+
+Restore and reset change a dataset revision: other tabs refresh before making further writes. After an interrupted upload response, the UI reloads actual server data and reports that the restore could not be confirmed instead of retrying it automatically. Recovery ZIPs can be restored through the same dialog. The offline SQLite backup command remains available for larger datasets.
+
+The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.

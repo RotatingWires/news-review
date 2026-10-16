@@ -14,14 +14,16 @@ import secrets
 import sqlite3
 import threading
 import time
+import tempfile
 from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
 from . import validation
 from .feeds import discover
-from .search import date_range, time_range
+from .search import date_range, time_range, date_time_range
 from .sources import read_source
 from .store import StorageUnavailable
+from .transfer import create_archive, restore_archive, MAX_UPLOAD
 
 logger = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -88,6 +90,47 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Expected a JSON object")
         return result
 
+    def send_file(self, path, filename):
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/zip')
+        self.send_header('Content-Length', str(path.stat().st_size))
+        self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.end_headers()
+        with path.open('rb') as source:
+            while chunk := source.read(65536):
+                self.wfile.write(chunk)
+
+    def import_backup(self):
+        if self.headers.get('X-NewsReview-Confirm') != 'RESTORE':
+            raise ValueError('Confirm that this restore replaces the current dataset')
+        if self.headers.get_content_type() != 'application/zip' or self.headers.get('Transfer-Encoding'):
+            raise ValueError('Upload a ZIP with a Content-Length header')
+        length = int(self.headers.get('Content-Length', '0'))
+        if not 0 < length <= MAX_UPLOAD:
+            self.send(413, {'error': 'Backup ZIP must be between 1 byte and 256 MiB'})
+            return
+        if not self.server.collector.lock.acquire(blocking=False):
+            self.send(409, {'error': 'Wait for collection/review to finish before restoring a backup'})
+            return
+        try:
+            with tempfile.TemporaryDirectory(prefix='newsreview-upload-') as directory:
+                path = Path(directory) / 'upload.zip'
+                with path.open('wb') as destination:
+                    remaining = length
+                    while remaining:
+                        chunk = self.rfile.read(min(65536, remaining))
+                        if not chunk:
+                            raise ValueError('Upload ended before the complete ZIP was received')
+                        destination.write(chunk)
+                        remaining -= len(chunk)
+                result = restore_archive(self.server.store, path)
+                self.server.collector.update(message='Backup restored. Reading history and preferences were reloaded.')
+                self.send(200, result)
+        finally:
+            self.server.collector.lock.release()
+
     def authorized(self):
         if not self.server.password:
             return True
@@ -143,6 +186,15 @@ class Handler(BaseHTTPRequestHandler):
             if not self.authorized():
                 self.send(401, {"error": "Sign in to continue"})
                 return
+            if write and self.headers.get('X-NewsReview-Revision'):
+                with self.server.store.connect() as db:
+                    revision = json.loads(db.execute("SELECT value FROM settings WHERE key='data_revision'").fetchone()[0])
+                if self.headers['X-NewsReview-Revision'] != revision:
+                    self.send(409, {'error': 'Data changed after a restore or reset. Reload before making changes.', 'code': 'revision_changed'})
+                    return
+            if self.command == 'POST' and path == '/api/import/backup':
+                self.import_backup()
+                return
             if write:
                 self.mutate(path, self.body())
             else:
@@ -181,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
     def static(self, path):
         name = "index.html" if path == "/" else path.lstrip("/")
         # Explicit flat asset allowlist: never serve runtime data, source or dotfiles.
-        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "icon.svg"}:
+        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "icon.svg"}:
             self.send(404, {"error": "Not found"})
             return
         content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
@@ -205,6 +257,13 @@ class Handler(BaseHTTPRequestHandler):
             if date_text.strip():
                 values["start"], values["end"] = date_range(date_text)
             time_start, time_end = time_range(time_text)
+            combined = params.get('period', [''])[0]
+            if len(combined) > 200:
+                raise ValueError('Date/time range is too long')
+            if combined.strip():
+                period = date_time_range(combined)
+                values['start'], values['end'] = period['start'], period['end']
+                time_start, time_end = period['time_start'], period['time_end']
             tags = params.get("tag", [])
             if len(tags) > 100 or any(len(t) > 60 for t in tags):
                 raise ValueError("Choose at most 100 valid topics")
@@ -216,6 +275,11 @@ class Handler(BaseHTTPRequestHandler):
                 for field in ("article_text", "interests_snapshot"):
                     item.pop(field, None)
             self.send(200, result)
+        elif path == '/api/export':
+            with tempfile.TemporaryDirectory(prefix='newsreview-download-') as directory:
+                path = Path(directory) / 'export.zip'
+                create_archive(store, path)
+                self.send_file(path, 'newsreview-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '.zip')
         elif path == "/api/overview":
             self.send(200, {**store.overview(), "collector": self.server.collector.status(), "today": date.today().isoformat(),
                             "timezone": str(datetime.now().astimezone().tzinfo), "version": __version__})
@@ -230,7 +294,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self, path, data):
         store = self.server.store
-        if path == "/api/history/clear" and self.command == "POST":
+        if path == '/api/reset' and self.command == 'POST':
+            if data.get('confirmation') != 'RESET SELECTED':
+                raise ValueError('Type RESET SELECTED to confirm')
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {'error': 'Wait for collection/review or restore to finish before resetting data'})
+                return
+            try:
+                result = store.reset(data.get('selections'))
+                self.server.collector.update(message='Selected data was reset. Other data and preferences were kept.')
+                self.send(200, result)
+            finally:
+                self.server.collector.lock.release()
+        elif path == "/api/history/clear" and self.command == "POST":
             if data.get("confirmation") != "DELETE HISTORY":
                 raise ValueError("Type DELETE HISTORY to confirm")
             if not self.server.collector.lock.acquire(blocking=False):

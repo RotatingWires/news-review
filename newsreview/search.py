@@ -50,3 +50,19 @@ def parse_time(value):
 def time_range(value):
     parts = split_range(value, "time range")
     return (None, None) if parts is None else tuple(parse_time(part) for part in parts)
+
+
+def date_time_range(value, year=None):
+    """Date-only, time-only, or date range followed by comma and time range."""
+    parts = value.strip().split(',')
+    if len(parts) > 2:
+        raise ValueError('Use one comma between the date and time ranges')
+    if len(parts) == 2:
+        dates, times = (part.strip() for part in parts)
+    elif '/' in parts[0]:
+        dates, times = parts[0], ''
+    else:
+        dates, times = '', parts[0]
+    start, end = date_range(dates, year)
+    time_start, time_end = time_range(times)
+    return {'start': start, 'end': end, 'time_start': time_start, 'time_end': time_end}

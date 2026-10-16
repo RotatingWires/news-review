@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import secrets
 
 from .defaults import SETTINGS, SOURCES
 from .health import source_health
@@ -65,6 +66,7 @@ class Store:
                     db.execute(f'ALTER TABLE sources ADD COLUMN {name} {definition}')
             for key, value in SETTINGS.items():
                 db.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, json.dumps(value)))
+            db.execute("INSERT OR IGNORE INTO settings VALUES ('data_revision',?)", (json.dumps(secrets.token_hex(16)),))
             if not db.execute("SELECT 1 FROM settings WHERE key='sources_seeded'").fetchone():
                 db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCES)
                 db.execute("INSERT INTO settings VALUES ('sources_seeded', 'true')")
@@ -100,7 +102,7 @@ class Store:
 
     def settings(self):
         with self.connect() as db:
-            return {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] not in ("sources_seeded", "history_cleared_at")}
+            return {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] in SETTINGS}
 
     def save_settings(self, values):
         with self.connect() as db:
@@ -203,7 +205,8 @@ class Store:
             runs = [dict(r) for r in db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT 8")]
             for run in runs:
                 run["details"] = json.loads(run["details"])
-            return {"dates": dates, "tags": tags, "counts": counts, "runs": runs}
+            revision = json.loads(db.execute("SELECT value FROM settings WHERE key='data_revision'").fetchone()[0])
+            return {"dates": dates, "tags": tags, "counts": counts, "runs": runs, 'revision': revision}
 
     def pending(self, limit):
         with self.connect() as db:
@@ -236,16 +239,40 @@ class Store:
 
     def clear_history(self):
         """Remove the archive in one transaction, preserving every user setting."""
+        return self.reset({'history': True, 'bookmarks': True, 'runs': True})['deleted_stories']
+
+    def reset(self, selections):
+        allowed = {'history', 'bookmarks', 'runs', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection'}
+        if not isinstance(selections, dict) or set(selections) - allowed or not any(selections.values()) or any(type(v) is not bool for v in selections.values()):
+            raise ValueError('Choose at least one valid reset option')
         with self.connect() as db:
-            count = db.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
-            # Break self-references before deletion, including any related coverage.
-            db.execute("UPDATE stories SET duplicate_of=NULL")
-            db.execute("DELETE FROM stories")
-            db.execute("DELETE FROM runs")
-            db.execute("""UPDATE sources SET last_checked=NULL,last_error=NULL,last_success=NULL,first_checked=NULL,
-                newest_published=NULL,last_new_story=NULL,last_count=NULL,last_method=NULL,consecutive_failures=0,collection_note=''""")
-            db.execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(utcnow()),))
-            return count
+            result = {'deleted_stories': 0, 'cleared_bookmarks': 0}
+            if selections.get('history'):
+                where = '1=1' if selections.get('bookmarks') else 'bookmarked=0'
+                db.execute(f"""UPDATE stories SET duplicate_of=NULL,
+                    status=CASE WHEN status='duplicate' THEN CASE WHEN summary='' THEN 'pending' ELSE 'reviewed' END ELSE status END
+                    WHERE duplicate_of IN (SELECT id FROM stories WHERE {where})""")
+                result['deleted_stories'] = db.execute(f'DELETE FROM stories WHERE {where}').rowcount
+            if selections.get('bookmarks'):
+                result['cleared_bookmarks'] = db.execute('UPDATE stories SET bookmarked=0 WHERE bookmarked=1').rowcount
+            if selections.get('runs'):
+                db.execute('DELETE FROM runs')
+                db.execute("""UPDATE sources SET last_checked=NULL,last_error=NULL,last_success=NULL,first_checked=NULL,
+                    newest_published=NULL,last_new_story=NULL,last_count=NULL,last_method=NULL,consecutive_failures=0,collection_note=''""")
+            interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+            for option, key, empty in [('topics', 'topics', []), ('guidance', 'guidance', ''), ('exclusions', 'exclusions', [])]:
+                if selections.get(option):
+                    interests[key] = empty
+            db.execute("UPDATE settings SET value=? WHERE key='interests'", (json.dumps(interests),))
+            for key in ('ai', 'collection'):
+                if selections.get(key):
+                    db.execute('UPDATE settings SET value=? WHERE key=?', (json.dumps(SETTINGS[key]), key))
+            if selections.get('sources'):
+                db.execute('UPDATE sources SET removed=1,enabled=0')
+            if selections.get('history') or selections.get('runs'):
+                db.execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(utcnow()),))
+            db.execute("UPDATE settings SET value=? WHERE key='data_revision'", (json.dumps(secrets.token_hex(16)),))
+            return result
 
     def start_run(self, kind):
         with self.connect() as db:

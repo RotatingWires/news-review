@@ -1,5 +1,6 @@
 import { Feed } from './feed.js';
 import { Settings } from './settings.js';
+import { Transfer } from './transfer.js';
 
 import { $, api, busy, toast, formatTime } from './shared.js';
 
@@ -10,6 +11,7 @@ class App {
     this.authenticated = false;
     this.feed = new Feed(this);
     this.settings = new Settings(this);
+    this.transfer = new Transfer(this);
     this.pollTimer = null;
     this.unconfirmedRefresh = null;
   }
@@ -34,6 +36,7 @@ class App {
     $('daily-nav').onclick = () => this.show('daily');
     $('bookmarks-nav').onclick = () => this.show('bookmarks');
     $('settings-nav').onclick = () => this.show('settings');
+    $('help-nav').onclick = () => $('help-dialog').showModal();
     $('collect').onclick = () => this.collect('collect', $('collect'));
     $('review-pending').onclick = () => this.collect('review', $('review-pending'));
     $('login-dialog').addEventListener('cancel', event => event.preventDefault());
@@ -80,6 +83,8 @@ class App {
     this.overview = await api('overview');
     $('version').textContent = 'v' + this.overview.version;
     const state = this.overview.collector;
+    document.querySelector('.status-dot').classList.toggle('collecting', state.running);
+    document.querySelector('.status-bar').setAttribute('aria-busy', String(state.running));
     const pending = this.overview.counts.pending || 0;
     $('collector-status').textContent = state.running ? state.message : `${state.message} · ${pending} awaiting review`;
     $('collect').disabled = state.running;
@@ -87,6 +92,7 @@ class App {
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
     $('refresh-sources').disabled = state.running;
+    this.transfer.sync();
     const last = this.overview.runs.find(run => run.kind === 'collect');
     let refreshStatus = state.running ? state.message : last
       ? `${state.message} · Last collection: ${last.status} · Started ${formatTime(last.started_at)} · ${last.details.errors?.length || 0} errors. See each source and run history for details.`
@@ -110,10 +116,13 @@ class App {
         }
         const firstConnection = !this.overview;
         const lastRun = this.overview?.runs[0]?.id;
+        const lastRevision = this.overview?.revision;
         const wasRunning = this.overview?.collector.running;
         await this.refreshOverview();
-        if (firstConnection || lastRun !== this.overview.runs[0]?.id || (wasRunning && !this.overview.collector.running)) {
+        if (lastRevision && lastRevision !== this.overview.revision) this.feed.clearFilters();
+        if (firstConnection || lastRevision !== this.overview.revision || lastRun !== this.overview.runs[0]?.id || (wasRunning && !this.overview.collector.running)) {
           if (this.view !== 'settings') await this.feed.load();
+          else if (lastRevision !== this.overview.revision) await this.settings.load();
           else await this.settings.refreshSources();
         }
         if (this.view === 'settings' && !$('panel-sources').hidden) await this.settings.refreshSources();

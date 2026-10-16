@@ -19,6 +19,8 @@
       <button id="daily-nav" class="nav-button active" aria-current="page">Daily feed</button>
       <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
       <button id="settings-nav" class="nav-button">Settings</button>
+      <button id="help-nav" class="nav-button">Help</button>
+      <button id="transfer-nav" class="nav-button">Import/Export...</button>
       <button id="theme" class="nav-button" aria-label="Switch color theme" title="Switch color theme">Dark theme</button>
       <button id="logout" class="nav-button" hidden>Sign out</button>
     </nav>
@@ -43,9 +45,8 @@
         <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
       </div>
       <div class="filter-bar">
-        <div class="topic-filter"><button id="topic-button" aria-expanded="false" aria-controls="topic-menu">Topics: All topics ▾</button><fieldset id="topic-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
-        <label>Date range<input type="text" id="date-range" form="search" placeholder="10/3 - 10/8" autocomplete="off" spellcheck="false" maxlength="100"></label>
-        <label>Time range<input type="text" id="time-range" form="search" placeholder="9am - 9pm" autocomplete="off" spellcheck="false" maxlength="100"></label>
+        <div class="topic-filter"><button id="topic-button" aria-expanded="false" aria-controls="topic-menu"><span id="topic-label">Topics: All topics</span><span class="topic-arrow" aria-hidden="true">▾</span></button><fieldset id="topic-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
+        <label>Date/time range<input type="text" id="period" form="search" placeholder="9/1/26 - 10/1/26, 10am - 3pm" autocomplete="off" spellcheck="false" maxlength="200"></label>
         <label class="checkbox"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
         <button id="clear-search" class="text-button" hidden>Clear search</button>
       </div>
@@ -66,7 +67,7 @@
         <form id="interests-form">
           <div id="interest-rows" class="interest-rows"></div><button id="add-interest" type="button">+ Add interest</button>
           <label>Editorial guidance<textarea id="guidance" rows="5" maxlength="6000"></textarea></label>
-          <label>Exclude <span class="muted">— one topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
+          <label>Exclude <span class="muted">One topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
           <button class="primary" type="submit">Save interests</button>
         </form>
       </section>
@@ -87,7 +88,7 @@
           <label>Request timeout (seconds)<input id="ai-timeout" type="number" min="10" max="600" required></label>
           <label>Maximum article characters<input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
           <p id="ai-help" class="callout full"></p>
-          <div class="button-row full"><button class="primary" type="submit">Save AI settings</button><button id="test-model" type="button">Test with a sample article</button></div>
+          <div class="button-row full"><button class="primary" type="submit">Save Settings</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
         </form>
         <p class="muted">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
@@ -105,7 +106,7 @@
         </form>
         <div class="maintenance"><h3>Review queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button id="retry-failed">Reset failed reviews</button><button id="reassess">Reassess history…</button></div></div>
         <h3>Recent runs</h3><div id="run-history"></div>
-        <div class="maintenance"><h3>Fresh start</h3><p>Delete all stories, bookmarks, summaries, and collection/review history. Keep your sources, interests, editorial guidance, exclusions, local AI, and schedule settings.</p><p class="muted">This cannot be undone in the app. The next scheduled collection will be tomorrow; you can check sources manually whenever you are ready.</p><button id="clear-history" class="danger">Delete all history…</button></div>
+        <div class="maintenance"><h3>Fresh start</h3><p>Choose which history and preferences to clear. Bookmarked stories can be kept while other history is removed.</p><button id="clear-history" class="danger">Fresh start...</button></div>
       </section>
       </fieldset>
     </section>
@@ -115,26 +116,90 @@
   </div>
   <div id="toast" role="status" hidden></div>
 
-  <dialog id="source-dialog"><form id="source-form">
+  <dialog id="source-dialog"><form id="source-form" class="dialog-layout">
     <div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div>
-    <input type="hidden" id="source-id">
-    <label>Name<input id="source-name" maxlength="100" required></label>
-    <label>Website URL<input id="source-url" type="url" required></label>
-    <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — prefer feed, otherwise read website</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
-    <div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button><button id="preview-source" type="button">Preview stories</button></div>
-    <label>Feed URL <span class="muted">— optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
-    <label>Article URL contains <span class="muted">— optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
-    <p class="muted">Website mode reads article cards, headline links, and structured article lists from this page. Preview before saving. JavaScript-only or restricted pages may need a custom adapter.</p>
-    <output id="source-preview" class="callout" hidden></output>
-    <label>Warn after this many days without activity<input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
-    <label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
-    <datalist id="source-categories"><option>News</option><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio &amp; SDR</option><option>PBX &amp; VoIP</option></datalist>
-    <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
-    <p id="source-error" class="error" role="alert"></p>
-    <div class="button-row"><button class="primary" type="submit">Save source</button><button type="button" data-close="source-dialog">Cancel</button></div>
+    <div class="dialog-body">
+      <input type="hidden" id="source-id">
+      <label>Name<input id="source-name" maxlength="100" required></label>
+      <label>Website URL<input id="source-url" type="url" required></label>
+      <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — prefer feed, otherwise read website</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
+      <div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom feed</button><button id="preview-source" type="button">Preview stories</button></div>
+      <label>Feed URL <span class="muted">Optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
+      <label>Article URL contains <span class="muted">Optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
+      <p class="muted">Use a page listing articles or forum threads. Preview before saving. JavaScript-only or restricted pages may need a custom adapter.</p>
+      <output id="source-preview" class="callout" hidden></output>
+      <label>Warn after this many days without activity<input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
+      <label>Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
+      <datalist id="source-categories"><option>News</option><option>Technology</option><option>Security</option><option>Standards</option><option>Hardware</option><option>Radio &amp; SDR</option><option>PBX &amp; VoIP</option></datalist>
+      <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
+      <p id="source-error" class="error" role="alert"></p>
+    </div>
+    <div class="dialog-actions"><button class="primary" type="submit">Save</button><button type="button" data-close="source-dialog">Cancel</button></div>
   </form></dialog>
-  <dialog id="confirm-dialog"><h2>Reassess saved history?</h2><p>Queue every saved story for review using your current interests and model. Existing summaries remain visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p><div class="button-row"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div></dialog>
-  <dialog id="clear-history-dialog"><form id="clear-history-form"><h2>Delete all history?</h2><p>All stories, bookmarks, summaries, and run history will be permanently removed from the active database. Your sources, interests, editorial guidance, exclusions, AI settings, and collection settings will stay.</p><label>Type DELETE HISTORY to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="DELETE HISTORY"></label><p id="clear-history-error" class="error" role="alert"></p><div class="button-row"><button class="danger" type="submit">Delete history permanently</button><button type="button" data-close="clear-history-dialog">Cancel</button></div></form></dialog>
-  <dialog id="login-dialog"><form id="login-form"><p class="eyebrow">YOUR PERSONAL EDITION</p><h2>Welcome back.</h2><label>Server password<input id="password" type="password" autocomplete="current-password" required></label><p id="login-error" class="error" role="alert"></p><button class="primary" type="submit">Sign in</button></form></dialog>
+  <dialog id="confirm-dialog"><div class="dialog-layout">
+    <div class="dialog-heading"><h2>Reassess saved history?</h2><button data-close="confirm-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Queue every saved story for review using your current interests and model. Previous summaries stay visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p></div>
+    <div class="dialog-actions"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div>
+  </div></dialog>
+  <dialog id="clear-history-dialog"><form id="clear-history-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Fresh start</h2><button type="button" data-close="clear-history-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <p>Only the selected items will be cleared. This cannot be undone in the app. Export a ZIP first if you might want to restore them.</p>
+      <fieldset class="reset-options"><legend>Choose what to clear</legend>
+        <label class="checkbox"><input type="checkbox" id="reset-history" checked> Story history (keep bookmarked stories unless Bookmarks is also selected)</label>
+        <label class="checkbox"><input type="checkbox" id="reset-bookmarks"> Bookmarks (remove saved flags; delete saved stories too if Story history is selected)</label>
+        <label class="checkbox"><input type="checkbox" id="reset-runs" checked> Collection/review runs and source check history</label>
+        <label class="checkbox"><input type="checkbox" id="reset-topics"> Interest topics and ranks</label>
+        <label class="checkbox"><input type="checkbox" id="reset-guidance"> Editorial guidance</label>
+        <label class="checkbox"><input type="checkbox" id="reset-exclusions"> Exclusions</label>
+        <label class="checkbox"><input type="checkbox" id="reset-sources"> Configured sources (preserve labels on any retained stories)</label>
+        <label class="checkbox"><input type="checkbox" id="reset-ai"> AI settings (restore defaults and pause review)</label>
+        <label class="checkbox"><input type="checkbox" id="reset-collection"> Collection settings (restore defaults)</label>
+      </fieldset>
+      <p class="muted">Clearing story/run history pauses automatic collection for the rest of today. Manual Check sources remains available.</p>
+      <label>Type RESET SELECTED to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="RESET SELECTED"></label>
+      <p id="clear-history-error" class="error" role="alert"></p>
+    </div>
+    <div class="dialog-actions"><button class="danger" type="submit">Reset selected data</button><button type="button" data-close="clear-history-dialog">Cancel</button></div>
+  </form></dialog>
+  <dialog id="login-dialog"><form id="login-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Sign in to NewsReview</h2></div>
+    <div class="dialog-body"><label>Server password<input id="password" type="password" autocomplete="current-password" required></label><p id="login-error" class="error" role="alert"></p></div>
+    <div class="dialog-actions"><button class="primary" type="submit">Sign in</button></div>
+  </form></dialog>
+  <dialog id="help-dialog"><div class="dialog-layout">
+    <div class="dialog-heading"><h2>Help - NewsReview</h2><button data-close="help-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body help-content">
+      <h3>What AI reviews do</h3>
+      <p>Your local model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, explains why it matters, adds topic tags, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage.</p>
+      <p>Filtered stories remain in the database but are hidden in the normal feed. Select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
+      <h3>Adding sources</h3>
+      <p>Open Settings, Sources, then Add source. Use a homepage, news section, or category page that lists multiple articles, rather than a single article URL. Enter a name and category, choose a collection method, and use Preview stories before saving.</p>
+      <p>Automatic prefers a supplied or advertised RSS/Atom feed and falls back to the website listing. RSS/Atom only reports feed failures. Website page reads article cards, headline links, and structured lists directly from downloaded HTML. An optional Article URL contains filter, such as /news/, narrows website candidates.</p>
+      <h3>Forums and threads</h3>
+      <p>Choose a relevant subforum/category page or its feed that lists threads. NewsReview opens the linked threads as story candidates, then your model filters the discussions. A single thread is one discussion, not a continuing list of new stories; new replies do not automatically create new tiles for the same thread URL. Forum discussions are not necessarily verified reporting.</p>
+      <h3>What gets downloaded</h3>
+      <p>Feeds/listings find the links. During AI review, NewsReview downloads each article or thread page to extract readable text. A headline-only feed can work if that page is readable. If it is blocked, only the available excerpt is used and labeled. JavaScript-only, restricted, or unusual pages may need a custom adapter.</p>
+      <h3>Search and source health</h3>
+      <p>Combine dates and times with a comma: 9/1/26 - 10/1/26, 10am - 3pm. A date range or time range alone also works. Times use the server timezone; overnight ranges are supported. Topics match any checked selection.</p>
+      <p>The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
+      <h3>Backups and fresh starts</h3>
+      <p>Import/Export downloads a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>
+      <p>Fresh start in Settings lets you clear selected data, including history, bookmarks, interests, guidance, sources, or settings. Unchecked categories are preserved. Keeping Bookmarks unchecked preserves saved stories when clearing other history.</p>
+    </div>
+    <div class="dialog-actions"><button data-close="help-dialog">OK</button></div>
+  </div></dialog>
+  <dialog id="transfer-dialog"><div class="dialog-layout">
+    <div class="dialog-heading"><h2>Import/Export</h2><button data-close="transfer-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <h3>Export</h3><p>Download a complete NewsReview ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, and run history. It includes committed database changes while the app runs. Store it privately; the ZIP is not encrypted.</p>
+      <h3>Restore a backup</h3><p>Choose a NewsReview export ZIP. Restoring replaces the current dataset rather than merging it. The server validates it and saves a private recovery ZIP before changing anything. Your login password and browser theme are not replaced.</p>
+      <label>Choose ZIP backup<input id="backup-file" type="file" accept=".zip,application/zip"></label>
+      <p id="backup-file-info" class="muted">Maximum ZIP size: 256 MiB. Maximum database size: 1 GiB.</p>
+      <label class="checkbox"><input type="checkbox" id="confirm-restore"> I understand that restoring replaces all current NewsReview data and preferences.</label>
+      <p id="transfer-status" role="status"></p>
+    </div>
+    <div class="dialog-actions"><button id="export-backup">Download Export</button><button id="restore-backup" class="danger" disabled>Restore backup</button><button data-close="transfer-dialog">Close</button></div>
+  </div></dialog>
 </body>
 </html>
