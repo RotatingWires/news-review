@@ -483,6 +483,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.5.3
+
+- Give Review pending and Check sources matching widths and heights in the Daily Feed toolbar.
+
 ### v0.5.2
 
 - Add horizontal navigation-bar padding so Sign out and its hover highlight stay inset from the window edge on desktop and mobile.

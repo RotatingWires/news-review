@@ -122,6 +122,7 @@ nav { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 #theme { margin-left: auto; }
 main { padding: 16px; flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .titlebar, .masthead, .window > footer { flex-shrink: 0; }
+.collection-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .edition-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 footer {
   justify-content: space-between;
