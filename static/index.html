@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <meta name="description" content="Your personal news reader, review desk, and searchable archive.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NewsReview">
+  <meta name="theme-color" content="#111858">
   <title>NewsReview</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
@@ -20,8 +25,10 @@
       <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
       <button id="settings-nav" class="nav-button">Settings</button>
       <button id="help-nav" class="nav-button">Help</button>
+      <span class="nav-account">
       <button id="theme" class="nav-button" aria-label="Switch color theme" title="Switch color theme">Dark theme</button>
       <button id="logout" class="nav-button" hidden>Sign out</button>
+      </span>
     </nav>
   </header>
 

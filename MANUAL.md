@@ -119,6 +119,10 @@ While a visible tab knows a collection/review job is running, it checks progress
 
 The daily scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you return to the tab, change the main view, or reload the page. Other-tab bookmark/source changes are picked up on return; there is no continuous background synchronization.
 
+## Mobile home-screen installation
+
+Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s Install/Add to Home Screen action on Android. Both the login and reader pages advertise the NewsReview icon and manifest. Existing home-screen shortcuts may need to be removed and added again to refresh their icon. This is an online reader: the NewsReview server must remain reachable; installing it does not add offline storage.
+
 ## Reading and searching
 
 - **Daily feed:** the selected day shows stories published on that date in your browser timezone. Stories without a publication date use their collection date. This applies to existing history too.
@@ -482,6 +486,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.5.5
+
+- Add a web app manifest, 192/512px app icons, and an Apple touch icon for home-screen installation. No offline article caching or service worker is added; the server connection is still required.
+- Keep theme and Sign out controls together on the right when mobile navigation wraps. Respect device safe areas and prevent version-label wrapping in the bottom bar.
 
 ### v0.5.4
 

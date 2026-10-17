@@ -68,3 +68,5 @@ Database exports and recovery ZIPs contain private reading history/preferences a
 See the manual for [model setup](MANUAL.md#connect-your-own-model), [configuration](MANUAL.md#data-configuration-and-logging), [service installation](MANUAL.md#run-as-a-service), and [troubleshooting](MANUAL.md#troubleshooting).
 
 The Daily Feed date picker and archive date ranges use story publication dates in your browser timezone, falling back to collection dates for undated stories.
+
+On mobile, use your browser’s Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
