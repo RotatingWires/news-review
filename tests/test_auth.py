@@ -45,6 +45,26 @@ class AuthTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 loaded.setup(token, 'changed-password', 'changed-password')
 
+    def test_setup_does_not_require_hard_links(self):
+        # An audit hook rejects hard links without replacing application or OS code.
+        with tempfile.TemporaryDirectory() as directory:
+            script = """
+import sys
+from pathlib import Path
+from newsreview.auth import Auth
+def reject_links(event, args):
+    if event == 'os.link':
+        raise OSError(50, 'Hard links are unsupported')
+sys.addaudithook(reject_links)
+path = Path(sys.argv[1]) / 'auth.json'
+auth = Auth(path)
+auth.setup(auth.setup_token, 'portable-password', 'portable-password')
+assert Auth(path).verify('portable-password')
+assert not list(path.parent.glob('.auth-*'))
+"""
+            result = subprocess.run([sys.executable, '-c', script, directory], capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_malformed_credentials_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'auth.json'

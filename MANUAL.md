@@ -328,7 +328,7 @@ py -3 -m newsreview --host 0.0.0.0 --port 8714
 
 On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `server.log` (a service manager may capture console output).
 
-The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Malformed credentials stop startup rather than reopening setup.
+The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
@@ -482,6 +482,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.5.1
+
+- Fix first-run password creation on Windows drives that reject hard links (WinError 50). Use exclusive credential-file creation, retaining owner-only POSIX permissions and overwrite protection.
+- Flush credentials before completing setup; clean up failed writes and fail closed on files left incomplete by abrupt shutdown.
 
 ### v0.5.0
 

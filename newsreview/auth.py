@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import secrets
-import tempfile
 import threading
 
 
@@ -48,16 +47,19 @@ class Auth:
             record = {"version": 1, "iterations": 600000, "salt": base64.b64encode(salt).decode(),
                       "hash": base64.b64encode(hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 600000)).decode()}
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            fd, temporary = tempfile.mkstemp(prefix=".auth-", dir=self.path.parent)
+            # Exclusive creation works on filesystems without hard-link support,
+            # and prevents competing setup requests from replacing credentials.
+            fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as stream:
                     json.dump(record, stream)
                     stream.flush()
                     os.fsync(stream.fileno())
-                # Publish complete credentials exclusively; never overwrite another setup.
-                os.link(temporary, self.path)
-            finally:
-                Path(temporary).unlink(missing_ok=True)
+            except BaseException:
+                # Remove only the incomplete file this request created. An abrupt
+                # process/power loss instead leaves invalid credentials fail-closed.
+                self.path.unlink(missing_ok=True)
+                raise
             self.record = record
             self.setup_token = None
 
