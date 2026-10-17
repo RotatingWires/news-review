@@ -56,35 +56,22 @@ class App {
     $('help-nav').onclick = () => $('help-dialog').showModal();
     $('collect').onclick = () => this.collect('collect', $('collect'));
     $('review-pending').onclick = () => this.collect('review', $('review-pending'));
-    $('login-dialog').addEventListener('cancel', event => event.preventDefault());
-    $('login-form').onsubmit = async event => {
-      event.preventDefault();
-      await busy(event.submitter, async () => {
-        try {
-          await api('login', 'POST', { password: $('password').value });
-          $('password').value = '';
-          $('login-error').textContent = '';
-          $('login-dialog').close();
-          await this.load();
-        } catch (error) { $('login-error').textContent = error.message; }
-      });
-    };
     $('logout').onclick = async () => {
       try {
-        await api('logout', 'POST', {});
+        await api('auth/logout', 'POST', {});
         this.authenticated = false;
         clearTimeout(this.pollTimer);
         clearTimeout(this.resumeTimer);
         $('stories').replaceChildren();
         $('settings').hidden = true;
         $('reader').hidden = false;
-        $('login-dialog').showModal();
+        location.replace('/login.html');
       } catch (error) { notify(error.message, true); }
     };
     try {
-      const session = await api('session');
+      const session = await api('auth/status');
       $('logout').hidden = !session.password_required;
-      if (!session.authenticated) { $('login-dialog').showModal(); return; }
+      if (!session.authenticated) { location.replace('/login.html'); return; }
       await this.load();
     } catch (error) { notify(error.message, true); setDefaultStatus(error.message); this.poll(); }
   }
@@ -153,8 +140,8 @@ class App {
     clearTimeout(this.pollTimer);
     try {
       if (!this.authenticated) {
-        const session = await api('session');
-        if (!session.authenticated) { if (!$('login-dialog').open) $('login-dialog').showModal(); return; }
+        const session = await api('auth/status');
+        if (!session.authenticated) { location.replace('/login.html'); return; }
         this.authenticated = true;
       }
       const firstConnection = !this.overview;
@@ -173,7 +160,7 @@ class App {
           await this.settings.refreshSources();
       }
     } catch (error) {
-      if ($('login-dialog').open) this.authenticated = false;
+      if (error.status === 401) this.authenticated = false;
       setDefaultStatus(error.message);
     } finally {
       this.syncInFlight = false;

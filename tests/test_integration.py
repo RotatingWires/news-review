@@ -123,14 +123,15 @@ class IntegrationTests(unittest.TestCase):
         self.collector.worker.join(10)
         self.assertFalse(self.collector.status()['running'])
 
-    def start_api(self, password=''):
-        self.server = AppServer(('127.0.0.1', 0), self.store, self.collector, password)
+    def start_api(self, password=None):
+        self.server = AppServer(('127.0.0.1', 0), self.store, self.collector, password or 'fixture-password')
+        self.api_cookie = 'newsreview_session=' + self.server.session() if password is None else ''
         self.server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.server_thread.start()
         self.api_root = f'http://127.0.0.1:{self.server.server_port}'
 
     def request(self, path, method='GET', data=None, headers=None):
-        request_headers = {'Content-Type': 'application/json', **(headers or {})}
+        request_headers = {'Content-Type': 'application/json', 'Cookie': self.api_cookie, **(headers or {})}
         body = json.dumps(data).encode() if data is not None else None
         try:
             response = urlopen(Request(self.api_root + path, data=body, headers=request_headers, method=method), timeout=5)
@@ -267,7 +268,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_loopback_guard_and_static_security_headers(self):
         self.start_api()
-        self.assertEqual(self.request('/api/overview', headers={'Host': 'attacker.example'})[0], 403)
+        self.assertEqual(self.request('/api/overview', headers={'Host': 'attacker.example', 'Cookie': ''})[0], 401)
         status, html, headers = self.request('/')
         self.assertEqual(status, 200)
         self.assertIn('NewsReview', html)
@@ -299,14 +300,14 @@ class IntegrationTests(unittest.TestCase):
     def test_zip_api_confirmation_lock_revision_and_atomic_restore(self):
         self.collect()
         self.start_api()
-        with urlopen(self.api_root + '/api/export', timeout=5) as response:
+        with urlopen(Request(self.api_root + '/api/export', headers={'Cookie': self.api_cookie}), timeout=5) as response:
             self.assertEqual(response.headers.get_content_type(), 'application/zip')
             archive = response.read()
         revision = self.store.overview()['revision']
 
         def upload(headers=None):
             request = Request(self.api_root + '/api/import/backup', data=archive, method='POST',
-                              headers={'Content-Type': 'application/zip', **(headers or {})})
+                              headers={'Content-Type': 'application/zip', 'Cookie': self.api_cookie, **(headers or {})})
             try:
                 response = urlopen(request, timeout=5)
             except HTTPError as error:

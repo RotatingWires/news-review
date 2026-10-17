@@ -46,7 +46,7 @@ def run():
         fixture_thread = threading.Thread(target=fixture.serve_forever, daemon=True)
         fixture_thread.start()
         collector = Collector(store, Fetcher(public=False), Reviewer(Fetcher(public=False)))
-        server = AppServer(('127.0.0.1', 0), store, collector)
+        server = AppServer(('127.0.0.1', 0), store, collector, 'fixture-password')
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
         try:
@@ -57,6 +57,7 @@ def run():
                 api_requests = []
                 page.on('request', lambda request: api_requests.append(request.url.rsplit('/', 1)[-1]) if request.method == 'GET' else None)
                 page.on('pageerror', lambda error: errors.append(str(error)))
+                page.context.add_cookies([{'name': 'newsreview_session', 'value': server.session(), 'url': f'http://127.0.0.1:{server.server_port}', 'httpOnly': True, 'sameSite': 'Strict'}])
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4

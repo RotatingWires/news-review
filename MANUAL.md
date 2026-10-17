@@ -306,7 +306,7 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | Environment variable | Purpose |
 | --- | --- |
 | `NEWSREVIEW_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
-| `NEWSREVIEW_PASSWORD` | Server password, required for non-loopback serving; at least 12 characters |
+| `NEWSREVIEW_PASSWORD` | Optional one-time password bootstrap (8–1024 characters), only when auth.json does not exist |
 | `NEWSREVIEW_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
 | `NEWSREVIEW_MODEL_API_KEY` | Optional bearer token for a compatible model server |
 
@@ -314,23 +314,27 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 
 ## LAN access and authentication
 
-Loopback access is the default. For LAN access, set a password and explicitly change the listening address:
+Loopback access is the default. For LAN access, explicitly change the listening address:
 
 ```bash
-export NEWSREVIEW_PASSWORD='replace-with-a-long-private-password'
 python3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
 PowerShell:
 
 ```powershell
-$env:NEWSREVIEW_PASSWORD = 'replace-with-a-long-private-password'
 py -3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
-The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Changing the environment password requires a restart.
+On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `server.log` (a service manager may capture console output).
 
-API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Without a configured password, requests using non-local hostnames are rejected. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
+The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Malformed credentials stop startup rather than reopening setup.
+
+ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
+
+The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Setup uses the same five-attempt limit.
+
+API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
 This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `NEWSREVIEW_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
 
@@ -348,7 +352,7 @@ The app must stay running for its scheduler to run. It can also be launched at l
 4. If needed, put variables in `/etc/newsreview.env`, readable only by the service administrator. The template loads it as an optional environment file.
 5. Install the unit using your normal system administration process, then enable/start it.
 
-The template listens on loopback. Edit the bind address and set the required password if you want direct LAN access. The system's timezone controls daily collection. The app does not install or alter system services automatically.
+The template listens on loopback. Edit the bind address for direct LAN access; find the first-run setup token in the service console/journal. The system's timezone controls daily collection. The app does not install or alter system services automatically.
 
 ### Windows / Task Scheduler
 
@@ -446,10 +450,14 @@ newsreview/
   reviewer.py       local model adapters, editorial prompt, output validation
   collector.py      collection/review worker and daily scheduler
   validation.py     source/settings input validation
+  auth.py           persistent password hashes and first-run setup tokens
   server.py         same-origin HTTP API, authentication and static assets
   backup.py         consistent online SQLite backup command
   transfer.py       validated ZIP snapshots and transactional restoration
 static/
+  login.html        TaskList-style setup/login page
+  login.js          setup token, password creation, and sign-in
+  auth.css          shared sibling-app login layout
   index.html        reader, settings panels, dialogs
   style.css         responsive Windows 95 light/dark layout
   app.js            startup, navigation and collection status
@@ -463,15 +471,23 @@ tests/              unit/integration tests and optional browser/live-feed audits
 deploy/             example systemd unit
 ```
 
+The authentication browser check (`python3 -m tests.browser_auth`) verifies first-run setup, incorrect credentials, logout/login, and mobile layout.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
 
 The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. Persistence owns the current schema version and archive validation imports it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
 
-For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and both browser suites above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
+For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.5.0
+
+- Replace environment-password requirements with TaskList-style console-token setup and a matching standalone login screen.
+- Persist salted password hashes outside the reading database; protect loopback and LAN APIs, rate-limit setup/login, and preserve credentials through imports and resets.
+- Keep legacy login/session/logout API routes and support one-time migration from NEWSREVIEW_PASSWORD.
 
 ### v0.4.15
 

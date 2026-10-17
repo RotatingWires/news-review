@@ -33,27 +33,31 @@ Data and logs live in `./data`. Back up through **Settings → Collection & hist
 
 The local quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, session cookies, or reading data in transit. Use HTTPS for remote access as described below.
 
-Non-loopback serving requires `NEWSREVIEW_PASSWORD` to contain at least 12 characters.
+On first startup, enter the console setup token in the browser and create a password (at least 8 characters). This applies to loopback and LAN access.
 
 ## LAN access and authentication
 
-Loopback access is the default. For LAN access, set a password and explicitly change the listening address:
+Loopback access is the default. For LAN access, explicitly change the listening address:
 
 ```bash
-export NEWSREVIEW_PASSWORD='replace-with-a-long-private-password'
 python3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
 PowerShell:
 
 ```powershell
-$env:NEWSREVIEW_PASSWORD = 'replace-with-a-long-private-password'
 py -3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
-The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Changing the environment password requires a restart.
+On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `server.log` (a service manager may capture console output).
 
-API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Without a configured password, requests using non-local hostnames are rejected. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
+The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Malformed credentials stop startup rather than reopening setup.
+
+ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
+
+The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Setup uses the same five-attempt limit.
+
+API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
 This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `NEWSREVIEW_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
 

@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
 from . import validation
+from .auth import Auth
 from .feeds import discover
 from .search import date_range, time_range, date_time_range
 from .sources import read_source
@@ -34,7 +35,8 @@ class AppServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
     def __init__(self, address, store, collector, password=""):
-        self.store, self.collector, self.password = store, collector, password
+        self.store, self.collector = store, collector
+        self.auth = Auth(store.path.parent / "auth.json", password)
         self.session_key = secrets.token_bytes(32)
         self.login_attempts = {}
         self.login_lock = threading.Lock()
@@ -132,8 +134,8 @@ class Handler(BaseHTTPRequestHandler):
             self.server.collector.lock.release()
 
     def authorized(self):
-        if not self.server.password:
-            return True
+        if not self.server.auth.configured:
+            return False
         try:
             cookie = SimpleCookie(self.headers.get("Cookie", ""))
             return "newsreview_session" in cookie and self.server.valid_session(cookie["newsreview_session"].value)
@@ -146,8 +148,8 @@ class Handler(BaseHTTPRequestHandler):
             hostname = urlsplit("http://" + host).hostname
         except ValueError:
             hostname = None
-        if not hostname or (not self.server.password and hostname not in ("localhost", "127.0.0.1", "::1")):
-            self.send(403, {"error": "Set NEWSREVIEW_PASSWORD before using a non-local hostname"})
+        if not hostname:
+            self.send(403, {"error": "Invalid Host header"})
             return False
         if write:
             origin = self.headers.get("Origin")
@@ -171,11 +173,11 @@ class Handler(BaseHTTPRequestHandler):
             if not self.guard(write):
                 return
             path = urlsplit(self.path).path
-            if not write and path == "/api/session":
-                self.send(200, {"authenticated": self.authorized(), "password_required": bool(self.server.password)})
+            if not write and path in ("/api/session", "/api/auth/status"):
+                self.send(200, {"authenticated": self.authorized(), "configured": self.server.auth.configured, "password_required": True, "version": __version__})
                 return
-            if self.command == "POST" and path == "/api/login":
-                self.login()
+            if self.command == "POST" and path in ("/api/login", "/api/auth/login", "/api/auth/setup"):
+                self.login(setup=path == "/api/auth/setup")
                 return
             if not path.startswith("/api/"):
                 if write:
@@ -211,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.exception("Request failed")
             self.send(500, {"error": "An internal error occurred. See the server log."})
 
-    def login(self):
+    def login(self, setup=False):
         data = self.body()
         ip = self.client_address[0]
         now = time.time()
@@ -224,7 +226,16 @@ class Handler(BaseHTTPRequestHandler):
             attempts.append(now)
             self.server.login_attempts[ip] = attempts
         password = data.get("password", "")
-        if not isinstance(password, str) or not hmac.compare_digest(hashlib.sha256(password.encode()).digest(), hashlib.sha256(self.server.password.encode()).digest()):
+        if setup:
+            try:
+                self.server.auth.setup(data.get("setupToken"), password, data.get("confirmPassword"))
+            except FileExistsError:
+                self.send(409, {"error": "A password is already configured."})
+                return
+            except PermissionError:
+                self.send(401, {"error": "Incorrect setup token."})
+                return
+        elif not self.server.auth.verify(password):
             self.send(401, {"error": "Incorrect password"})
             return
         secure = "; Secure" if os.environ.get("NEWSREVIEW_SECURE_COOKIE") == "1" else ""
@@ -232,8 +243,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def static(self, path):
         name = "index.html" if path == "/" else path.lstrip("/")
+        if (name == "index.html" and not self.authorized()) or (name == "login.html" and self.authorized()):
+            target = "/login.html" if name == "index.html" else "/"
+            self.send(302, b"", "text/plain", {"Location": target})
+            return
         # Explicit flat asset allowlist: never serve runtime data, source or dotfiles.
-        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "dropdowns.js", "icon.svg"}:
+        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "dropdowns.js", "icon.svg", "login.html", "login.js", "auth.css"}:
             self.send(404, {"error": "Not found"})
             return
         content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
@@ -318,7 +333,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"deleted": count})
             finally:
                 self.server.collector.lock.release()
-        elif path == "/api/logout" and self.command == "POST":
+        elif path in ("/api/logout", "/api/auth/logout") and self.command == "POST":
             self.send(200, {"ok": True}, headers={"Set-Cookie": "newsreview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
         elif path.startswith("/api/bookmarks/") and self.command == "PUT":
             store.bookmark(int(path.rsplit("/", 1)[1]), validation.boolean(data.get("bookmarked"), "Bookmarked"))

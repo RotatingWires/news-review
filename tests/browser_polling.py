@@ -18,7 +18,7 @@ def run():
     with tempfile.TemporaryDirectory() as directory:
         store = Store(Path(directory) / 'newsreview.db')
         collector = Collector(store)
-        server = AppServer(('127.0.0.1', 0), store, collector)
+        server = AppServer(('127.0.0.1', 0), store, collector, 'fixture-password')
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
@@ -30,6 +30,7 @@ def run():
                 errors = []
                 page.on('request', lambda request: requests.append(request.url) if request.url.endswith('/api/overview') else None)
                 page.on('pageerror', lambda error: errors.append(str(error)))
+                page.context.add_cookies([{'name': 'newsreview_session', 'value': server.session(), 'url': f'http://127.0.0.1:{server.server_port}', 'httpOnly': True, 'sameSite': 'Strict'}])
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 expect(page.locator('#version')).to_have_text('v' + __version__)
                 expect(page.locator('#empty')).to_be_visible()

@@ -62,7 +62,7 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   document.dispatchEvent(new CustomEvent('newsreview-connection', { detail: { error: result.code === 'storage_unavailable' ? result.error : null } }));
   if (path === 'overview' && response.ok) dataRevision = result.revision;
   if (!response.ok) {
-    if (response.status === 401 && path !== 'login' && !$('login-dialog').open) $('login-dialog').showModal();
+    if (response.status === 401) location.replace('/login.html');
     const error = new Error(result.error || `Request failed (${response.status})`);
     error.status = response.status;
     throw error;

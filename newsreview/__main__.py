@@ -23,10 +23,6 @@ def main():
     parser.add_argument("--no-scheduler", action="store_true", help="Disable the daily scheduler for this process")
     args = parser.parse_args()
     password = os.environ.get("NEWSREVIEW_PASSWORD", "")
-    if args.host not in ("127.0.0.1", "localhost") and len(password) < 12:
-        parser.error("Set NEWSREVIEW_PASSWORD to at least 12 characters before binding beyond loopback")
-    if password and len(password) < 12:
-        parser.error("NEWSREVIEW_PASSWORD must contain at least 12 characters")
     if not 1 <= args.port <= 65535:
         parser.error("Port must be 1–65535")
     directory = Path(args.data_dir).resolve()
@@ -36,6 +32,8 @@ def main():
     store = Store(database_path(directory))
     collector = Collector(store)
     server = AppServer((args.host, args.port), store, collector, password)
+    if server.auth.setup_token:
+        print(f"\nNewsReview first-run setup token: {server.auth.setup_token}\nOpen the app and enter this token to create your password.\nThe token changes on restart until setup is complete.\n", flush=True)
     if not args.no_scheduler:
         threading.Thread(target=collector.schedule, daemon=True, name="daily-scheduler").start()
     logging.info("NewsReview %s at http://%s:%s · data: %s", __version__, args.host, args.port, directory)
