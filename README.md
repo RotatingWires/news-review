@@ -14,7 +14,7 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
 - Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
 - `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
-- Commits use the existing project convention: `v0.4.14: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
+- Commits use the existing project convention: `v0.4.15: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
@@ -299,7 +299,7 @@ data/
 
 The directory is Git-ignored. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`PRAGMA user_version` tracks schema version 2. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (2); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
 The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, significance, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
@@ -463,7 +463,23 @@ tests/              unit/integration tests and optional browser/live-feed audits
 deploy/             example systemd unit
 ```
 
+## Maintenance and cleanup
+
+Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
+
+The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. Persistence owns the current schema version and archive validation imports it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
+
+For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and both browser suites above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
+
 ## Release notes
+
+### v0.4.15
+
+- Consolidate reset/restore dataset reloads in the app, invalidate pending feed reads, and remove duplicate source/settings requests.
+- Use HTML form defaults and controls for selective reset instead of repeating checkbox/default lists in JavaScript.
+- Share the authoritative schema-version constant between persistence and ZIP validation, retaining historical migration thresholds.
+- Consolidate footer CSS, remove unused source-state/mobile rules, and scope form margins directly instead of overriding them with `!important`.
+- Preserve migration/API compatibility, separate backup paths, existing titlebar styling, polling behavior, and source configuration. Add no dependencies, monkey patches, or replacement controls.
 
 ### v0.4.14
 

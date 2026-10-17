@@ -64,17 +64,6 @@ export class Transfer {
     } finally { this.lock(false); }
   }
 
-  async reloadDataset() {
-    // Never leave cached rows presented as confirmed data after an attempted restore.
-    this.app.feed.requestId++;
-    $('stories').replaceChildren();
-    await this.app.refreshOverview();
-    this.app.feed.clearFilters();
-    this.app.feed.page = 1;
-    await this.app.settings.load();
-    await this.app.feed.load();
-  }
-
   async restore() {
     const file = $('backup-file').files[0];
     if (this.busy || !file || !$('confirm-restore').checked) return;
@@ -92,12 +81,12 @@ export class Transfer {
       const result = await response.json();
       if (!result.restored) throw new Error('The server did not confirm the restore.');
       restored = true;
-      await this.reloadDataset();
+      await this.app.reloadDataset();
       notify(`Restored ${result.totals.stories} stories and ${result.totals.sources} source records. Recovery backup: data/backups/${result.recoveryBackup}`);
       $('confirm-restore').checked = false;
     } catch (error) {
       let message = restored ? `Backup restored, but the display could not be refreshed: ${error.message}` : `Restore could not be confirmed: ${error.message}`;
-      try { await this.reloadDataset(); message += ' Current server data has been reloaded.'; }
+      try { await this.app.reloadDataset(); message += ' Current server data has been reloaded.'; }
       catch { $('stories').replaceChildren(); message += ' Could not reload server data; reconnect before continuing.'; }
       notify(message, true);
     } finally { this.lock(false); }

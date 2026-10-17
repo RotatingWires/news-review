@@ -54,6 +54,8 @@ def run():
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page(viewport={'width': 1440, 'height': 1050}, timezone_id='America/New_York')
                 errors = []
+                api_requests = []
+                page.on('request', lambda request: api_requests.append(request.url.rsplit('/', 1)[-1]) if request.method == 'GET' else None)
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
@@ -314,17 +316,26 @@ def run():
                 page.get_by_role('button', name='Collection & history', exact=True).click()
                 history_count = store.stories()['total']
                 page.get_by_role('button', name='Fresh start...', exact=True).click()
+                page.locator('#reset-history').uncheck()
+                page.locator('#reset-bookmarks').check()
+                page.locator('#reset-topics').check()
                 page.locator('#clear-history-dialog').get_by_role('button', name='Cancel', exact=True).click()
                 assert store.stories()['total'] == history_count
                 page.get_by_role('button', name='Fresh start...', exact=True).click()
+                expect(page.locator('#reset-history')).to_be_checked()
+                expect(page.locator('#reset-runs')).to_be_checked()
+                expect(page.locator('#reset-bookmarks')).not_to_be_checked()
+                expect(page.locator('#reset-topics')).not_to_be_checked()
                 page.get_by_label('Type RESET SELECTED to confirm', exact=True).fill('wrong')
                 page.get_by_role('button', name='Reset selected data', exact=True).click()
                 assert store.stories()['total'] == history_count
                 preferences = store.settings()
                 page.locator('#reset-bookmarks').check()
+                api_requests.clear()
                 page.get_by_label('Type RESET SELECTED to confirm', exact=True).fill('RESET SELECTED')
                 page.get_by_role('button', name='Reset selected data', exact=True).click()
                 expect(page.locator('#status-message')).to_contain_text('Selected data reset')
+                assert api_requests.count('sources') == 1, 'Reset fetched source settings more than once'
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
                 assert len(store.sources()) == 35

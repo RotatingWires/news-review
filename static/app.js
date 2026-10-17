@@ -97,6 +97,17 @@ class App {
     this.poll();
   }
 
+  async reloadDataset() {
+    // Reset/restore must invalidate pending feed reads before replacing cached rows.
+    this.feed.requestId++;
+    $('stories').replaceChildren();
+    await this.refreshOverview();
+    this.feed.clearFilters();
+    this.feed.page = 1;
+    await this.settings.load();
+    await this.feed.load();
+  }
+
   async refreshOverview() {
     this.overview = await api('overview');
     $('version').textContent = 'v' + this.overview.version;

@@ -58,25 +58,17 @@ export class Settings {
       await this.app.refreshOverview();
     });
     $('clear-history').onclick = () => {
-      $('clear-history-confirmation').value = '';
+      $('clear-history-form').reset();
       $('clear-history-error').textContent = '';
-      ['history', 'runs'].forEach(key => { $('reset-' + key).checked = true; });
-      ['bookmarks', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection'].forEach(key => { $('reset-' + key).checked = false; });
       $('clear-history-dialog').showModal();
       $('clear-history-dialog').querySelector('[data-close]').focus();
     };
     $('clear-history-form').onsubmit = event => this.submit(event, async () => {
       try {
-        const selections = Object.fromEntries(['history', 'bookmarks', 'runs', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection'].map(key => [key, $('reset-' + key).checked]));
+        const selections = Object.fromEntries([...$('clear-history-form').querySelectorAll('.reset-options input')].map(input => [input.id.slice('reset-'.length), input.checked]));
         const result = await api('reset', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
         $('clear-history-dialog').close();
-        this.app.feed.clearFilters();
-        this.app.feed.page = 1;
-        $('stories').replaceChildren();
-        await this.app.refreshOverview();
-        await this.refreshSources();
-        await this.app.feed.load();
-        await this.load();
+        await this.app.reloadDataset();
         notify(`Selected data reset (${result.deleted_stories} stories removed). Unchecked categories were kept.`);
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });

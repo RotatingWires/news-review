@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
 
+SCHEMA_VERSION = 2
+
 
 class StorageUnavailable(RuntimeError):
     pass
@@ -28,7 +30,7 @@ class Store:
         with self.connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version > 2:
+            if version > SCHEMA_VERSION:
                 raise RuntimeError("Database is newer than this app; upgrade the application.")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS sources (
@@ -82,7 +84,7 @@ class Store:
                 db.execute("""UPDATE sources SET first_checked=last_checked,
                     last_success=CASE WHEN last_error IS NULL THEN last_checked ELSE NULL END,
                     consecutive_failures=CASE WHEN last_error IS NULL THEN 0 ELSE 1 END""")
-            db.execute('PRAGMA user_version=2')
+            db.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
             db.execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", (utcnow(),))
         self.initialized = True
 

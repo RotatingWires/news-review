@@ -14,6 +14,7 @@ import zipfile
 from . import __version__
 from .defaults import SETTINGS, SOURCE_UPDATES
 from .network import valid_url
+from .store import SCHEMA_VERSION
 from . import validation
 
 MAX_UPLOAD = 256 * 1024 * 1024
@@ -148,7 +149,7 @@ def extract_and_validate(store, upload, directory):
                 if member.file_size > limit or member.flag_bits & 1 or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
                     raise ValueError('Backup member is encrypted, unsupported, or exceeds its size limit')
             manifest = json.loads(archive.read('manifest.json'))
-            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') != 2:
+            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') != SCHEMA_VERSION:
                 raise ValueError('This is not a supported NewsReview backup format')
             if _version(manifest.get('application_version')) > _version(__version__):
                 raise ValueError('This backup is from a newer NewsReview version. Update the application first.')
@@ -167,7 +168,7 @@ def extract_and_validate(store, upload, directory):
                 raise ValueError('Backup has unexpected tables, triggers, or views')
             if any(r['sql'] and 'VIRTUAL TABLE' in r['sql'].upper() for r in objects):
                 raise ValueError('Virtual tables are not accepted in backups')
-            if imported.execute('PRAGMA user_version').fetchone()[0] != 2 or imported.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+            if imported.execute('PRAGMA user_version').fetchone()[0] != SCHEMA_VERSION or imported.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('Backup database schema/integrity check failed')
             if imported.execute('PRAGMA foreign_key_check').fetchone():
                 raise ValueError('Backup contains invalid source/duplicate relationships')
