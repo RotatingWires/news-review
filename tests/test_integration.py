@@ -414,7 +414,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('restart', result['error'])
         self.assertFalse(self.store.path.exists(), 'Requests must not create an empty SQLite database behind the app')
         fresh = Store(self.store.path)
-        self.assertEqual(len(fresh.sources()), 33)
+        self.assertEqual(len(fresh.sources()), 37)
 
 
 if __name__ == '__main__':

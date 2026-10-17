@@ -150,22 +150,25 @@ Each story has a relevance square beside its bookmark: green **75–100**, yello
 
 ## Sources
 
-The following **33 sources** are seeded once on a fresh database:
+The following **37 sources** are seeded once on a fresh database:
 
 | Group | Sources |
 | --- | --- |
+| Google and Apple coverage | 9to5Google, 9to5Mac |
 | Original technology sources | BetaNews, Ars Technica, BleepingComputer, TechCrunch, MacRumors, Android Authority, Engadget, MIT Technology Review, PCWorld, The Register, Tom's Hardware, CNET |
 | Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix, general Hackaday |
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
 | Homelab and self-hosting | selfh.st, ServeTheHome, VirtualizationHowto |
-| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews |
+| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews, HackerNoon Cybersecurity, TechRepublic Security |
 
 Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
-[SOURCES.md](SOURCES.md) links to the 21 current approved additions separately from the original 12 websites.
+[SOURCES.md](SOURCES.md) links to the 25 current approved additions separately from the original 12 websites.
 
 The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.
+
+The v0.5.6 source update adds 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security once for new and existing installations. All four use verified RSS feeds in Automatic mode; HackerNoon uses its cybersecurity tag feed for the requested category page. Existing source customizations, disabled/removed records, and interests are preserved. Restart after updating, then use **Check new sources** to collect them.
 
 General Hackaday is added once on upgrade to v0.4.11, using `https://hackaday.com/blog/feed/`. The ham-radio source remains separate. Identical article URLs discovered through both are still stored only once. Matching configured URLs and later disable/remove choices are preserved, using the same source-update mechanism as v0.4.8.
 
@@ -486,6 +489,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.5.6
+
+- Add 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security with verified feeds through the non-overwriting one-time source update.
 
 ### v0.5.5
 

@@ -38,7 +38,14 @@ SOURCE_ADDITIONS_048 = [
     ("KrebsOnSecurity", "https://krebsonsecurity.com/", "https://krebsonsecurity.com/feed/", "Security"),
     ("Cybernews", "https://cybernews.com/news/", "", "Security"),
 ]
+SOURCE_ADDITIONS_056 = [
+    ("9to5Google", "https://9to5google.com/", "https://9to5google.com/feed/", "Technology"),
+    ("9to5Mac", "https://9to5mac.com/", "https://9to5mac.com/feed/", "Technology"),
+    ("HackerNoon · Cybersecurity", "https://hackernoon.com/c/cybersecurity", "https://hackernoon.com/tagged/cybersecurity/feed", "Security"),
+    ("TechRepublic · Security", "https://www.techrepublic.com/topic/security/", "https://www.techrepublic.com/rssfeeds/topic/security/", "Security"),
+]
 SOURCE_UPDATES = {
+    'source_additions_056': SOURCE_ADDITIONS_056,
     'source_additions_048': SOURCE_ADDITIONS_048,
     'source_additions_0411': [
         ("Hackaday", "https://hackaday.com/", "https://hackaday.com/blog/feed/", "Engineering"),

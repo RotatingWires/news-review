@@ -70,3 +70,5 @@ See the manual for [model setup](MANUAL.md#connect-your-own-model), [configurati
 The Daily Feed date picker and archive date ranges use story publication dates in your browser timezone, falling back to collection dates for undated stories.
 
 On mobile, use your browser’s Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
+
+The default [source list](SOURCES.md) includes 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security. Approved additions appear once on restart after updating; use **Check new sources** to collect them.

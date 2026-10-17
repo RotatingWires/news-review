@@ -1,6 +1,6 @@
 # Approved source additions
 
-These are the 21 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
+These are the 25 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
 
 ## Standards, engineering, and open source
 
@@ -39,3 +39,12 @@ These are the 21 current approved additions, excluding the original 12 technolog
 - [Cybernews](https://cybernews.com/news/)
 
 These seven sources are added once on upgrade as well as on fresh installs. Matching configured URLs are kept as-is, including disabled/removed sources. Six have verified RSS feeds; Cybernews uses Automatic collection and currently falls back to its news listing (21 candidates during the v0.4.8 audit). MDN Blog and WebKit were not added; web.dev was already part of the earlier approved source list.
+
+## Google, Apple, and security additions (v0.5.6)
+
+- [9to5Google](https://9to5google.com/) — RSS: `https://9to5google.com/feed/`
+- [9to5Mac](https://9to5mac.com/) — RSS: `https://9to5mac.com/feed/`
+- [HackerNoon Cybersecurity](https://hackernoon.com/c/cybersecurity) — RSS: `https://hackernoon.com/tagged/cybersecurity/feed`
+- [TechRepublic Security](https://www.techrepublic.com/topic/security/) — RSS: `https://www.techrepublic.com/rssfeeds/topic/security/`
+
+Added once on restart after upgrading, without overwriting existing source settings or re-enabling removed/disabled sources. Use **Check new sources** to collect these feeds.

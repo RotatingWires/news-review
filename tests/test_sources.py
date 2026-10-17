@@ -77,12 +77,12 @@ class SourceTests(unittest.TestCase):
         self.store.insert_story(source_id, {'headline': 'An archived protocol article', 'url': 'https://example.com/old',
             'excerpt': 'Text', 'published_at': None, 'category': 'Protocols'}, '2026-10-15')
         reopened = Store(self.store.path)
-        self.assertEqual(len(reopened.sources()), 33)
+        self.assertEqual(len(reopened.sources()), 37)
         self.assertEqual(reopened.stories()['items'][0]['source_name'], 'Daniel Stenberg')
         self.assertEqual(reopened.stories()['total'], 1)
         restored = reopened.save_source({'name': 'Manually restored', 'url': 'https://daniel.haxx.se/blog/', 'feed_url': '', 'category': 'News', 'enabled': True})
         self.assertEqual(restored, source_id)
-        self.assertEqual(len(Store(self.store.path).sources()), 34, 'One-time migration must not repeatedly remove a manually restored source')
+        self.assertEqual(len(Store(self.store.path).sources()), 38, 'One-time migration must not repeatedly remove a manually restored source')
 
     def test_approved_sources_upgrade_once_preserving_configuration_and_removals(self):
         from newsreview.defaults import SOURCE_ADDITIONS_048
@@ -96,7 +96,7 @@ class SourceTests(unittest.TestCase):
             'feed_url': feed, 'category': 'Custom', 'enabled': False})
         preferences = self.store.settings()
         upgraded = Store(self.store.path)
-        self.assertEqual(len(upgraded.sources()), 33)
+        self.assertEqual(len(upgraded.sources()), 37)
         self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
         existing = next(item for item in upgraded.sources() if item['id'] == source_id)
         self.assertEqual(existing['name'], 'My existing self-host source')
@@ -105,7 +105,7 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(upgraded.settings(), preferences)
         with upgraded.connect() as db:
             db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (source_id,))
-        self.assertEqual(len(Store(self.store.path).sources()), 32)
+        self.assertEqual(len(Store(self.store.path).sources()), 36)
         upgraded.reset({'sources': True})
         self.assertEqual(Store(self.store.path).sources(), [])
 
@@ -126,6 +126,31 @@ class SourceTests(unittest.TestCase):
         with upgraded.connect() as db:
             db.execute('UPDATE sources SET removed=1 WHERE url=?', (url,))
         self.assertFalse(any(item['url'] == url for item in Store(self.store.path).sources()))
+
+    def test_google_mac_security_additions_upgrade_once(self):
+        from newsreview.defaults import SOURCE_ADDITIONS_056
+        with self.store.connect() as db:
+            db.execute("DELETE FROM settings WHERE key='source_additions_056'")
+            for _, url, _, _ in SOURCE_ADDITIONS_056:
+                db.execute('DELETE FROM sources WHERE url=?', (url,))
+        name, url, feed, category = SOURCE_ADDITIONS_056[0]
+        identifier = self.store.save_source({'name': 'My Google feed', 'url': url, 'feed_url': feed,
+                                             'category': 'Custom', 'enabled': False})
+        upgraded = Store(self.store.path)
+        additions = {item[1] for item in SOURCE_ADDITIONS_056}
+        self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
+        existing = next(item for item in upgraded.sources() if item['id'] == identifier)
+        self.assertEqual(existing['name'], 'My Google feed')
+        self.assertFalse(existing['enabled'])
+        self.assertEqual(existing['category'], 'Custom')
+        for config in upgraded.sources():
+            if config['url'] in additions:
+                self.assertFalse(config['last_checked'])
+        with upgraded.connect() as db:
+            db.execute('UPDATE sources SET removed=1 WHERE url=?', (url,))
+        reopened = Store(self.store.path)
+        self.assertFalse(any(item['url'] == url for item in reopened.sources()))
+        self.assertEqual(reopened.settings(), upgraded.settings())
 
     def test_source_modes_and_intervals_are_validated(self):
         config = {'name': 'Website', 'url': 'https://example.com/', 'category': 'News', 'mode': 'page', 'stale_days': 30}
