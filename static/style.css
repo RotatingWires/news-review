@@ -115,7 +115,7 @@ h3 { font-size: 15px; }
 .titlebar-name { justify-self: start; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-buttons { justify-self: end; letter-spacing: 4px; white-space: nowrap; }
 .titlebar-caption { justify-self: center; min-width: 0; max-width: min(50vw, 520px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.masthead { border-bottom: 1px solid var(--shadow); padding: 3px 0; }
+.masthead { border-bottom: 1px solid var(--shadow); padding: 3px 6px; }
 nav { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .nav-button { border-color: transparent; box-shadow: none; padding: 4px 12px; }
 .nav-button.active { background: var(--surface-alt); }

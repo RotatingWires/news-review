@@ -483,6 +483,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.5.2
+
+- Add horizontal navigation-bar padding so Sign out and its hover highlight stay inset from the window edge on desktop and mobile.
+
 ### v0.5.1
 
 - Fix first-run password creation on Windows drives that reject hard links (WinError 50). Use exclusive credential-file creation, retaining owner-only POSIX permissions and overwrite protection.
