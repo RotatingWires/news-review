@@ -23,7 +23,7 @@ export class Feed {
       key.append(item);
     });
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
-    ['day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    ['query', 'day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
     $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
     document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });

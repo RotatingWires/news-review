@@ -139,10 +139,11 @@ def run():
                 page.get_by_role('button', name='Clear search').click()
                 expect(page.locator('.story')).to_have_count(4)
                 page.get_by_label('Search history').fill('FreePBX')
-                page.get_by_role('button', name='Search', exact=True).click()
+                page.locator('#results-heading').click()
                 expect(page.locator('.story')).to_have_count(1)
                 assert 'FreePBX' in page.locator('.story h3').inner_text()
-                page.get_by_role('button', name='Clear search').click()
+                page.get_by_label('Search history').fill('')
+                page.locator('#results-heading').click()
                 expect(page.locator('.story')).to_have_count(4)
 
                 assert page.locator('#topic-button').bounding_box()['width'] <= 170
