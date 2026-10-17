@@ -100,6 +100,7 @@ class App {
   async refreshOverview() {
     this.overview = await api('overview');
     $('version').textContent = 'v' + this.overview.version;
+    document.querySelector('.titlebar-name').textContent = 'NewsReview v' + this.overview.version;
     const state = this.overview.collector;
     document.querySelector('.status-dot').classList.toggle('collecting', state.running);
     document.querySelector('footer').setAttribute('aria-busy', String(state.running));
