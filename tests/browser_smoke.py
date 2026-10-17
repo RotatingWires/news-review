@@ -40,7 +40,7 @@ def run():
             store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=[90, 60, 25, 75][index]), set()),
                                 {**store.settings()['ai'], 'model': 'fixture-model'}, store.settings()['interests'], summary, 'article')
         store.insert_story(source, {'headline': 'Yesterday’s protocol update', 'url': 'https://example.com/yesterday',
-                                   'excerpt': 'A source excerpt from the previous day.', 'published_at': None, 'category': 'Protocols'}, (date.today() - timedelta(days=1)).isoformat())
+                                   'excerpt': 'A source excerpt from the previous day.', 'published_at': (date.today() - timedelta(days=1)).isoformat() + 'T12:00:00+00:00', 'category': 'Protocols'}, (date.today() - timedelta(days=1)).isoformat())
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), FixtureHandler)
         fixture.requests = []
         fixture_thread = threading.Thread(target=fixture.serve_forever, daemon=True)
@@ -188,6 +188,8 @@ def run():
                 page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(1)
                 expect(page.locator('.story h3')).to_contain_text('Experimental HTTP method')
+                with store.connect() as db:
+                    db.execute("UPDATE stories SET published_at=NULL, discovered_at=? WHERE url != 'https://example.com/yesterday'", (today + 'T12:00:00+00:00',))
                 page.get_by_label('Date/time range', exact=True).fill(date_text)
                 page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(5)

@@ -161,7 +161,7 @@ class Store:
     def stories(self, *, day="", query="", start="", end="", tag="", tags=None,
                 time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, page=1):
         zone = None
-        if time_start is not None and time_zone:
+        if time_zone:
             if not isinstance(time_zone, str) or len(time_zone) > 100:
                 raise ValueError('Invalid search timezone')
             try:
@@ -173,10 +173,14 @@ class Store:
             local = datetime.fromisoformat(timestamp).astimezone(zone)
             return local.hour * 60 + local.minute
 
+        def calendar_day(timestamp):
+            return datetime.fromisoformat(timestamp).astimezone(zone).date().isoformat()
+
+        story_date = "newsreview_date(COALESCE(s.published_at,s.discovered_at))"
         clauses, args = ["1=1"], []
         if not show_hidden:
             clauses.append("(s.status NOT IN ('filtered','duplicate') OR s.bookmarked=1)")
-        for value, clause in [(day, "s.day=?"), (start, "s.day>=?"), (end, "s.day<=?")]:
+        for value, clause in [(day, f"{story_date}=?"), (start, f"{story_date}>=?"), (end, f"{story_date}<=?")]:
             if value:
                 clauses.append(clause)
                 args.append(value)
@@ -201,11 +205,12 @@ class Store:
         where = " AND ".join(clauses)
         with self.connect() as db:
             db.create_function("newsreview_clock", 1, clock_minutes, deterministic=True)
+            db.create_function("newsreview_date", 1, calendar_day, deterministic=True)
             total = db.execute(f"SELECT COUNT(*) FROM stories s WHERE {where}", args).fetchone()[0]
             rows = db.execute(f"""SELECT s.*,src.name AS source_name,src.category AS source_category,
                 (SELECT COUNT(*) FROM stories d WHERE d.duplicate_of=s.id) AS related_count
                 FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE {where}
-                ORDER BY s.day DESC,s.score DESC,s.discovered_at DESC,s.id DESC LIMIT 48 OFFSET ?""", (*args, (page - 1) * 48))
+                ORDER BY {story_date} DESC,s.score DESC,s.discovered_at DESC,s.id DESC LIMIT 48 OFFSET ?""", (*args, (page - 1) * 48))
             return {"items": [self.story(r) for r in rows], "total": total, "page": page, "page_size": 48}
 
     def related(self, story_id):

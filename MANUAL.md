@@ -31,7 +31,7 @@ On Windows:
 py -3 -m newsreview
 ```
 
-Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Time-range search also needs a timezone database; Linux usually provides one. On hosts without system timezone data, install `tzdata` with `python3 -m pip install tzdata` (Windows: `py -3 -m pip install tzdata`).
+Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Publication-date browsing and time-range search need a timezone database; Linux usually provides one. On hosts without system timezone data, install `tzdata` with `python3 -m pip install tzdata` (Windows: `py -3 -m pip install tzdata`).
 
 1. Open **Settings → Local AI** and enter the model server URL and exact installed model name.
 2. Use **Test with a sample article**, then **Save**.
@@ -121,24 +121,24 @@ The daily scheduler runs independently on the server and still collects with no 
 
 ## Reading and searching
 
-- **Daily feed:** an edition contains stories first discovered on the selected day, using the server's local calendar date.
+- **Daily feed:** the selected day shows stories published on that date in your browser timezone. Stories without a publication date use their collection date. This applies to existing history too.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
 - **Search:** a keyword searches across all stored days, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
 - **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
-- **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter edition/discovery dates. Include years when crossing New Year.
-- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected edition date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
+- **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter publication dates (collection dates for undated stories). Include years when crossing New Year.
+- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected calendar date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
 - Keyword, date, and time filters combine and search across the archive. Press Enter or Search to apply them; changed keyword and date/time fields also apply when you click or tab out. Clearing the keyword and leaving the field removes that filter.
 - **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
 - **Include filtered / duplicates:** reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
-- **Ordering and pagination:** 48 results per page, newest edition day first, then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
+- **Ordering and pagination:** 48 results per page, newest publication day first (collection day for undated stories), then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
 
-Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; edition dates remain the server's recorded date.
+Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
 No sample articles are inserted into your real database. The first edition starts empty until collection runs.
 
-Time search uses standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
+Publication-date browsing and time search use standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
 
 ### Relevance colors
 
@@ -270,7 +270,7 @@ The model receives article content as untrusted data, has no tools, and is instr
 
 Deduplication is deliberately conservative and approximate. Identical URLs are deterministic duplicates; different URLs require a model decision and can occasionally be missed or grouped incorrectly. The main tile exposes additional coverage links. The **Include filtered / duplicates** option makes those decisions inspectable. No vector database or embedding model is required.
 
-An article's publication time can differ from its edition day. Undated articles keep a null publication timestamp; the app does not invent one. The feed preserves publication dates as reported, without independently verifying publisher timestamps. Extracted article text can be partial; “article” records the extraction basis, not a guarantee of complete access.
+Stored discovery/edition dates are retained for collection history; Daily Feed browsing and date searches use publication dates with collection-date fallback. Undated articles keep a null publication timestamp; the app does not invent one. The feed preserves publication dates as reported, without independently verifying publisher timestamps. Extracted article text can be partial; “article” records the extraction basis, not a guarantee of complete access.
 
 ### Queue, retries, and scheduling
 
@@ -407,7 +407,7 @@ If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the
 | Check new sources is disabled | All enabled sources have a recorded check, or a collection/review job is running. Enable a new source or use Refresh sources to retry checked sources. |
 | Source preview works but no new tiles appear | Preview never saves history. Collect afterward; lookback/per-source limits, known URLs, the selected edition, topics/search, or hidden filtered/duplicate coverage may explain the result. |
 | Stories show excerpts and gray squares | AI is paused, not yet run, or queued for reassessment. Save a model, test it, then use Review pending. Check Recent runs for failures and retry limits. |
-| A visible story does not match a time search | Times use the tile timestamp and browser timezone; dates select the edition/discovery day. Clear other filters and include filtered/duplicate coverage if necessary. |
+| A visible story does not match a time search | Times use the tile timestamp and browser timezone; dates use the publication day, falling back to collection day. Clear other filters and include filtered/duplicate coverage if necessary. |
 | A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess history to queue the archive explicitly. |
 | Connection or storage error in the footer | Check the app process, address, logs, and data directory. A deleted running database requires stopping and restarting or restoring a backup; write actions are not replayed automatically. |
 
@@ -482,6 +482,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.5.4
+
+- Filter Daily Feed days and archive date ranges by publication date in the browser timezone, with collection-date fallback for undated stories. Apply the rule to existing history without rewriting records.
+- Order history by the same calendar date, then relevance.
 
 ### v0.5.3
 

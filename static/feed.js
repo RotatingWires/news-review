@@ -109,7 +109,7 @@ export class Feed {
     const query = $('query').value.trim(), period = $('period').value.trim();
     const history = Boolean(query || period);
     const bookmarked = this.app.view === 'bookmarks';
-    const params = new URLSearchParams({ page: this.page });
+    const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     if (query) params.set('query', query);
     if (period) {
       params.set('period', period);
@@ -196,7 +196,7 @@ export class Feed {
     const timestamp = story.published_at || story.discovered_at;
     const time = el('time', '', (story.published_at ? '' : 'Collected ') + formatTime(timestamp));
     time.dateTime = timestamp;
-    time.title = `Collected ${formatTime(story.discovered_at)} · edition ${story.day}`;
+    time.title = `Collected ${formatTime(story.discovered_at)}`;
     bottom.append(time);
     if (story.milestone !== 'not applicable') bottom.append(el('span', '', story.milestone));
     if (story.model) {

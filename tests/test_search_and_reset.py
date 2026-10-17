@@ -73,7 +73,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual({item['headline'] for item in result['items']}, {'Story 1', 'Story 2', 'Story 4', 'Story 5'})
         self.assertEqual(self.store.stories(time_start=start, time_end=end, time_zone='UTC')['total'], 0)
         self.assertEqual(self.store.stories(start='2026-10-15', end='2026-10-15', time_start=start, time_end=end,
-                                          time_zone='America/New_York')['total'], 4)
+                                          time_zone='America/New_York')['total'], 3)
         with self.assertRaises(ValueError):
             self.store.stories(time_start=start, time_end=end, time_zone='Not/AZone')
 

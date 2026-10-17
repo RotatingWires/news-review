@@ -98,6 +98,19 @@ class StoreTests(unittest.TestCase):
     def insert(self, headline='New HTTP method', url='https://example.com/story', day='2026-10-15'):
         return self.store.insert_story(self.source, {"headline": headline, "url": url, "excerpt": "Useful details", "published_at": "2026-10-14T08:00:00+00:00", "category": "Protocols"}, day)
 
+    def test_publication_calendar_dates_and_undated_fallback(self):
+        self.store.insert_story(self.source, {"headline": "Midnight boundary", "url": "https://example.com/boundary", "excerpt": "", "published_at": "2026-10-17T01:30:00+00:00", "category": "Protocols"}, '2026-10-18')
+        self.assertEqual(self.store.stories(day='2026-10-16', time_zone='America/New_York')['total'], 1)
+        self.assertEqual(self.store.stories(day='2026-10-17', time_zone='UTC')['total'], 1)
+        self.assertEqual(self.store.stories(day='2026-10-18', time_zone='UTC')['total'], 0)
+        self.assertEqual(self.store.stories(start='2026-10-16', end='2026-10-16', time_zone='America/New_York')['total'], 1)
+        self.store.insert_story(self.source, {"headline": "Undated", "url": "https://example.com/undated", "excerpt": "", "published_at": None, "category": "Protocols"}, '2020-01-01')
+        with self.store.connect() as db:
+            db.execute("UPDATE stories SET discovered_at='2026-10-18T10:00:00+00:00' WHERE published_at IS NULL")
+        result = self.store.stories(day='2026-10-18', time_zone='UTC')
+        self.assertEqual([story['headline'] for story in result['items']], ['Undated'])
+        self.assertEqual(self.store.stories(time_zone='UTC')['items'][0]['headline'], 'Undated')
+
     def test_exact_source_list_and_persistent_first_run_defaults(self):
         self.assertEqual(len(self.store.sources()), 33)
         settings = self.store.settings()
@@ -113,7 +126,8 @@ class StoreTests(unittest.TestCase):
     def test_unique_url_history_search_bookmark_and_reassessment(self):
         self.assertTrue(self.insert())
         self.assertFalse(self.insert())
-        story = self.store.stories(day='2026-10-15')["items"][0]
+        story = self.store.stories(day='2026-10-14', time_zone='UTC')["items"][0]
+        self.assertEqual(self.store.stories(day='2026-10-15', time_zone='UTC')['total'], 0)
         self.assertEqual(story["published_at"][:10], '2026-10-14')
         self.store.bookmark(story["id"], True)
         result = validate_review(review(), set())

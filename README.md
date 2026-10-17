@@ -27,7 +27,7 @@ You can collect without a model: stories show source excerpts marked **awaiting 
 
 The scheduler initially runs at **07:00 in the server's local timezone**, with overdue work catching up about 20 seconds after startup. To set up without automatic collection, run `python3 -m newsreview --no-scheduler`. Only one process should use a data directory.
 
-Data and logs live in `./data`. Back up through **Settings → Collection & history → Import/Export...**. On hosts without system timezone data, install `tzdata` for time-range search (`python3 -m pip install tzdata`, or `py -3 -m pip install tzdata` on Windows).
+Data and logs live in `./data`. Back up through **Settings → Collection & history → Import/Export...**. On hosts without system timezone data, install `tzdata` for publication-date browsing and time-range search (`python3 -m pip install tzdata`, or `py -3 -m pip install tzdata` on Windows).
 
 ## Security and privacy
 
@@ -66,3 +66,5 @@ This is a single-user/household application using Python's standard-library HTTP
 Database exports and recovery ZIPs contain private reading history/preferences and are unencrypted. Restoring a ZIP replaces the dataset; the app first saves a recovery ZIP. Do not delete the data directory while the app runs or copy only a live SQLite main file; use the [backup and restore instructions](MANUAL.md#backup-restore-and-updates).
 
 See the manual for [model setup](MANUAL.md#connect-your-own-model), [configuration](MANUAL.md#data-configuration-and-logging), [service installation](MANUAL.md#run-as-a-service), and [troubleshooting](MANUAL.md#troubleshooting).
+
+The Daily Feed date picker and archive date ranges use story publication dates in your browser timezone, falling back to collection dates for undated stories.
