@@ -35,8 +35,7 @@ export class Settings {
       } catch (error) { $('model-test-result').textContent = error.message; throw error; }
     });
     $('collection-form').onsubmit = event => this.submit(event, async () => {
-      const [hour, minute] = $('schedule-time').value.split(':').map(Number);
-      const collection = { enabled: $('schedule-enabled').checked, hour, minute,
+      const collection = { enabled: $('schedule-enabled').checked, interval_hours: Number($('schedule-interval').value),
         items_per_source: Number($('items-per-source').value), max_reviews: Number($('max-reviews').value), lookback_days: Number($('lookback').value) };
       await api('settings', 'PUT', { collection });
       this.values.collection = collection;
@@ -144,7 +143,7 @@ export class Settings {
       $('ai-input').value = ai.max_input_chars;
       this.aiHelp();
       $('schedule-enabled').checked = collection.enabled;
-      $('schedule-time').value = `${String(collection.hour).padStart(2, '0')}:${String(collection.minute).padStart(2, '0')}`;
+      $('schedule-interval').value = collection.interval_hours ?? 24;
       $('items-per-source').value = collection.items_per_source;
       $('max-reviews').value = collection.max_reviews;
       $('lookback').value = collection.lookback_days;
@@ -246,7 +245,7 @@ export class Settings {
   renderRuns() {
     if (!this.app.overview) return;
     const overview = this.app.overview;
-    $('schedule-timezone').textContent = `Uses the app server’s local timezone (${overview.timezone}). The server must be running. If today’s scheduled time was missed, it catches up after startup.`;
+    $('schedule-timezone').textContent = `Collects every configured number of hours after the last full collection starts. The server must be running; overdue work catches up after startup. Manual full collections restart the interval.`;
     const runs = overview.runs.map(run => {
       const details = el('details', 'run');
       details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : ''} · ${run.status}`));

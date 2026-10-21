@@ -163,10 +163,29 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.requeue(True), 1)
         self.assertEqual(len(self.store.pending(10)), 1)
 
-    def test_daily_schedule_persists_and_handles_interruption(self):
+    def test_three_hour_interval_respects_elapsed_time_and_restart(self):
+        config = {**self.store.settings()['collection'], 'interval_hours': 3}
+        self.store.save_settings({'collection': config})
+        now = datetime(2026, 10, 15, 23, 0, tzinfo=timezone.utc)
+        run_id = self.store.start_run('collect')
+        with self.store.connect() as db:
+            db.execute('UPDATE runs SET started_at=? WHERE id=?', (now.isoformat(), run_id))
+        self.store.finish_run(run_id, 'failed', {})
+        collector = Collector(Store(self.store.path))
+        self.assertFalse(collector.schedule_due(now + timedelta(hours=2, minutes=59)))
+        self.assertTrue(collector.schedule_due(now + timedelta(hours=3)))
+        self.assertTrue(collector.schedule_due(now + timedelta(days=3)))
+        for value in (0, -1, 1.5, 8761, True):
+            with self.assertRaises(ValueError):
+                settings({'collection': {**config, 'interval_hours': value}}, SETTINGS)
+        self.assertEqual(settings({'collection': config}, SETTINGS)['collection']['interval_hours'], 3)
+        legacy = {key: value for key, value in config.items() if key != 'interval_hours'}
+        self.assertEqual(settings({'collection': legacy}, SETTINGS)['collection']['interval_hours'], 24)
+
+    def test_interval_schedule_persists_and_handles_interruption(self):
         collector = Collector(self.store)
         now = datetime(2026, 10, 15, 8, 0, tzinfo=timezone.utc)
-        self.assertFalse(collector.schedule_due(now.replace(hour=6)))
+        self.assertTrue(collector.schedule_due(now.replace(hour=6)))
         self.assertTrue(collector.schedule_due(now))
         run_id = self.store.start_run('review')
         self.store.finish_run(run_id, 'complete', {})

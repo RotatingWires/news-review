@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8714)
     parser.add_argument("--data-dir", default=os.environ.get("NEWSREVIEW_DATA_DIR", "data"))
-    parser.add_argument("--no-scheduler", action="store_true", help="Disable the daily scheduler for this process")
+    parser.add_argument("--no-scheduler", action="store_true", help="Disable automatic collection for this process")
     args = parser.parse_args()
     password = os.environ.get("NEWSREVIEW_PASSWORD", "")
     if not 1 <= args.port <= 65535:
@@ -35,7 +35,7 @@ def main():
     if server.auth.setup_token:
         print(f"\nNewsReview first-run setup token: {server.auth.setup_token}\nOpen the app and enter this token to create your password.\nThe token changes on restart until setup is complete.\n", flush=True)
     if not args.no_scheduler:
-        threading.Thread(target=collector.schedule, daemon=True, name="daily-scheduler").start()
+        threading.Thread(target=collector.schedule, daemon=True, name="collection-scheduler").start()
     logging.info("NewsReview %s at http://%s:%s · data: %s", __version__, args.host, args.port, directory)
     try:
         server.serve_forever()

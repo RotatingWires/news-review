@@ -279,6 +279,10 @@ class Handler(BaseHTTPRequestHandler):
                 period = date_time_range(combined)
                 values['start'], values['end'] = period['start'], period['end']
                 time_start, time_end = period['time_start'], period['time_end']
+            # An explicit date range widens browsing; keywords and time-only
+            # filters retain the selected day supplied by the reader.
+            if values['start'] or values['end']:
+                values['day'] = ''
             tags = params.get("tag", [])
             if len(tags) > 100 or any(len(t) > 60 for t in tags):
                 raise ValueError("Choose at most 100 valid topics")

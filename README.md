@@ -25,7 +25,7 @@ On Windows, use `py -3 -m newsreview`. Open **http://127.0.0.1:8714**.
 
 You can collect without a model: stories show source excerpts marked **awaiting AI review**. Configure a model later and click **Review pending**. No paid API or cloud model is required.
 
-The scheduler initially runs at **07:00 in the server's local timezone**, with overdue work catching up about 20 seconds after startup. To set up without automatic collection, run `python3 -m newsreview --no-scheduler`. Only one process should use a data directory.
+Automatic collection initially runs **every 24 hours**. Change **Settings → Collection & history → Collect every (hours)** to any whole-number interval from 1 to 8760, such as 3 hours. Overdue work catches up about 20 seconds after startup. To set up without automatic collection, run `python3 -m newsreview --no-scheduler`. Only one process should use a data directory.
 
 Data and logs live in `./data`. Back up through **Settings → Collection & history → Import/Export...**. On hosts without system timezone data, install `tzdata` for publication-date browsing and time-range search (`python3 -m pip install tzdata`, or `py -3 -m pip install tzdata` on Windows).
 
@@ -72,3 +72,5 @@ The Daily Feed date picker and archive date ranges use story publication dates i
 On mobile, use your browser’s Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
 
 The default [source list](SOURCES.md) includes 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security. Approved additions appear once on restart after updating; use **Check new sources** to collect them.
+
+Keyword and time-only searches stay within the selected day. Enter a date range to search across days; clear it to return to the day picker. Bookmarks search all saved stories unless limited by a date range.

@@ -58,7 +58,8 @@ def settings(value, current):
             raise ValueError("Invalid collection settings")
         result["collection"] = {
             "enabled": boolean(c.get("enabled"), "Schedule enabled"),
-            "hour": integer(c.get("hour"), "Hour", 0, 23), "minute": integer(c.get("minute"), "Minute", 0, 59),
+            "interval_hours": integer(c.get("interval_hours", 24), "Collection interval (hours)", 1, 8760),
+            "hour": integer(c.get("hour", 7), "Hour", 0, 23), "minute": integer(c.get("minute", 0), "Minute", 0, 59),
             "items_per_source": integer(c.get("items_per_source"), "Articles per source", 1, 50),
             "max_reviews": integer(c.get("max_reviews"), "Reviews per run", 1, 500),
             "lookback_days": integer(c.get("lookback_days"), "Lookback days", 1, 30),

@@ -142,6 +142,17 @@ class IntegrationTests(unittest.TestCase):
             value = json.loads(content) if response.headers.get_content_type() == 'application/json' else content
             return response.status, value, response.headers
 
+    def test_keyword_and_time_search_remain_day_scoped_until_date_range(self):
+        self.start_api()
+        for day in ('2026-10-15', '2026-10-16'):
+            self.store.insert_story(next(source['id'] for source in self.store.sources() if source['enabled']), {'headline': 'Shared protocol news', 'url': 'https://example.com/' + day,
+                                    'excerpt': '', 'published_at': day + 'T15:00:00+00:00', 'category': 'Protocols'}, day)
+        base = '/api/stories?day=2026-10-16&query=Shared&time_zone=UTC'
+        self.assertEqual(self.request(base)[1]['total'], 1)
+        self.assertEqual(self.request(base + '&period=10am%20-%2012pm')[1]['total'], 0)
+        self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26')[1]['total'], 2)
+        self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26,%202pm%20-%204pm')[1]['total'], 2)
+
     def test_discovery_collection_model_review_and_idempotence(self):
         self.assertEqual(discover(self.fetcher, self.root), self.root + '/feed')
         self.store.save_settings({'ai': self.model_config()})

@@ -40,7 +40,7 @@ Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Pub
 
 You can collect before setting up a model. Stories display source excerpts labeled **awaiting AI review**, rather than pretending those excerpts are generated summaries. Later, configure the model and click **Review pending**.
 
-The daily scheduler is enabled initially for **07:00 in the server's local timezone**. An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
+Automatic collection is enabled initially **every 24 hours**, adjustable under **Settings → Collection & history → Collect every (hours)** (1–8760 whole hours). An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
 
 ```bash
 python3 -m newsreview --no-scheduler
@@ -117,7 +117,7 @@ NewsReview does **not** poll `/api/overview` while idle. Opening the app or chan
 
 While a visible tab knows a collection/review job is running, it checks progress every **2.5 seconds** and reloads the relevant content when the job finishes. Connection failures retry read requests every **5 seconds** until recovery. Hidden tabs pause these checks; a read already in flight may finish. Checks also pause during ZIP transfer and resume afterward if needed. Idle checks stop again once the job or connection recovery finishes.
 
-The daily scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you return to the tab, change the main view, or reload the page. Other-tab bookmark/source changes are picked up on return; there is no continuous background synchronization.
+The interval scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you return to the tab, change the main view, or reload the page. Other-tab bookmark/source changes are picked up on return; there is no continuous background synchronization.
 
 ## Mobile home-screen installation
 
@@ -127,12 +127,12 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 
 - **Daily feed:** the selected day shows stories published on that date in your browser timezone. Stories without a publication date use their collection date. This applies to existing history too.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
-- **Search:** a keyword searches across all stored days, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
+- **Search:** a keyword searches the currently selected publication day, unless an explicit date range is entered, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
 - **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
 - **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter publication dates (collection dates for undated stories). Include years when crossing New Year.
 - **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected calendar date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
-- Keyword, date, and time filters combine and search across the archive. Press Enter or Search to apply them; changed keyword and date/time fields also apply when you click or tab out. Clearing the keyword and leaving the field removes that filter.
-- **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. By itself it filters the selected day; with keyword/date/time search it filters the historical results. Clicking a tile's tag adds that topic to the current selection.
+- Keywords and time-only filters combine within the selected day. An explicit date range replaces the day picker as the date scope and searches that range; clearing it returns to the selected day. The day picker and previous/next buttons are disabled while an explicit date range is active; Today clears the range and restores daily browsing. Bookmarks continue to search all saved stories unless a date range is supplied. Press Enter or Search to apply them; changed keyword and date/time fields also apply when you click or tab out. Clearing the keyword and leaving the field removes that filter.
+- **Topics:** choose multiple checkboxes in the Topics dropdown. Results match **any** selected topic; select All topics to remove that restriction. It filters the selected day with keywords or time-only searches, or the explicit date range when one is entered. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
 - **Include filtered / duplicates:** reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
 - **Ordering and pagination:** 48 results per page, newest publication day first (collection day for undated stories), then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
@@ -213,7 +213,7 @@ If the website cannot be downloaded or parsed, usable feed entries are retained 
 - A successful or failed collection attempt records a check, so failed sources are excluded from Check new sources thereafter. Use Refresh sources to retry them. Disabled sources are skipped by both buttons.
 - Adding a source makes it eligible; Preview stories and Find RSS/Atom feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
 - New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
-- The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not satisfy or suppress the scheduled daily full collection; normal manual full collection still does.
+- The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not restart the scheduled full-collection interval; normal manual full collection still does.
 
 The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. A review-only job cannot be combined with `unchecked_only`. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
 
@@ -261,7 +261,7 @@ Under **Settings → Collection & history**, click **Fresh start...**, choose th
 
 Clearing history keeps bookmarked stories unless Bookmarks is also selected. Bookmarks alone removes saved flags without deleting stories. Clearing sources retires the configuration while preserving labels on retained stories; defaults are not reseeded. Resetting AI/collection settings restores their defaults. Unchecked preferences remain intact. The operation is transactional and rejected while collection/review runs.
 
-Clearing history or runs suppresses automatic collection for the rest of the day, including after restart. Manual collection remains available. Removed URLs may be collected again. Backups and logs are separate files and are retained. This is not a secure disk wipe.
+Clearing history or runs restarts the automatic collection interval from the reset time, including after restart. Manual collection remains available. Removed URLs may be collected again. Backups and logs are separate files and are retained. This is not a secure disk wipe.
 
 ## Collection and AI pipeline
 
@@ -286,9 +286,9 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
 - Each failed review increments an attempt count. After three attempts, use **Reset failed reviews** once the underlying issue is fixed.
 - Fresh/unattempted entries are processed first, newest first; older pending entries can wait on busy days. Increase the per-run limit or run additional review batches to catch up.
-- A daily collection starts after its configured local time if no collection was started that day. A manual full-source collection counts for that day; review-only and new-source-only jobs do not.
+- Collection is due when the configured hours have elapsed since the most recent full collection started. Manual full collections restart the interval; review-only and new-source-only jobs do not. With no previous full collection it runs on the next scheduler tick. Existing daily settings become a 24-hour interval; their old hour/minute fields are retained for archive compatibility but no longer control scheduling.
 - There is no wake-from-sleep mechanism. If the service was offline, it checks current feeds when it resumes; it cannot reconstruct stories that have already disappeared from those feeds.
-- The schedule survives restarts through the SQLite run history. Partial/failed runs count as today's attempt; retry manually if needed. An interrupted process is marked interrupted at the next startup.
+- The schedule survives restarts through the SQLite run history. Partial/failed full runs also restart the interval to avoid rapid retries; retry manually if needed. Missed intervals produce one catch-up run, not a replay of every missed run. An interrupted process is marked interrupted at the next startup.
 - Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
 
 ## Data, configuration, and logging
@@ -359,11 +359,11 @@ The app must stay running for its scheduler to run. It can also be launched at l
 4. If needed, put variables in `/etc/newsreview.env`, readable only by the service administrator. The template loads it as an optional environment file.
 5. Install the unit using your normal system administration process, then enable/start it.
 
-The template listens on loopback. Edit the bind address for direct LAN access; find the first-run setup token in the service console/journal. The system's timezone controls daily collection. The app does not install or alter system services automatically.
+The template listens on loopback. Edit the bind address for direct LAN access; find the first-run setup token in the service console/journal. The scheduler uses elapsed hours, independent of timezone or daylight-saving changes. The app does not install or alter system services automatically.
 
 ### Windows / Task Scheduler
 
-Create a task that starts your Python executable with `-m newsreview`, and set **Start in** to the checkout directory. Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the daily schedule.
+Create a task that starts your Python executable with `-m newsreview`, and set **Start in** to the checkout directory. Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the interval schedule.
 
 ## Backup, restore, and updates
 
@@ -426,7 +426,7 @@ The automated suite needs only Python:
 python3 -m unittest discover -v
 ```
 
-It uses real temporary SQLite databases and local HTTP fixtures for RSS, article pages, Ollama, and compatible model responses. Tests cover parsing, extraction/excerpt fallback, settings/model validation, duplicate references, queue retries, idempotent/full/new-source collection, isolated review queues, daily scheduling, source failures/upgrades, history/search/timezones, bookmarks, ZIP restore validation and recovery, selective resets, authentication, origin checks, and static-file boundaries. No tests contact the live sources or require a real model. No monkey patches are used.
+It uses real temporary SQLite databases and local HTTP fixtures for RSS, article pages, Ollama, and compatible model responses. Tests cover parsing, extraction/excerpt fallback, settings/model validation, duplicate references, queue retries, idempotent/full/new-source collection, isolated review queues, interval scheduling, source failures/upgrades, history/search/timezones, bookmarks, ZIP restore validation and recovery, selective resets, authentication, origin checks, and static-file boundaries. No tests contact the live sources or require a real model. No monkey patches are used.
 
 Optional real-browser verification requires Playwright and its Chromium browser in your development environment:
 
@@ -444,7 +444,7 @@ GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local ve
 ```text
 newsreview/
   __init__.py       authoritative application version
-  __main__.py       CLI, server startup, logging, daily scheduler startup
+  __main__.py       CLI, server startup, logging, interval scheduler startup
   defaults.py       initial source list, interests, collection/model defaults
   store.py          SQLite schema, queries, queue and settings persistence
   migration.py      safe import of the first-version database filename
@@ -455,7 +455,7 @@ newsreview/
   sources.py        Automatic/feed/page collection strategy
   health.py         observed source health and inactivity warnings
   reviewer.py       local model adapters, editorial prompt, output validation
-  collector.py      collection/review worker and daily scheduler
+  collector.py      collection/review worker and interval scheduler
   validation.py     source/settings input validation
   auth.py           persistent password hashes and first-run setup tokens
   server.py         same-origin HTTP API, authentication and static assets
@@ -489,6 +489,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.6.0
+
+- Replace fixed daily collection times with configurable elapsed-hour intervals, persistent across restarts and safe across midnight/daylight-saving changes.
+- Keep Daily Feed keyword/time-only searches within the selected publication day; explicit date ranges widen search.
 
 ### v0.5.6
 

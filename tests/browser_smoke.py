@@ -104,6 +104,10 @@ def run():
                 page.locator('#help-dialog .dialog-actions button').click()
                 page.get_by_role('button', name='Settings', exact=True).click()
                 page.get_by_role('button', name='Collection & history', exact=True).click()
+                page.locator('#schedule-interval').fill('3')
+                page.locator('#collection-form button[type=submit]').click()
+                expect(page.locator('#status-message')).to_have_text('Collection settings saved.')
+                assert store.settings()['collection']['interval_hours'] == 3
                 page.get_by_role('button', name='Import/Export...', exact=True).click()
                 with page.expect_download() as download_info:
                     page.locator('#export-backup').click()
@@ -138,7 +142,7 @@ def run():
                 page.get_by_role('button', name='Today', exact=True).click()
                 page.get_by_label('Search history').fill('Android Authority')
                 page.get_by_role('button', name='Search', exact=True).click()
-                expect(page.locator('.story')).to_have_count(5)
+                expect(page.locator('.story')).to_have_count(4)
                 page.get_by_role('button', name='Clear search').click()
                 expect(page.locator('.story')).to_have_count(4)
                 page.get_by_label('Search history').fill('FreePBX')
@@ -185,6 +189,9 @@ def run():
                     db.execute("UPDATE stories SET published_at='2026-10-15T15:00:00+00:00', discovered_at='2026-10-16T02:00:00+00:00' WHERE url='https://example.com/0'")
                 page.emulate_media(reduced_motion='reduce')
                 page.get_by_label('Date/time range', exact=True).fill('10am - 12pm')
+                page.get_by_label('Date/time range', exact=True).press('Enter')
+                expect(page.locator('.story')).to_have_count(0)
+                page.get_by_label('Date/time range', exact=True).fill('10/15/26 - 10/15/26, 10am - 12pm')
                 page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(1)
                 expect(page.locator('.story h3')).to_contain_text('Experimental HTTP method')
@@ -234,7 +241,7 @@ def run():
                 page.locator('#source-feed').fill(f'http://127.0.0.1:{fixture.server_port}/feed')
                 page.locator('#source-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(34)
+                expect(page.locator('.source-row')).to_have_count(38)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
@@ -244,7 +251,7 @@ def run():
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(35)
+                expect(page.locator('.source-row')).to_have_count(39)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.get_by_role('button', name='Server type', exact=True).click()
                 page.get_by_role('option', name='Compatible local chat server (e.g. LM Studio)', exact=True).click()
@@ -341,7 +348,7 @@ def run():
                 assert api_requests.count('sources') == 1, 'Reset fetched source settings more than once'
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 35
+                assert len(store.sources()) == 39
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors

@@ -99,10 +99,10 @@
       </section>
 
       <section id="panel-collection" class="settings-panel" hidden>
-        <h2>Daily collection</h2><p class="muted" id="schedule-timezone"></p>
+        <h2>Automatic collection</h2><p class="muted" id="schedule-timezone"></p>
         <form id="collection-form" class="form-grid">
-          <label class="checkbox full"><input type="checkbox" id="schedule-enabled"> Enable daily collection</label>
-          <label>Collection time<input id="schedule-time" type="time" required></label>
+          <label class="checkbox full"><input type="checkbox" id="schedule-enabled"> Enable automatic collection</label>
+          <label>Collect every (hours)<input id="schedule-interval" type="number" min="1" max="8760" step="1" required></label>
           <label>Newest articles per source<input id="items-per-source" type="number" min="1" max="50" required></label>
           <label>Maximum AI reviews per run<input id="max-reviews" type="number" min="1" max="500" required></label>
           <label>Collect articles from the last (days)<input id="lookback" type="number" min="1" max="30" required></label>
@@ -161,7 +161,7 @@
         <label class="checkbox"><input type="checkbox" id="reset-ai"> AI settings (restore defaults and pause review)</label>
         <label class="checkbox"><input type="checkbox" id="reset-collection"> Collection settings (restore defaults)</label>
       </fieldset>
-      <p class="muted">Clearing story/run history pauses automatic collection for the rest of today. Manual Check sources remains available.</p>
+      <p class="muted">Clearing story/run history restarts the automatic collection interval. Manual Check sources remains available.</p>
       <label>Type RESET SELECTED to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="RESET SELECTED"></label>
       <p id="clear-history-error" class="error" role="alert"></p>
     </div>

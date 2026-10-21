@@ -107,7 +107,10 @@ export class Feed {
     const requestId = ++this.requestId;
     if (!$('day').value) $('day').value = this.app.overview.today;
     const query = $('query').value.trim(), period = $('period').value.trim();
-    const history = Boolean(query || period);
+    const history = period.includes('/');
+    const searching = Boolean(query || period);
+    ['day', 'previous-day', 'next-day'].forEach(id => { $(id).disabled = history; });
+    $('day').title = history ? 'The date range controls which days are searched. Clear it to use this picker.' : 'Publication day';
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     if (query) params.set('query', query);
@@ -116,7 +119,7 @@ export class Feed {
       params.set('time_zone', Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
     this.selectedTopics.forEach(topic => params.append('tag', topic));
-    if (!history && !bookmarked) params.set('day', $('day').value);
+    if (!bookmarked) params.set('day', $('day').value);
     if (bookmarked) params.set('bookmarks', '1');
     if ($('show-hidden').checked) params.set('hidden', '1');
     $('stories').setAttribute('aria-busy', 'true');
@@ -125,13 +128,13 @@ export class Feed {
       if (requestId !== this.requestId) return;
       $('stories').replaceChildren(...result.items.map(story => this.tile(story)));
       $('day-controls').hidden = bookmarked;
-      $('clear-search').hidden = !history && !this.selectedTopics.size && !$('show-hidden').checked;
+      $('clear-search').hidden = !searching && !this.selectedTopics.size && !$('show-hidden').checked;
       $('results-heading').textContent = history ? 'From your history' : bookmarked ? 'Saved stories' : this.editionTitle();
       $('story-count').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('empty').hidden = result.total > 0;
-      $('empty-title').textContent = bookmarked ? 'No bookmarks yet.' : history ? 'Nothing matched this search.' : 'No stories in this edition.';
-      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : history ? 'Try another keyword or a wider date range. Search includes saved headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Your local model can be connected whenever you’re ready.';
-      $('empty-action').hidden = bookmarked || history;
+      $('empty-title').textContent = bookmarked ? 'No bookmarks yet.' : searching ? 'Nothing matched this search.' : 'No stories in this edition.';
+      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Your local model can be connected whenever you’re ready.';
+      $('empty-action').hidden = bookmarked || searching;
       $('empty-action').onclick = () => this.app.collect('collect', $('empty-action'));
       $('page-prev').hidden = this.page <= 1;
       $('page-next').hidden = this.page * result.page_size >= result.total;

@@ -150,19 +150,22 @@ class Collector:
 
     def schedule_due(self, now):
         config = self.store.settings()["collection"]
-        if not config["enabled"] or (now.hour, now.minute) < (config["hour"], config["minute"]):
+        if not config["enabled"]:
             return False
         with self.store.connect() as db:
             rows = db.execute("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' AND COALESCE(json_extract(details,'$.scope'),'all')!='unchecked' ORDER BY id DESC LIMIT 1").fetchall()
             reset = db.execute("SELECT value FROM settings WHERE key='history_cleared_at'").fetchone()
-        if reset and datetime.fromisoformat(json.loads(reset[0])).astimezone(now.tzinfo).date() == now.date():
-            return False
-        last_day = datetime.fromisoformat(rows[0][0]).astimezone(now.tzinfo).date() if rows else None
-        return last_day != now.date()
+        anchors = [datetime.fromisoformat(rows[0][0])] if rows else []
+        if reset:
+            anchors.append(datetime.fromisoformat(json.loads(reset[0])))
+        if not anchors:
+            return True
+        elapsed = now.astimezone(timezone.utc) - max(value.astimezone(timezone.utc) for value in anchors)
+        return elapsed >= timedelta(hours=config.get("interval_hours", 24))
 
     def schedule(self):
-        # Schedule in the server's local timezone. Persistent run history prevents
-        # repeated daily runs after a restart. An overdue run catches up at startup.
+        # Persistent UTC elapsed time survives restarts and daylight-saving changes.
+        # Missed intervals trigger one catch-up run, without replaying a backlog.
         while not self.stop_event.wait(20):
             try:
                 now = datetime.now().astimezone()
