@@ -197,6 +197,12 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request(path, 'POST', data)[1]['deleted'], 0)
         self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
 
+    def test_relevance_filter_api_validation(self):
+        self.start_api()
+        for query in ('exclude_relevance=unknown', 'exclude_relevance=high&' * 5):
+            self.assertEqual(self.request('/api/stories?' + query)[0], 400)
+        self.assertEqual(self.request('/api/stories?exclude_relevance=high&exclude_relevance=pending')[0], 200)
+
     def test_discovery_collection_model_review_and_idempotence(self):
         self.assertEqual(discover(self.fetcher, self.root), self.root + '/feed')
         self.store.save_settings({'ai': self.model_config()})

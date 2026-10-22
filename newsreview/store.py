@@ -161,7 +161,7 @@ class Store:
         return result
 
     def stories(self, *, day="", query="", start="", end="", tag="", tags=None,
-                time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, page=1):
+                time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, excluded_relevance=None, page=1):
         zone = None
         if time_zone:
             if not isinstance(time_zone, str) or len(time_zone) > 100:
@@ -186,6 +186,15 @@ class Store:
             if value:
                 clauses.append(clause)
                 args.append(value)
+        excluded = list(dict.fromkeys(excluded_relevance or []))
+        if any(value not in ('high', 'medium', 'low', 'pending') for value in excluded):
+            raise ValueError('Invalid relevance filter')
+        if excluded:
+            bucket = """CASE WHEN s.status='pending' OR typeof(s.score)!='integer' OR s.score<0 THEN 'pending'
+                WHEN s.score>=75 THEN 'high' WHEN s.score>=40 THEN 'medium' ELSE 'low' END"""
+            placeholders = ','.join('?' for _ in excluded)
+            clauses.append(f"({bucket}) NOT IN ({placeholders})")
+            args.extend(excluded)
         selected_tags = list(dict.fromkeys([*(tags or []), *([tag] if tag else [])]))
         if selected_tags:
             placeholders = ','.join('?' for _ in selected_tags)

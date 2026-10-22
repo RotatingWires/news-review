@@ -24,6 +24,7 @@ export class Feed {
     });
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
     ['query', 'day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    document.querySelectorAll('input[name="relevance"]').forEach(input => { input.onchange = () => this.reload(); });
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
     $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
     document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
@@ -36,7 +37,7 @@ export class Feed {
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       this.closeTopics(false);
-      const items = [$('topic-all'), ...$('topic-options').querySelectorAll('input')];
+      const items = [...$('topic-menu').querySelectorAll('button, input')];
       const current = items.indexOf(document.activeElement);
       const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
         : current < 0 ? 0 : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
@@ -56,6 +57,7 @@ export class Feed {
     this.selectedTopics.clear();
     this.renderTopics(this.app.overview.tags);
     $('show-hidden').checked = false;
+    document.querySelectorAll('input[name="relevance"]').forEach(input => { input.checked = true; });
   }
 
   closeTopics(close) {
@@ -65,7 +67,7 @@ export class Feed {
 
   renderTopics(topics) {
     this.selectedTopics = new Set([...this.selectedTopics].filter(topic => topics.includes(topic)));
-    $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
+    $('topic-label').textContent = 'Filter...';
     $('topic-options').replaceChildren(...topics.map(topic => {
       const label = el('div', 'checkbox topic-row');
       const checkbox = el('input');
@@ -74,7 +76,7 @@ export class Feed {
       checkbox.checked = this.selectedTopics.has(topic);
       checkbox.onchange = () => {
         if (checkbox.checked) this.selectedTopics.add(topic); else this.selectedTopics.delete(topic);
-        $('topic-label').textContent = this.selectedTopics.size ? `Topics: ${this.selectedTopics.size} selected` : 'Topics: All topics';
+        $('topic-label').textContent = 'Filter...';
         this.reload();
       };
       label.onmousedown = event => { if (event.target !== checkbox) event.preventDefault(); };
@@ -120,6 +122,8 @@ export class Feed {
     }
     this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!bookmarked) params.set('day', $('day').value);
+    const excludedRelevance = [...document.querySelectorAll('input[name="relevance"]')].filter(input => !input.checked).map(input => input.value);
+    excludedRelevance.forEach(value => params.append('exclude_relevance', value));
     if (bookmarked) params.set('bookmarks', '1');
     if ($('show-hidden').checked) params.set('hidden', '1');
     $('stories').setAttribute('aria-busy', 'true');
@@ -128,7 +132,7 @@ export class Feed {
       if (requestId !== this.requestId) return;
       $('stories').replaceChildren(...result.items.map(story => this.tile(story)));
       $('day-controls').hidden = bookmarked;
-      $('clear-search').hidden = !searching && !this.selectedTopics.size && !$('show-hidden').checked;
+      $('clear-search').hidden = !searching && !this.selectedTopics.size && !$('show-hidden').checked && !excludedRelevance.length;
       $('results-heading').textContent = history ? 'From your history' : bookmarked ? 'Saved stories' : this.editionTitle();
       $('story-count').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('empty').hidden = result.total > 0;

@@ -286,10 +286,13 @@ class Handler(BaseHTTPRequestHandler):
             tags = params.get("tag", [])
             if len(tags) > 100 or any(len(t) > 60 for t in tags):
                 raise ValueError("Choose at most 100 valid topics")
+            excluded_relevance = params.get('exclude_relevance', [])
+            if len(excluded_relevance) > 4:
+                raise ValueError('Choose at most four relevance filters')
             values.pop("tag")
             page = validation.integer(int(params.get("page", ["1"])[0]), "Page", 1, 100000)
             result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end, time_zone=params.get("time_zone", [""])[0],
-                                   bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
+                                   excluded_relevance=excluded_relevance, bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
             for item in result["items"]:
                 for field in ("article_text", "interests_snapshot"):
                     item.pop(field, None)

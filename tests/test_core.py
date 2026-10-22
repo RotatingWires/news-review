@@ -123,6 +123,27 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(reopened.sources()[0]["enabled"], 0)
         self.assertEqual(len(reopened.sources()), 39)
 
+    def test_relevance_filters_match_tiers_and_combine_with_visibility(self):
+        for score in (0, 39, 40, 74, 75, 100):
+            self.insert(headline=f'Score {score}', url=f'https://example.com/score/{score}')
+            with self.store.connect() as db:
+                db.execute("UPDATE stories SET status='reviewed',score=? WHERE headline=?", (score, f'Score {score}'))
+        self.insert(headline='Pending', url='https://example.com/pending')
+        self.assertEqual(self.store.stories(excluded_relevance=['high'])['total'], 5)
+        self.assertEqual(self.store.stories(excluded_relevance=['medium'])['total'], 5)
+        self.assertEqual(self.store.stories(excluded_relevance=['low'])['total'], 5)
+        self.assertEqual(self.store.stories(excluded_relevance=['pending'])['total'], 6)
+        self.assertEqual(self.store.stories(excluded_relevance=['high', 'medium', 'low', 'pending'])['total'], 0)
+        with self.store.connect() as db:
+            db.execute("UPDATE stories SET bookmarked=1 WHERE score=0")
+            db.execute("UPDATE stories SET status='duplicate' WHERE score=100")
+        self.assertEqual(self.store.stories(bookmarks=True, excluded_relevance=['low'])['total'], 0)
+        self.assertEqual(self.store.stories(show_hidden=True)['total'], 7)
+        self.assertEqual(self.store.stories(show_hidden=True, excluded_relevance=['high'])['total'], 5)
+        self.assertEqual(self.store.stories(query='Score', excluded_relevance=['high', 'low'])['total'], 2)
+        with self.assertRaises(ValueError):
+            self.store.stories(excluded_relevance=['unknown'])
+
     def test_unique_url_history_search_bookmark_and_reassessment(self):
         self.assertTrue(self.insert())
         self.assertFalse(self.insert())

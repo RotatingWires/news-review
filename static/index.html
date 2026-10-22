@@ -49,9 +49,20 @@
         <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, sources, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
       </div>
       <div class="filter-bar">
-        <div class="topic-filter custom-dropdown"><button id="topic-button" class="dropdown-trigger" aria-expanded="false" aria-controls="topic-menu" aria-haspopup="true"><span id="topic-label" class="dropdown-label">Topics: All topics</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button><fieldset id="topic-menu" class="dropdown-menu" hidden><legend>Match any selected topic</legend><div class="button-row"><button id="topic-all" type="button">All topics</button></div><div id="topic-options"></div></fieldset></div>
+        <div class="topic-filter custom-dropdown">
+          <button id="topic-button" class="dropdown-trigger" aria-expanded="false" aria-controls="topic-menu" aria-haspopup="true"><span id="topic-label" class="dropdown-label">Filter...</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button>
+          <div id="topic-menu" class="dropdown-menu" role="group" aria-label="Story filters" hidden>
+            <fieldset class="filter-group"><legend>Relevance</legend>
+              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="high" checked> Highly relevant (75–100)</label>
+              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="medium" checked> Somewhat relevant (40–74)</label>
+              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="low" checked> Low relevance (0–39)</label>
+              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="pending" checked> Awaiting review</label>
+            </fieldset>
+            <label class="checkbox filter-option"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
+            <fieldset class="filter-group"><legend>Topics (match any selected)</legend><button id="topic-all" type="button">All topics</button><div id="topic-options"></div></fieldset>
+          </div>
+        </div>
         <label>Date/time range<input type="text" id="period" form="search" placeholder="9/1/26 - 10/1/26, 10am - 3pm" autocomplete="off" spellcheck="false" maxlength="200"></label>
-        <label class="checkbox"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
         <button id="clear-search" class="text-button" hidden>Clear search</button>
       </div>
       <div class="results-heading"><h2 id="results-heading">Today’s Edition</h2><span id="story-count"></span><div id="relevance-key" aria-label="Relevance color key"></div></div>
@@ -182,7 +193,7 @@
     <div class="dialog-body help-content">
       <h3>What AI reviews do</h3>
       <p>Your local model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, explains why it matters, adds topic tags, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage.</p>
-      <p>Filtered stories remain in the database but are hidden in the normal feed. Select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
+      <p>Filtered stories remain in the database but are hidden in the normal feed. Open Filter... and select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
       <h3>Adding sources</h3>
       <p>Open Settings, Sources, then Add source. Use a homepage, news section, or category page that lists multiple articles, rather than a single article URL. Enter a name and category, choose a collection method, and use Preview stories before saving.</p>
       <p>Automatic prefers a supplied or advertised RSS/Atom feed. If it fails, is empty, or becomes stale according to the source warning interval, it also checks the website listing. Website results are merged with usable feed entries; if the website cannot be read, feed entries are kept and the limitation is shown. RSS/Atom only reports feed failures. Website page reads article cards, headline links, and structured lists directly from downloaded HTML. An optional Article URL contains filter, such as /news/, narrows website candidates.</p>

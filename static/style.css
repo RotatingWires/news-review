@@ -152,11 +152,14 @@ footer {
 .filter-bar input[type="text"] { width: 350px; max-width: 100%; }
 .filter-bar .checkbox { align-self: center; margin-left: auto; }
 .topic-filter { position: relative; }
-#topic-button { width: 164px; min-width: 0; }
+#topic-button { width: 120px; min-width: 0; }
 #topic-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#topic-menu { max-height: none; overflow: hidden; margin: 4px 0 0; padding: 8px; width: 225px; min-width: 0; max-width: calc(100vw - 56px); }
+#topic-menu { max-height: min(65dvh, 460px); overflow: auto; margin: 4px 0 0; padding: 8px; width: 300px; min-width: 0; max-width: calc(100vw - 40px); }
 #topic-menu legend { background: var(--face); font-size: 12px; }
-#topic-options { max-height: 210px; overflow: auto; margin-top: 8px; }
+.filter-group { margin: 0 0 10px; padding: 8px; }
+#topic-menu .filter-option { display: flex; width: 100%; margin: 0; padding: 5px 3px; cursor: pointer; font-size: 13px; }
+#topic-menu .filter-option:hover { background: var(--title); color: var(--title-text); }
+#topic-options { margin-top: 8px; }
 #topic-options .topic-row { display: flex; width: 100%; margin: 0; padding: 5px 3px; font-size: 13px; cursor: pointer; }
 #topic-options .topic-row:hover { background: var(--title); color: var(--title-text); }
 #topic-options input { cursor: pointer; }

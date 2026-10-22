@@ -65,6 +65,17 @@ def run():
                 expect(page.locator('.relevance-indicator.relevance-medium')).to_have_count(1)
                 expect(page.locator('.relevance-indicator.relevance-low')).to_have_count(1)
                 expect(page.locator('#relevance-key .relevance-key-item')).to_have_count(4)
+                page.locator('#topic-button').click()
+                expect(page.locator('#topic-label')).to_have_text('Filter...')
+                page.locator('input[name="relevance"][value="low"]').uncheck()
+                expect(page.locator('.story')).to_have_count(3)
+                page.locator('input[name="relevance"][value="high"]').uncheck()
+                expect(page.locator('.story')).to_have_count(1)
+                page.locator('input[name="relevance"][value="medium"]').uncheck()
+                expect(page.locator('.story')).to_have_count(0)
+                page.locator('#topic-button').press('Escape')
+                page.get_by_role('button', name='Clear search', exact=True).click()
+                expect(page.locator('.story')).to_have_count(4)
                 indicator = page.locator('.relevance-indicator').first.bounding_box()
                 bookmark = page.locator('.bookmark').first.bounding_box()
                 assert indicator['width'] == indicator['height'] == bookmark['width'] == bookmark['height']
@@ -155,13 +166,13 @@ def run():
 
                 assert page.locator('#topic-button').bounding_box()['width'] <= 170
                 page.locator('#topic-button').press('ArrowDown')
-                expect(page.locator('#topic-all')).to_be_focused()
-                page.locator('#topic-all').press('Escape')
+                expect(page.locator('input[name="relevance"][value="high"]')).to_be_focused()
+                page.locator('input[name="relevance"][value="high"]').press('Escape')
                 expect(page.locator('#topic-menu')).to_be_hidden()
                 page.locator('#topic-button').click()
-                assert page.locator('#topic-menu').bounding_box()['width'] <= 230
-                assert page.locator('#topic-menu').evaluate('el => el.scrollHeight <= el.clientHeight')
-                assert page.locator('#topic-options').evaluate('el => el.scrollHeight > el.clientHeight')
+                assert page.locator('#topic-menu').bounding_box()['width'] <= 310
+                assert page.locator('#topic-menu').bounding_box()['height'] <= 460
+                assert page.locator('#topic-options').evaluate('el => el.scrollHeight <= el.clientHeight')
                 assert page.locator('#topic-options').evaluate('el => el.scrollWidth <= el.clientWidth')
                 page.locator('#topic-options').evaluate('el => { el.scrollTop = el.scrollHeight; }')
                 expect(page.locator('#topic-all')).to_be_visible()
