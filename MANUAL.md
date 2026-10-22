@@ -498,6 +498,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.6.4
+
+- Show disabled sources with one red Disabled label, removing the redundant collection-disabled warning.
+
 ### v0.6.3
 
 - Add a counted confirmation dialog for purging AI-marked duplicate stories near Fresh start. Preserve bookmarks and referenced stories, block concurrent background work, and compact the database after deletion.

@@ -1,3 +1,3 @@
 """NewsReview: a small, self-hosted news reader."""
 
-__version__ = "0.6.3"
+__version__ = "0.6.4"

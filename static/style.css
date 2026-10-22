@@ -231,7 +231,7 @@ footer > span { padding: 3px 5px; border: 2px solid; border-color: var(--shadow)
 .source-info strong, .source-info small { display: block; overflow-wrap: anywhere; }
 .source-info small, .source-state { color: var(--muted); font-size: 12px; }
 .source-state { display: block; font-weight: bold; }
-.source-state.error, .source-state.broken { color: var(--error); }
+.source-state.disabled, .source-state.error, .source-state.broken { color: var(--error); }
 .source-state.warning, .source-info .source-warning { color: var(--error); }
 .settings-panel .section-heading { flex-wrap: wrap; align-items: flex-start; }
 #source-preview { overflow-wrap: anywhere; }

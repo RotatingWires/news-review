@@ -14,7 +14,7 @@ def source_health(source, now=None):
         return max(0, (now - datetime.fromisoformat(value)).total_seconds() / 86400)
 
     if not source['enabled']:
-        return {'status': 'disabled', 'warnings': ['Collection is disabled.']}
+        return {'status': 'disabled', 'warnings': []}
     if source['last_error']:
         warnings.append(f"Last check failed ({source['consecutive_failures']} consecutive): {source['last_error']}")
     if not source['last_checked']:
