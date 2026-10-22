@@ -499,6 +499,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.7.4
+
+- Avoid repeating Not checked in new-source warnings; keep one status label and the Refresh sources instruction.
+
 ### v0.7.3
 
 - Remove the redundant Needs attention source heading and shorten Broken to a plain status label without an em dash. Keep detailed red warnings and failure counts below the source name.

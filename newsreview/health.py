@@ -18,7 +18,7 @@ def source_health(source, now=None):
     if source['last_error']:
         warnings.append(f"Last check failed ({source['consecutive_failures']} consecutive): {source['last_error']}")
     if not source['last_checked']:
-        return {'status': 'unchecked', 'warnings': ['Not checked yet. Refresh sources to test it.']}
+        return {'status': 'unchecked', 'warnings': ['Refresh sources to test it.']}
     if age(source['last_checked']) >= threshold:
         warnings.append(f'Not checked in at least {threshold} days; source health is stale.')
     if source['newest_published'] and age(source['newest_published']) >= threshold:
