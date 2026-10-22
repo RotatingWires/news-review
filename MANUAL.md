@@ -222,7 +222,7 @@ The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unche
 
 The Sources tab shows a persistent refresh status while collection/review runs, followed by its recorded result. **Refresh sources** uses the same background job as **Check sources**: collect candidates, then review a bounded batch if a model is configured. Individual failures remain attached to their sources and in run history; they do not prevent other sources from finishing.
 
-Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Needs attention**, **Check failed**, **Broken — repeated failures** (three or more consecutive failed checks), and **Disabled**. A successful check resets the failure counter.
+Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Check failed**, **Broken** (three or more consecutive failed checks), and **Disabled**. Stale/inactivity warnings show their detailed red explanation without a redundant Needs attention heading. A successful check resets the failure counter.
 
 The default inactivity warning interval is **14 days**, editable per source (1–365). Warnings cover checks older than that interval, an old newest publication date, an empty result, or no newly observed stories when dates are unavailable. An inactive/stale warning is an observation, not proof a publisher has shut down. Increase the interval for monthly/occasional publishers. An automatic switch from a configured broken feed to a usable website page is marked as a warning, with the original feed error visible.
 
@@ -498,6 +498,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.7.3
+
+- Remove the redundant Needs attention source heading and shorten Broken to a plain status label without an em dash. Keep detailed red warnings and failure counts below the source name.
 
 ### v0.7.2
 

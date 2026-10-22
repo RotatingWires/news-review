@@ -222,7 +222,8 @@ export class Settings {
       title.append(externalLink(source.url, source.name));
       info.append(title, el('small', '', `${source.category} · ${source.mode === 'page' ? 'Website page' : source.feed_url || 'Automatic feed / website discovery'}`));
       const status = source.health.status;
-      info.append(el('span', 'source-state ' + status, status === 'healthy' ? 'Healthy' : status === 'unchecked' ? 'Not checked' : status === 'disabled' ? 'Disabled' : status === 'broken' ? 'Broken — repeated failures' : status === 'error' ? 'Check failed' : 'Needs attention'));
+      const statusLabel = { healthy: 'Healthy', unchecked: 'Not checked', disabled: 'Disabled', broken: 'Broken', error: 'Check failed' }[status];
+      if (statusLabel) info.append(el('span', 'source-state ' + status, statusLabel));
       source.health.warnings.forEach(warning => info.append(el('small', 'source-warning', warning)));
       if (source.last_checked) info.append(el('small', '', `Checked ${formatTime(source.last_checked)} · Last success ${formatTime(source.last_success)} · ${source.last_count ?? 'Unknown'} entries · ${source.last_method || 'Method unknown'}`));
       if (source.newest_published) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newest_published)));
