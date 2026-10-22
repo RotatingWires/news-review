@@ -499,6 +499,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.7.1
+
+- Make relevance and Include filtered / duplicates rows use the same full-row checkbox interaction as topics, including clicks in blank row space.
+
 ### v0.7.0
 
 - Combine topics, Include filtered / duplicates, and relevance-level checkboxes in one Filter... dropdown on Daily Feed and Bookmarks. Apply relevance filters before result counting and pagination.

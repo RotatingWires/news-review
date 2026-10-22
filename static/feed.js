@@ -7,6 +7,16 @@ const RELEVANCE = [
 ];
 const UNREVIEWED = { name: 'pending', label: 'Awaiting review' };
 
+function checkboxRow(row, checkbox) {
+  row.onmousedown = event => { if (event.target !== checkbox) event.preventDefault(); };
+  row.onclick = event => {
+    if (event.target === checkbox) return;
+    event.preventDefault();
+    checkbox.focus({ preventScroll: true });
+    checkbox.click();
+  };
+}
+
 export class Feed {
   constructor(app) {
     this.app = app;
@@ -25,6 +35,7 @@ export class Feed {
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
     ['query', 'day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
     document.querySelectorAll('input[name="relevance"]').forEach(input => { input.onchange = () => this.reload(); });
+    document.querySelectorAll('#topic-menu .filter-option').forEach(row => checkboxRow(row, row.querySelector('input')));
     $('topic-button').onclick = () => this.closeTopics(!$('topic-menu').hidden);
     $('topic-all').onclick = () => { this.selectedTopics.clear(); this.renderTopics(this.app.overview.tags); this.reload(); };
     document.addEventListener('click', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
@@ -79,13 +90,7 @@ export class Feed {
         $('topic-label').textContent = 'Filter...';
         this.reload();
       };
-      label.onmousedown = event => { if (event.target !== checkbox) event.preventDefault(); };
-      label.onclick = event => {
-        if (event.target === checkbox) return;
-        event.preventDefault();
-        checkbox.focus({ preventScroll: true });
-        checkbox.click();
-      };
+      checkboxRow(label, checkbox);
       label.append(checkbox, el('span', 'topic-name', topic));
       return label;
     }));
