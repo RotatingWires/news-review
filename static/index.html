@@ -111,6 +111,7 @@
         <div class="maintenance"><h3>Review queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button id="retry-failed">Reset failed reviews</button><button id="reassess">Reassess history…</button></div></div>
         <div class="maintenance"><h3>Import/Export</h3><p>Download a ZIP backup or restore a saved NewsReview archive.</p><button id="transfer-nav" type="button">Import/Export...</button></div>
         <h3>Recent runs</h3><div id="run-history"></div>
+        <div class="maintenance"><h3>Purge duplicates</h3><p>Remove AI-marked duplicate stories while keeping bookmarks and stories referenced by other saved stories. Compact the database to reclaim unused space.</p><button id="purge-duplicates" class="danger">Purge duplicates...</button></div>
         <div class="maintenance"><h3>Fresh start</h3><p>Choose which history and preferences to clear. Bookmarked stories can be kept while other history is removed.</p><button id="clear-history" class="danger">Fresh start...</button></div>
       </section>
       </fieldset>
@@ -146,6 +147,15 @@
     <div class="dialog-body"><p>Queue every saved story for review using your current interests and model. Previous summaries stay visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p></div>
     <div class="dialog-actions"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div>
   </div></dialog>
+  <dialog id="purge-duplicates-dialog"><form id="purge-duplicates-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Purge duplicates</h2><button type="button" data-close="purge-duplicates-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <p id="purge-duplicates-count"></p>
+      <p>This permanently deletes AI-marked duplicate stories that are not bookmarked or referenced by other stories. Main stories, bookmarks, interests, sources, and collection settings are kept.</p>
+      <p>The database is compacted afterward to reclaim space. This can take time. Deleted articles may be collected again if they are still listed by a source. Export a backup first if you may want them back.</p>
+    </div>
+    <div class="dialog-actions"><button type="button" data-close="purge-duplicates-dialog">Cancel</button><button id="confirm-purge-duplicates" class="danger" type="submit">Purge duplicates</button></div>
+  </form></dialog>
   <dialog id="clear-history-dialog"><form id="clear-history-form" class="dialog-layout">
     <div class="dialog-heading"><h2>Fresh start</h2><button type="button" data-close="clear-history-dialog" aria-label="Close">×</button></div>
     <div class="dialog-body">

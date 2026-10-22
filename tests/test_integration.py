@@ -153,6 +153,50 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26')[1]['total'], 2)
         self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26,%202pm%20-%204pm')[1]['total'], 2)
 
+    def test_duplicate_purge_confirmation_lock_bookmarks_references_and_compaction(self):
+        self.start_api()
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        identifiers = {}
+        for name in ('main', 'delete', 'bookmark', 'parent', 'child', 'pending', 'filtered'):
+            self.store.insert_story(source, {'headline': name, 'url': 'https://example.com/purge/' + name,
+                                            'excerpt': '', 'published_at': None, 'category': 'Security'}, '2026-10-21')
+            with self.store.connect() as db:
+                identifiers[name] = db.execute('SELECT id FROM stories WHERE headline=?', (name,)).fetchone()[0]
+        with self.store.connect() as db:
+            for name in ('delete', 'bookmark', 'parent', 'child'):
+                db.execute("UPDATE stories SET status='duplicate', duplicate_of=? WHERE id=?", (identifiers['main'], identifiers[name]))
+            db.execute("UPDATE stories SET bookmarked=1 WHERE id IN (?,?)", (identifiers['bookmark'], identifiers['child']))
+            db.execute('UPDATE stories SET duplicate_of=? WHERE id=?', (identifiers['parent'], identifiers['child']))
+            db.execute("UPDATE stories SET status='filtered' WHERE id=?", (identifiers['filtered'],))
+            db.execute("UPDATE stories SET article_text=? WHERE id=?", ('Redundant article text ' * 30000, identifiers['delete']))
+        settings = self.store.settings()
+        revision = self.store.overview()['revision']
+        with self.store.connect() as db:
+            before_pages = db.execute('PRAGMA page_count').fetchone()[0]
+        self.assertEqual(self.request('/api/maintenance/duplicates')[1]['count'], 1)
+        path = '/api/maintenance/duplicates/purge'
+        self.assertEqual(self.request(path, 'POST', {})[0], 400)
+        data = {'confirmation': 'PURGE DUPLICATES'}
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(self.request(path, 'POST', data)[0], 409)
+        finally:
+            self.collector.lock.release()
+        self.assertEqual(self.request(path, 'POST', data, {'Origin': 'https://evil.example'})[0], 403)
+        status, result, _ = self.request(path, 'POST', data)
+        self.assertEqual(status, 200)
+        self.assertEqual(result, {'deleted': 1, 'compacted': True})
+        self.assertEqual(self.store.settings(), settings)
+        self.assertNotEqual(self.store.overview()['revision'], revision)
+        self.assertEqual(self.store.stories(show_hidden=True)['total'], 6)
+        self.assertEqual(self.store.stories(bookmarks=True)['total'], 2)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+            self.assertLess(db.execute('PRAGMA page_count').fetchone()[0], before_pages)
+        self.assertEqual(self.request('/api/maintenance/duplicates')[1]['count'], 0)
+        self.assertEqual(self.request(path, 'POST', data)[1]['deleted'], 0)
+        self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
+
     def test_discovery_collection_model_review_and_idempotence(self):
         self.assertEqual(discover(self.fetcher, self.root), self.root + '/feed')
         self.store.save_settings({'ai': self.model_config()})

@@ -12,6 +12,8 @@ from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
 
 SCHEMA_VERSION = 2
+PURGEABLE_DUPLICATES = """s.status='duplicate' AND s.bookmarked=0
+    AND NOT EXISTS (SELECT 1 FROM stories child WHERE child.duplicate_of=s.id)"""
 
 
 class StorageUnavailable(RuntimeError):
@@ -269,6 +271,27 @@ class Store:
     def clear_history(self):
         """Remove the archive in one transaction, preserving every user setting."""
         return self.reset({'history': True, 'bookmarks': True, 'runs': True})['deleted_stories']
+
+    def duplicate_purge_count(self):
+        with self.connect() as db:
+            return db.execute(f"SELECT COUNT(*) FROM stories s WHERE {PURGEABLE_DUPLICATES}").fetchone()[0]
+
+    def purge_duplicates(self):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            identifiers = [row[0] for row in db.execute(f"SELECT s.id FROM stories s WHERE {PURGEABLE_DUPLICATES}")]
+            db.executemany("DELETE FROM stories WHERE id=?", [(identifier,) for identifier in identifiers])
+            if identifiers:
+                db.execute("UPDATE settings SET value=? WHERE key='data_revision'", (json.dumps(secrets.token_hex(16)),))
+        result = {'deleted': len(identifiers), 'compacted': False}
+        if identifiers:
+            try:
+                with self.connect() as db:
+                    db.execute("VACUUM")
+                result['compacted'] = True
+            except sqlite3.Error:
+                result['warning'] = 'Duplicates were removed, but database compaction failed. Freed pages can still be reused; check available disk space.'
+        return result
 
     def reset(self, selections):
         allowed = {'history', 'bookmarks', 'runs', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection'}

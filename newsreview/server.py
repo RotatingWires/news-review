@@ -302,6 +302,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/overview":
             self.send(200, {**store.overview(), "collector": self.server.collector.status(), "today": date.today().isoformat(),
                             "timezone": str(datetime.now().astimezone().tzinfo), "version": __version__})
+        elif path == '/api/maintenance/duplicates':
+            self.send(200, {'count': store.duplicate_purge_count()})
         elif path == "/api/settings":
             self.send(200, store.settings())
         elif path == "/api/sources":
@@ -313,7 +315,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self, path, data):
         store = self.server.store
-        if path == '/api/reset' and self.command == 'POST':
+        if path == '/api/maintenance/duplicates/purge' and self.command == 'POST':
+            if data.get('confirmation') != 'PURGE DUPLICATES':
+                raise ValueError('Confirm duplicate purging before continuing')
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {'error': 'Wait for collection/review or restore to finish before purging duplicates'})
+                return
+            try:
+                result = store.purge_duplicates()
+                self.send(200, result)
+            finally:
+                self.server.collector.lock.release()
+        elif path == '/api/reset' and self.command == 'POST':
             if data.get('confirmation') != 'RESET SELECTED':
                 raise ValueError('Type RESET SELECTED to confirm')
             if not self.server.collector.lock.acquire(blocking=False):

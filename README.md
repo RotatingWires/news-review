@@ -74,3 +74,5 @@ On mobile, use your browser’s Add to Home Screen action to install NewsReview 
 The default [source list](SOURCES.md) includes Zero Day Initiative published advisories, The Hacker News, 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security. Approved additions appear once on restart after updating; use **Check new sources** to collect them.
 
 Keyword and time-only searches stay within the selected day. Enter a date range to search across days; clear it to return to the day picker. Bookmarks search all saved stories unless limited by a date range.
+
+Use **Settings → Collection & history → Purge duplicates** to remove AI-marked duplicate stories and compact the database. Bookmarks and stories referenced by other saved stories are kept.

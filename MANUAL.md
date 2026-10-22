@@ -291,6 +291,12 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - The schedule survives restarts through the SQLite run history. Partial/failed full runs also restart the interval to avoid rapid retries; retry manually if needed. Missed intervals produce one catch-up run, not a replay of every missed run. An interrupted process is marked interrupted at the next startup.
 - Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
 
+## Purging duplicate stories
+
+Open **Settings → Collection & history → Purge duplicates**, near Fresh start. The confirmation dialog previews the current eligible count; Cancel leaves the archive unchanged. Purging permanently deletes stories marked duplicate by AI review, excluding bookmarks and any story referenced by another saved story. Main stories, other history, preferences, sources, and run history remain intact. It does not guess duplicates from similar headlines or remove unrelated filtered/pending stories. Without AI-marked duplicates there is nothing to purge.
+
+The server rechecks eligibility inside a write transaction and refuses purging during collection, review, or restore. It updates the dataset revision so other tabs reload. SQLite VACUUM runs after deletion to shrink the database, which can take time and needs temporary free disk space. If compaction fails, the deletion remains committed and the UI reports the limitation; freed pages remain reusable. Space saved depends on the number and size of eligible stories; existing backup ZIPs and logs are separate and unchanged. Deleted URLs may be collected again while sources still list them. Export a backup before purging if you need a recovery path.
+
 ## Data, configuration, and logging
 
 By default, runtime data is stored in `./data` relative to the working directory:
@@ -480,6 +486,8 @@ deploy/             example systemd unit
 
 The authentication browser check (`python3 -m tests.browser_auth`) verifies first-run setup, incorrect credentials, logout/login, and mobile layout.
 
+The optional browser check `python3 -m tests.browser_purge` exercises purge confirmation, cancellation, bookmark preservation, empty state, and mobile layout using temporary data.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
@@ -489,6 +497,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.6.3
+
+- Add a counted confirmation dialog for purging AI-marked duplicate stories near Fresh start. Preserve bookmarks and referenced stories, block concurrent background work, and compact the database after deletion.
 
 ### v0.6.2
 

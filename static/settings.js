@@ -56,6 +56,22 @@ export class Settings {
       notify(`${result.count} stories queued. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
+    $('purge-duplicates').onclick = () => busy($('purge-duplicates'), async () => {
+      const result = await api('maintenance/duplicates');
+      $('purge-duplicates-count').textContent = `${result.count} duplicate ${result.count === 1 ? 'story can' : 'stories can'} be removed.`;
+      $('confirm-purge-duplicates').disabled = result.count === 0;
+      $('purge-duplicates-dialog').showModal();
+      $('purge-duplicates-dialog').querySelector('[data-close]').focus();
+    });
+    $('purge-duplicates-form').onsubmit = async event => {
+      event.preventDefault();
+      await busy(event.submitter, async () => {
+        const result = await api('maintenance/duplicates/purge', 'POST', { confirmation: 'PURGE DUPLICATES' }, 120000);
+        $('purge-duplicates-dialog').close();
+        await this.app.reloadDataset();
+        notify(result.warning || `${result.deleted} duplicate ${result.deleted === 1 ? 'story' : 'stories'} removed.${result.compacted ? ' Database compacted.' : ''} Bookmarks and preferences were kept.`, Boolean(result.warning));
+      }, 'Purging duplicate stories and compacting the database...');
+    };
     $('clear-history').onclick = () => {
       $('clear-history-form').reset();
       $('clear-history-error').textContent = '';
