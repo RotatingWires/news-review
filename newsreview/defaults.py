@@ -45,6 +45,9 @@ SOURCE_ADDITIONS_056 = [
     ("TechRepublic · Security", "https://www.techrepublic.com/topic/security/", "https://www.techrepublic.com/rssfeeds/topic/security/", "Security"),
 ]
 SOURCE_UPDATES = {
+    'source_additions_061': [
+        ("The Hacker News", "https://thehackernews.com/", "https://feeds.feedburner.com/TheHackersNews", "Security"),
+    ],
     'source_additions_056': SOURCE_ADDITIONS_056,
     'source_additions_048': SOURCE_ADDITIONS_048,
     'source_additions_0411': [

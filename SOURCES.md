@@ -1,6 +1,6 @@
 # Approved source additions
 
-These are the 25 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
+These are the 26 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
 
 ## Standards, engineering, and open source
 
@@ -48,3 +48,9 @@ These seven sources are added once on upgrade as well as on fresh installs. Matc
 - [TechRepublic Security](https://www.techrepublic.com/topic/security/) — RSS: `https://www.techrepublic.com/rssfeeds/topic/security/`
 
 Added once on restart after upgrading, without overwriting existing source settings or re-enabling removed/disabled sources. Use **Check new sources** to collect these feeds.
+
+## The Hacker News (v0.6.1)
+
+- [The Hacker News](https://thehackernews.com/) — RSS: `https://feeds.feedburner.com/TheHackersNews`
+
+Added once on restart after updating. Existing matching sources and disabled/removed choices remain unchanged; use **Check new sources** to collect it.

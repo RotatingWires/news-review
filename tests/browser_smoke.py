@@ -241,7 +241,7 @@ def run():
                 page.locator('#source-feed').fill(f'http://127.0.0.1:{fixture.server_port}/feed')
                 page.locator('#source-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(38)
+                expect(page.locator('.source-row')).to_have_count(39)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
@@ -251,7 +251,7 @@ def run():
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(39)
+                expect(page.locator('.source-row')).to_have_count(40)
                 page.get_by_role('button', name='Local AI', exact=True).click()
                 page.get_by_role('button', name='Server type', exact=True).click()
                 page.get_by_role('option', name='Compatible local chat server (e.g. LM Studio)', exact=True).click()
@@ -348,7 +348,7 @@ def run():
                 assert api_requests.count('sources') == 1, 'Reset fetched source settings more than once'
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 39
+                assert len(store.sources()) == 40
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors
