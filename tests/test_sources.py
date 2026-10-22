@@ -77,12 +77,12 @@ class SourceTests(unittest.TestCase):
         self.store.insert_story(source_id, {'headline': 'An archived protocol article', 'url': 'https://example.com/old',
             'excerpt': 'Text', 'published_at': None, 'category': 'Protocols'}, '2026-10-15')
         reopened = Store(self.store.path)
-        self.assertEqual(len(reopened.sources()), 38)
+        self.assertEqual(len(reopened.sources()), 39)
         self.assertEqual(reopened.stories()['items'][0]['source_name'], 'Daniel Stenberg')
         self.assertEqual(reopened.stories()['total'], 1)
         restored = reopened.save_source({'name': 'Manually restored', 'url': 'https://daniel.haxx.se/blog/', 'feed_url': '', 'category': 'News', 'enabled': True})
         self.assertEqual(restored, source_id)
-        self.assertEqual(len(Store(self.store.path).sources()), 39, 'One-time migration must not repeatedly remove a manually restored source')
+        self.assertEqual(len(Store(self.store.path).sources()), 40, 'One-time migration must not repeatedly remove a manually restored source')
 
     def test_approved_sources_upgrade_once_preserving_configuration_and_removals(self):
         from newsreview.defaults import SOURCE_ADDITIONS_048
@@ -96,7 +96,7 @@ class SourceTests(unittest.TestCase):
             'feed_url': feed, 'category': 'Custom', 'enabled': False})
         preferences = self.store.settings()
         upgraded = Store(self.store.path)
-        self.assertEqual(len(upgraded.sources()), 38)
+        self.assertEqual(len(upgraded.sources()), 39)
         self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
         existing = next(item for item in upgraded.sources() if item['id'] == source_id)
         self.assertEqual(existing['name'], 'My existing self-host source')
@@ -105,7 +105,7 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(upgraded.settings(), preferences)
         with upgraded.connect() as db:
             db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (source_id,))
-        self.assertEqual(len(Store(self.store.path).sources()), 37)
+        self.assertEqual(len(Store(self.store.path).sources()), 38)
         upgraded.reset({'sources': True})
         self.assertEqual(Store(self.store.path).sources(), [])
 

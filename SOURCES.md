@@ -1,6 +1,6 @@
 # Approved source additions
 
-These are the 26 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
+These are the 27 current approved additions, excluding the original 12 technology websites. Daniel Stenberg and LWN were removed in v0.3.0.
 
 ## Standards, engineering, and open source
 
@@ -54,3 +54,9 @@ Added once on restart after upgrading, without overwriting existing source setti
 - [The Hacker News](https://thehackernews.com/) — RSS: `https://feeds.feedburner.com/TheHackersNews`
 
 Added once on restart after updating. Existing matching sources and disabled/removed choices remain unchanged; use **Check new sources** to collect it.
+
+## Zero Day Initiative (v0.6.2)
+
+- [Zero Day Initiative published advisories](https://www.zerodayinitiative.com/advisories/published/) — RSS: `https://www.zerodayinitiative.com/rss/published/`
+
+Collects published vulnerability disclosures, including technical details and vendor remediation links. Added once on restart without overwriting existing source settings or disabled/removed choices.

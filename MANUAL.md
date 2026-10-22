@@ -150,7 +150,7 @@ Each story has a relevance square beside its bookmark: green **75–100**, yello
 
 ## Sources
 
-The following **38 sources** are seeded once on a fresh database:
+The following **39 sources** are seeded once on a fresh database:
 
 | Group | Sources |
 | --- | --- |
@@ -160,11 +160,11 @@ The following **38 sources** are seeded once on a fresh database:
 | Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
 | Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
 | Homelab and self-hosting | selfh.st, ServeTheHome, VirtualizationHowto |
-| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews, The Hacker News, HackerNoon Cybersecurity, TechRepublic Security |
+| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews, The Hacker News, Zero Day Initiative, HackerNoon Cybersecurity, TechRepublic Security |
 
 Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
 
-[SOURCES.md](SOURCES.md) links to the 26 current approved additions separately from the original 12 websites.
+[SOURCES.md](SOURCES.md) links to the 27 current approved additions separately from the original 12 websites.
 
 The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.
 
@@ -489,6 +489,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.6.2
+
+- Add Zero Day Initiative’s published vulnerability advisories as a Security source with its RSS feed, once for new and existing installations without overwriting source choices.
 
 ### v0.6.1
 
