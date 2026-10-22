@@ -499,6 +499,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.7.2
+
+- Move Include filtered / duplicates to the top of Filter..., above Relevance and Topics.
+
 ### v0.7.1
 
 - Make relevance and Include filtered / duplicates rows use the same full-row checkbox interaction as topics, including clicks in blank row space.

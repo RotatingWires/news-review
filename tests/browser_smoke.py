@@ -173,8 +173,8 @@ def run():
 
                 assert page.locator('#topic-button').bounding_box()['width'] <= 170
                 page.locator('#topic-button').press('ArrowDown')
-                expect(page.locator('input[name="relevance"][value="high"]')).to_be_focused()
-                page.locator('input[name="relevance"][value="high"]').press('Escape')
+                expect(page.locator('#show-hidden')).to_be_focused()
+                page.locator('#show-hidden').press('Escape')
                 expect(page.locator('#topic-menu')).to_be_hidden()
                 page.locator('#topic-button').click()
                 assert page.locator('#topic-menu').bounding_box()['width'] <= 310
