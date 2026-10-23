@@ -277,12 +277,21 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.store.overview()['runs'][0]['status'], 'partial')
 
     def test_model_test_uses_real_adapter_contract(self):
-        result = self.reviewer.test(self.model_config())
-        self.assertEqual(result['status'], 'reviewed')
-        payload = self.fixture.requests[-1][1]
-        self.assertFalse(payload['stream'])
-        self.assertEqual(payload['format']['type'], 'object')
-        self.assertNotIn('tools', payload)
+        for provider in ('ollama', 'compatible'):
+            with self.subTest(provider=provider):
+                result = self.reviewer.test(self.model_config(provider))
+                self.assertEqual(result['status'], 'reviewed')
+                path, payload = self.fixture.requests[-1]
+                self.assertFalse(payload['stream'])
+                self.assertNotIn('tools', payload)
+                if provider == 'ollama':
+                    self.assertEqual(path, '/api/chat')
+                    self.assertIs(payload['think'], False)
+                    self.assertEqual(payload['format']['type'], 'object')
+                else:
+                    self.assertEqual(path, '/v1/chat/completions')
+                    self.assertNotIn('think', payload)
+                    self.assertEqual(payload['response_format'], {'type': 'json_object'})
 
     def test_api_search_bookmarks_settings_sources_and_validation(self):
         self.collect()

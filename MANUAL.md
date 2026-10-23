@@ -64,7 +64,7 @@ In **Settings → Local AI**:
 | Server base URL | `http://127.0.0.1:11434` |
 | Model name | Exact installed model name from `ollama list` |
 
-The adapter calls `/api/chat` with streaming disabled and the requested JSON schema in `format`. See [Ollama's chat API](https://docs.ollama.com/api/chat) and [structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
+The adapter calls `/api/chat` with streaming disabled, `think: false`, and the requested JSON schema in `format`. This requests a direct review without a separate thinking phase on models that support disabling it. The same setting applies to the sample-article test and normal reviews. See [Ollama's chat API](https://docs.ollama.com/api/chat), [thinking controls](https://docs.ollama.com/capabilities/thinking), and [structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
 ### LM Studio or another compatible local server
 
@@ -498,6 +498,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.7.5
+
+- Send top-level `think: false` on every Ollama review request, including the sample-article test, to request direct structured reviews without a separate thinking phase on supported models.
+- Preserve the compatible local-server request format and verify both adapter contracts through real local HTTP fixtures.
 
 ### v0.7.4
 

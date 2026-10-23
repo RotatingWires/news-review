@@ -74,7 +74,7 @@ class Reviewer:
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         base = config["base_url"].rstrip("/")
         if config["provider"] == "ollama":
-            payload = {"model": config["model"], "messages": messages, "stream": False, "format": SCHEMA,
+            payload = {"model": config["model"], "messages": messages, "stream": False, "think": False, "format": SCHEMA,
                        "options": {"temperature": 0, "num_predict": 1200}}
             response = self.fetcher.json(base + "/api/chat", payload, config["timeout_seconds"])
             content = response.get("message", {}).get("content", "")
