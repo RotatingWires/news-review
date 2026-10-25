@@ -534,6 +534,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.9.4
+
+- Add spacing above the learned-preferences note using the same settings-note spacing as Local AI.
+
 ### v0.9.3
 
 - Track article openings and show a small Read label beneath the publisher on Daily Feed and Bookmarks. Save first-open timestamps in SQLite, retain them through reviews/bookmark changes, and include them in ZIP backups.

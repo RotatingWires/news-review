@@ -306,7 +306,7 @@ dialog::backdrop { background: #0007; }
 #transfer-dialog { width: min(460px, calc(100vw - 24px)); }
 
 button.danger:disabled { color: var(--error); opacity: 1; }
-.ai-subnotes { margin-top: 16px; }
+.settings-subnotes { margin-top: 16px; }
 .custom-dropdown { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
 .native-dropdown { display: none; }
 .dropdown-trigger { display: flex; align-items: stretch; justify-content: space-between; gap: 8px; width: 100%; padding: 3px 4px 3px 7px; text-align: left; background: var(--surface); }
