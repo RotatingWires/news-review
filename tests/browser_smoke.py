@@ -87,7 +87,7 @@ def run():
                 indicator = page.locator('.relevance-indicator').first.bounding_box()
                 bookmark = page.locator('.bookmark').first.bounding_box()
                 assert indicator['width'] == indicator['height'] == bookmark['width'] == bookmark['height']
-                assert indicator['x'] + indicator['width'] < bookmark['x']
+                assert bookmark['x'] + bookmark['width'] < indicator['x']
                 count_box = page.locator('#story-count').bounding_box()
                 assert page.locator('#relevance-key').bounding_box()['y'] >= count_box['y'] + count_box['height']
                 expect(page.locator('.relevance-indicator').first).to_have_attribute('title', 'Highly relevant: AI interest score 90/100')

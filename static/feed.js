@@ -219,7 +219,7 @@ export class Feed {
       button.onclick = () => this.editFeedback(story, vote);
       controls.append(button);
     });
-    controls.append(relevance, bookmark);
+    controls.append(bookmark, relevance);
     top.append(el('span', 'source-name', story.source_name || 'Source'), controls);
     const heading = el('h3');
     heading.append(externalLink(story.url, story.headline));
