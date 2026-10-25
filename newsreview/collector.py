@@ -123,7 +123,7 @@ class Collector:
                 for number, story in enumerate(pending, 1):
                     if self.stop_event.is_set() or self.review_stop_event.is_set():
                         break
-                    self.update(message=f"Reviewing {number}/{len(pending)} · {story['headline'][:70]}")
+                    self.update(message=f"Reviewing {number}/{len(pending)} · {story['headline']}")
                     text, basis = story["article_text"], story["content_basis"]
                     if not text:
                         try:
