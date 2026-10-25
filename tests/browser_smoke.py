@@ -37,7 +37,7 @@ def run():
                                        'published_at': None, 'category': category}, today)
             with store.connect() as db:
                 story_id = db.execute('SELECT id FROM stories WHERE url=?', (f'https://example.com/{index}',)).fetchone()[0]
-            store.review_result(story_id, validate_review(review(summary=summary, why_it_matters=why, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=[90, 60, 25, 75][index]), set()),
+            store.review_result(story_id, validate_review(review(summary=summary, tags=[category] + [f'Topic {index}-{n}' for n in range(5)], score=[90, 60, 25, 75][index]), set()),
                                 {**store.settings()['ai'], 'model': 'fixture-model'}, store.settings()['interests'], summary, 'article')
         store.insert_story(source, {'headline': 'Yesterday’s protocol update', 'url': 'https://example.com/yesterday',
                                    'excerpt': 'A source excerpt from the previous day.', 'published_at': (date.today() - timedelta(days=1)).isoformat() + 'T12:00:00+00:00', 'category': 'Protocols'}, (date.today() - timedelta(days=1)).isoformat())
@@ -61,6 +61,7 @@ def run():
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 page.wait_for_selector('.story')
                 assert page.locator('.story').count() == 4
+                expect(page.locator('.significance')).to_have_count(0)
                 expect(page.locator('.relevance-indicator.relevance-high')).to_have_count(2)
                 expect(page.locator('.relevance-indicator.relevance-medium')).to_have_count(1)
                 expect(page.locator('.relevance-indicator.relevance-low')).to_have_count(1)

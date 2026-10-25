@@ -41,6 +41,23 @@ export class Settings {
       this.values.collection = collection;
       notify('Collection settings saved.');
     });
+    $('feedback-profile-form').onsubmit = event => this.submit(event, async () => {
+      await api('feedback/profile', 'PUT', { profile: $('feedback-profile').value, enabled: $('feedback-enabled').checked, auto_update: $('feedback-auto').checked });
+      notify('Learned preferences saved.');
+      await this.loadFeedback();
+    });
+    $('feedback-rebuild').onclick = () => busy($('feedback-rebuild'), async () => {
+      await api('feedback/rebuild', 'POST', {}, Number(this.values.ai.timeout_seconds) * 1000 + 15000);
+      await this.loadFeedback();
+      notify('Learned preferences updated from recent feedback.');
+    }, 'Updating learned preferences...');
+    $('feedback-reset').onclick = () => $('feedback-reset-dialog').showModal();
+    $('feedback-confirm-reset').onclick = () => busy($('feedback-confirm-reset'), async () => {
+      await api('reset', 'POST', { confirmation: 'RESET SELECTED', selections: { feedback: true } });
+      $('feedback-reset-dialog').close();
+      await this.app.reloadDataset();
+      notify('Article feedback and learned preferences were reset.');
+    });
     $('retry-failed').onclick = () => busy($('retry-failed'), async () => {
       const result = await api('requeue', 'POST', { failed_only: true });
       notify(`${result.count} failed reviews reset. Use Review pending to process them.`);
@@ -152,6 +169,7 @@ export class Settings {
       interests.topics.forEach(topic => this.interestRow(topic));
       $('guidance').value = interests.guidance;
       $('exclusions').value = interests.exclusions.join('\n');
+      await this.loadFeedback();
       $('ai-provider').value = ai.provider;
       $('ai-url').value = ai.base_url;
       $('ai-model').value = ai.model;
@@ -193,6 +211,15 @@ export class Settings {
     $('interest-rows').append(row);
     syncDropdowns(row);
     if (!topic.name) input.focus();
+  }
+
+  async loadFeedback() {
+    const value = await api('feedback');
+    $('feedback-enabled').checked = value.enabled;
+    $('feedback-auto').checked = value.auto_update;
+    $('feedback-profile').value = value.profile;
+    $('feedback-rebuild').disabled = value.count === 0;
+    $('feedback-profile-status').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profile_revision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
   }
 
   aiValues() {

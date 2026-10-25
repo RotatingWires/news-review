@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from .network import valid_url
+from . import feedback
 
 
 def text(value, name, limit, *, empty=False):
@@ -80,4 +81,6 @@ def settings(value, current):
             raise ValueError("Use at most 100 exclusions")
         result["interests"] = {"guidance": text(i.get("guidance"), "Editorial guidance", 6000, empty=True),
                                "topics": topics, "exclusions": [text(e, "Exclusion", 200) for e in exclusions]}
+        if 'feedback' in i:
+            result['interests']['feedback'] = feedback.validate(i['feedback'])
     return {k: result[k] for k in value}

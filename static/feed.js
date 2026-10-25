@@ -32,6 +32,11 @@ export class Feed {
       item.append(swatch, document.createTextNode(tier.label + (tier.range ? ` (${tier.range})` : '')));
       key.append(item);
     });
+    $('feedback-form').onsubmit = async event => {
+      event.preventDefault();
+      await this.saveFeedback(this.feedbackVote, event.submitter);
+    };
+    $('feedback-remove').onclick = () => this.saveFeedback(0, $('feedback-remove'));
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
     ['query', 'day', 'period', 'show-hidden'].forEach(id => { $(id).onchange = () => this.reload(); });
     document.querySelectorAll('input[name="relevance"]').forEach(input => { input.onchange = () => this.reload(); });
@@ -61,6 +66,26 @@ export class Feed {
     $('clear-search').onclick = () => { this.clearFilters(); this.reload(); };
     $('page-prev').onclick = () => { this.page--; this.loadSafe(); };
     $('page-next').onclick = () => { this.page++; this.loadSafe(); };
+  }
+
+  editFeedback(story, vote) {
+    this.feedbackStory = story;
+    this.feedbackVote = vote;
+    $('feedback-title').textContent = vote > 0 ? 'Thumbs up' : 'Thumbs down';
+    $('feedback-headline').textContent = story.headline;
+    $('feedback-reason').value = story.feedback_reason || '';
+    $('feedback-remove').hidden = !story.feedback_vote;
+    $('feedback-dialog').showModal();
+    $('feedback-reason').focus();
+  }
+
+  async saveFeedback(vote, button) {
+    await busy(button, async () => {
+      await api('feedback/story/' + this.feedbackStory.id, 'PUT', { vote, reason: vote ? $('feedback-reason').value : '' });
+      $('feedback-dialog').close();
+      await this.load();
+      notify(vote ? 'Feedback saved. Learned preferences update before the next review batch.' : 'Article feedback removed.');
+    }, 'Saving article feedback...');
   }
 
   clearFilters() {
@@ -180,6 +205,15 @@ export class Feed {
     relevance.setAttribute('role', 'img');
     relevance.setAttribute('aria-label', description);
     const controls = el('span', 'story-controls');
+    [1, -1].forEach(vote => {
+      const button = el('button', 'feedback-button', vote > 0 ? '👍' : '👎');
+      button.type = 'button';
+      button.setAttribute('aria-label', (vote > 0 ? 'Like: ' : 'Dislike: ') + story.headline);
+      button.setAttribute('aria-pressed', String(story.feedback_vote === vote));
+      button.title = vote > 0 ? 'Thumbs up; add or edit an optional reason' : 'Thumbs down; add or edit an optional reason';
+      button.onclick = () => this.editFeedback(story, vote);
+      controls.append(button);
+    });
     controls.append(relevance, bookmark);
     top.append(el('span', 'source-name', story.source_name || 'Source'), controls);
     const heading = el('h3');
@@ -190,13 +224,6 @@ export class Feed {
     } else if (story.content_basis === 'excerpt') card.append(el('div', 'basis', 'AI summary · based on source excerpt'));
     const summary = story.summary || story.excerpt;
     card.append(el('p', 'story-summary', summary ? summary.slice(0, story.summary ? 2400 : 650) + (!story.summary && summary.length > 650 ? '…' : '') : 'No readable excerpt available. Open the original story to read more.'));
-    if (story.why_it_matters) {
-      const significance = el('div', 'significance');
-      significance.append(el('strong', '', 'Why it matters'), el('span', '', story.why_it_matters));
-      card.append(significance);
-    }
-    if (story.review_error) card.append(el('p', 'review-warning', story.review_error));
-    if (['filtered', 'duplicate'].includes(story.status)) card.append(el('div', 'basis', story.status === 'duplicate' ? 'Additional coverage of an existing story' : 'Filtered by your editorial preferences'));
     const tags = el('div', 'tags');
     story.tags.forEach(tag => {
       const button = el('button', 'tag', tag);

@@ -294,7 +294,7 @@ class Handler(BaseHTTPRequestHandler):
             result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end, time_zone=params.get("time_zone", [""])[0],
                                    excluded_relevance=excluded_relevance, bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
             for item in result["items"]:
-                for field in ("article_text", "interests_snapshot"):
+                for field in ("article_text", "interests_snapshot", "why_it_matters"):
                     item.pop(field, None)
             self.send(200, result)
         elif path == '/api/export':
@@ -307,6 +307,9 @@ class Handler(BaseHTTPRequestHandler):
                             "timezone": str(datetime.now().astimezone().tzinfo), "version": __version__})
         elif path == '/api/maintenance/duplicates':
             self.send(200, {'count': store.duplicate_purge_count()})
+        elif path == '/api/feedback':
+            value = store.feedback_state()
+            self.send(200, {key: item for key, item in value.items() if key != 'ratings'} | {'count': len(value['ratings'])})
         elif path == "/api/settings":
             self.send(200, store.settings())
         elif path == "/api/sources":
@@ -355,6 +358,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.collector.lock.release()
         elif path in ("/api/logout", "/api/auth/logout") and self.command == "POST":
             self.send(200, {"ok": True}, headers={"Set-Cookie": "newsreview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
+        elif path.startswith('/api/feedback/story/') and self.command == 'PUT':
+            vote = validation.integer(data.get('vote'), 'Vote', -1, 1)
+            reason = validation.text(data.get('reason', ''), 'Feedback reason', 320, empty=True)
+            store.rate_story(int(path.rsplit('/', 1)[1]), vote, reason)
+            self.send(200, {'ok': True})
+        elif path == '/api/feedback/profile' and self.command == 'PUT':
+            store.save_feedback_profile(validation.text(data.get('profile'), 'Learned preferences', 2400, empty=True),
+                                        enabled=validation.boolean(data.get('enabled'), 'Use feedback'),
+                                        auto_update=validation.boolean(data.get('auto_update'), 'Automatic profile updates'))
+            self.send(200, {'ok': True})
+        elif path == '/api/feedback/rebuild' and self.command == 'POST':
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {'error': 'Wait for the active job before updating learned preferences'})
+                return
+            try:
+                value = store.feedback_state()
+                if not value['ratings']:
+                    raise ValueError('Rate at least one article before updating learned preferences')
+                profile = self.server.collector.reviewer.learn_preferences(store.settings()['ai'], value)
+                saved = store.save_feedback_profile(profile, revision=value['revision'])
+                self.send(200 if saved else 409, {'ok': saved, 'error': None if saved else 'Feedback changed during profile generation. Please update again.'})
+            finally:
+                self.server.collector.lock.release()
         elif path.startswith("/api/bookmarks/") and self.command == "PUT":
             store.bookmark(int(path.rsplit("/", 1)[1]), validation.boolean(data.get("bookmarked"), "Bookmarked"))
             self.send(200, {"ok": True})

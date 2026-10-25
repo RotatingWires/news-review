@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
+from . import feedback
 
 SCHEMA_VERSION = 2
 PURGEABLE_DUPLICATES = """s.status='duplicate' AND s.bookmarked=0
@@ -111,11 +112,17 @@ class Store:
 
     def settings(self):
         with self.connect() as db:
-            return {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] in SETTINGS}
+            values = {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT * FROM settings") if row["key"] in SETTINGS}
+            values["interests"].setdefault("feedback", feedback.state(values["interests"]))
+            return values
 
     def save_settings(self, values):
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             for key, value in values.items():
+                if key == 'interests' and 'feedback' not in value:
+                    current = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+                    value = {**value, 'feedback': feedback.state(current)}
                 db.execute("UPDATE settings SET value=? WHERE key=?", (json.dumps(value), key))
 
     def sources(self):
@@ -222,7 +229,13 @@ class Store:
                 (SELECT COUNT(*) FROM stories d WHERE d.duplicate_of=s.id) AS related_count
                 FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE {where}
                 ORDER BY {story_date} DESC,s.score DESC,s.discovered_at DESC,s.id DESC LIMIT 48 OFFSET ?""", (*args, (page - 1) * 48))
-            return {"items": [self.story(r) for r in rows], "total": total, "page": page, "page_size": 48}
+            items = [self.story(row) for row in rows]
+            interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+            ratings = interests.get('feedback', {}).get('ratings', {})
+            for item in items:
+                rating = ratings.get(item['url'], {})
+                item.update(feedback_vote=rating.get('vote', 0), feedback_reason=rating.get('reason', ''))
+            return {"items": items, "total": total, "page": page, "page_size": 48}
 
     def related(self, story_id):
         with self.connect() as db:
@@ -233,6 +246,51 @@ class Store:
         with self.connect() as db:
             if not db.execute("UPDATE stories SET bookmarked=? WHERE id=?", (int(value), story_id)).rowcount:
                 raise ValueError("Story not found")
+
+    def feedback_state(self):
+        return feedback.state(self.settings()['interests'])
+
+    def rate_story(self, story_id, vote, reason):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            story = db.execute("SELECT s.*,src.name AS source_name FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE s.id=?", (story_id,)).fetchone()
+            if story is None:
+                raise ValueError('Story not found')
+            interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+            value = feedback.state(interests)
+            previous = value['ratings'].get(story['url'])
+            if (vote == 0 and previous is None) or (previous and previous['vote'] == vote and previous['reason'] == reason):
+                return
+            value['revision'] += 1
+            if vote:
+                value['ratings'][story['url']] = {'vote': vote, 'reason': reason, 'headline': story['headline'],
+                    'source': story['source_name'] or '', 'tags': json.loads(story['tags']),
+                    'summary': (story['summary'] or story['excerpt'])[:1200], 'updated': utcnow(), 'sequence': value['revision']}
+            else:
+                value['ratings'].pop(story['url'], None)
+            if not value['ratings']:
+                value.update(profile='', profile_revision=value['revision'])
+            feedback.validate(value)
+            interests['feedback'] = value
+            db.execute("UPDATE settings SET value=? WHERE key='interests'", (json.dumps(interests),))
+
+    def save_feedback_profile(self, profile, *, revision=None, enabled=None, auto_update=None):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+            value = feedback.state(interests)
+            if revision is not None and revision != value['revision']:
+                return False
+            if revision is None:
+                value['revision'] += 1
+            value.update(profile=profile, profile_revision=value['revision'])
+            if enabled is not None:
+                value['enabled'] = enabled
+            if auto_update is not None:
+                value['auto_update'] = auto_update
+            interests['feedback'] = feedback.validate(value)
+            db.execute("UPDATE settings SET value=? WHERE key='interests'", (json.dumps(interests),))
+            return True
 
     def overview(self):
         with self.connect() as db:
@@ -264,7 +322,7 @@ class Store:
             db.execute("""UPDATE stories SET summary=?,why_it_matters=?,tags=?,status=?,score=?,milestone=?,
                 duplicate_of=?,review_error=NULL,attempts=attempts+1,reviewed_at=?,provider=?,model=?,
                 interests_snapshot=?,article_text=?,content_basis=?,input_tokens=?,output_tokens=? WHERE id=?""",
-                (result["summary"], result["why_it_matters"], json.dumps(result["tags"]), result["status"],
+                (result["summary"], "", json.dumps(result["tags"]), result["status"],
                  result["score"], result["milestone"], result.get("duplicate_of"), utcnow(), config["provider"],
                  config["model"], json.dumps(interests), text, basis, result.get("input_tokens"), result.get("output_tokens"), story_id))
 
@@ -303,7 +361,7 @@ class Store:
         return result
 
     def reset(self, selections):
-        allowed = {'history', 'bookmarks', 'runs', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection'}
+        allowed = {'history', 'bookmarks', 'runs', 'topics', 'guidance', 'exclusions', 'sources', 'ai', 'collection', 'feedback'}
         if not isinstance(selections, dict) or set(selections) - allowed or not any(selections.values()) or any(type(v) is not bool for v in selections.values()):
             raise ValueError('Choose at least one valid reset option')
         with self.connect() as db:
@@ -321,6 +379,8 @@ class Store:
                 db.execute("""UPDATE sources SET last_checked=NULL,last_error=NULL,last_success=NULL,first_checked=NULL,
                     newest_published=NULL,last_new_story=NULL,last_count=NULL,last_method=NULL,consecutive_failures=0,collection_note=''""")
             interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
+            if selections.get('feedback'):
+                interests['feedback'] = feedback.state({})
             for option, key, empty in [('topics', 'topics', []), ('guidance', 'guidance', ''), ('exclusions', 'exclusions', [])]:
                 if selections.get(option):
                     interests[key] = empty

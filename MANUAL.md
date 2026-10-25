@@ -149,9 +149,9 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 - **Ordering and pagination:** 48 results per page, newest publication day first (collection day for undated stories), then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
 
-Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
+Tiles show the original headline and source, tags, the generated summary when available, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
-**Why it matters** targets 3–4 short, complete English sentences, limited to 90 words and 650 characters; fewer sentences are preferred when the article supports little significance. The prompt forbids language switching, unsupported benefits, generic industry commentary, and lists of unrelated interests. Validation rejects excessive length, more than four sentences, and unfinished endings rather than truncating saved text. This is a formatting/quality check, not independent fact checking. Existing summaries are kept as saved; use **Settings → Collection & history → Reassess history** to regenerate them with the updated instructions. This queues model work and does not rewrite the archive immediately.
+**Summaries only:** the model is asked for 2–4 short factual English sentences, plus relevance, tags, milestones, and duplicate decisions. Why it matters has been removed from both tile rendering and the requested model schema for every relevance level. Older explanations remain in the legacy SQLite column only for database/ZIP compatibility and are excluded from story API responses. New reviews clear that legacy field. No additional explanation is generated or hidden after generation.
 
 No sample articles are inserted into your real database. The first edition starts empty until collection runs.
 
@@ -305,6 +305,18 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - The schedule survives restarts through the SQLite run history. Partial/failed full runs also restart the interval to avoid rapid retries; retry manually if needed. Missed intervals produce one catch-up run, not a replay of every missed run. An interrupted process is marked interrupted at the next startup.
 - Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
 
+## Article feedback and learned preferences
+
+Each Daily Feed and Bookmarks tile has thumbs-up/down buttons, separate from bookmarking. Click one, optionally explain what you liked or disliked, then Save. You can edit the vote/reason or remove that article’s feedback from the same dialog. Reasons can distinguish the topic from the article’s quality or an incorrect AI summary. Feedback affects future review prompts; it does not instantly change existing scores, summaries, or sorting. Reassess history explicitly if you want older stories reviewed again.
+
+Ratings, optional reasons, and short article snapshots are saved by URL inside the SQLite interests preferences. Repeatedly saving the same vote/reason is a no-op. Recollected URLs recover their rating; deleting/purging story history does not erase feedback. Up to 10000 ratings are retained, with reasons limited to 320 characters. There is no new runtime dependency or model retraining.
+
+Under **Settings → Interests → Learned preferences**, view/edit the compact profile, enable/disable its use, or control automatic updates. When ratings change, the next batch with pending reviews makes at most one extra local model call to rebuild the profile from the **10 most recent ratings** (bounded headline, source, tags, excerpt/summary, and reason). Older ratings stay stored but are not included in that bounded refresh. Unchanged feedback reuses the cached profile. Each normal article review receives only the profile (at most 2400 characters), never the full rating/reason archive. Explicit written interests, guidance, and exclusions take priority; feedback guides relevance rather than supplying article facts.
+
+**Update from feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing Local AI controls, with warm reuse within a review batch.
+
+**Reset feedback...** confirms before clearing all votes, reasons, and the profile. Fresh start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, database schema version 2 and older ZIP table layouts remain compatible.
+
 ## Purging duplicate stories
 
 Open **Settings → Collection & history → Purge duplicates**, near Fresh start. The confirmation dialog previews the current eligible count; Cancel leaves the archive unchanged. Purging permanently deletes stories marked duplicate by AI review, excluding bookmarks and any story referenced by another saved story. Main stories, other history, preferences, sources, and run history remain intact. It does not guess duplicates from similar headlines or remove unrelated filtered/pending stories. Without AI-marked duplicates there is nothing to purge.
@@ -328,7 +340,7 @@ Both directories are Git-ignored. Runtime logs match TaskList: application start
 
 `SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (2); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
-The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, significance, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
+The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
 | Environment variable | Purpose |
 | --- | --- |
@@ -475,6 +487,7 @@ newsreview/
   listings.py       website article-card/headline/structured-list extraction
   sources.py        Automatic/feed/page collection strategy
   health.py         observed source health and inactivity warnings
+  feedback.py       bounded ratings, profile validation, and compact model context
   reviewer.py       local model adapters, editorial prompt, output validation
   collector.py      collection/review worker and interval scheduler
   validation.py     source/settings input validation
@@ -505,6 +518,8 @@ The optional browser check `python3 -m tests.browser_purge` exercises purge conf
 
 The optional browser check `python3 -m tests.browser_review_stop` uses a blocked model HTTP fixture to verify the active Stop review button, stopping state, queue preservation, and resume behavior.
 
+The optional browser check `python3 -m tests.browser_feedback` verifies article rating/reason edits, profile generation and manual settings, reset cancellation, persistence after reload, and summary-only mobile tiles.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
@@ -514,6 +529,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.9.0
+
+- Add thumbs-up/down ratings with optional reasons, cached learned-preference generation, manual editing/disable/reset controls, and selective Fresh start reset. Include feedback in SQLite/ZIP backups while retaining old archive compatibility.
+- Bound profile generation to the 10 latest ratings once per changed set before review batches; send only the cached profile to normal reviews and give explicit interests/guidance priority.
+- Remove Why it matters completely from current tiles, APIs, and model output for all relevance levels; keep its legacy storage column solely for compatibility.
 
 ### v0.8.1
 

@@ -85,6 +85,17 @@
           <label>Exclude <span class="muted">One topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
           <button class="primary" type="submit">Save</button>
         </form>
+        <div class="maintenance"><h3>Learned preferences</h3>
+          <p class="muted">Thumbs up/down and optional reasons help refine future relevance scores. Your written interests and guidance take priority. Automatic updates use the 10 most recent ratings once before a review batch, not every article.</p>
+          <form id="feedback-profile-form">
+            <label class="checkbox"><input id="feedback-enabled" type="checkbox" checked> Use learned preferences in reviews</label>
+            <label class="checkbox"><input id="feedback-auto" type="checkbox" checked> Update the profile automatically when feedback changes</label>
+            <label>Preference profile<textarea id="feedback-profile" rows="5" maxlength="2400"></textarea></label>
+            <p id="feedback-profile-status" class="muted"></p>
+            <div class="button-row"><button type="submit" class="primary">Save</button><button id="feedback-rebuild" type="button">Update from feedback</button><button id="feedback-reset" type="button" class="danger">Reset feedback...</button></div>
+          </form>
+          <p class="muted">Saving marks your edited profile current. Later ratings may regenerate it when automatic updates are enabled. Turn automatic updates off to keep a manual profile.</p>
+        </div>
       </section>
 
       <section id="panel-sources" class="settings-panel" hidden>
@@ -178,6 +189,7 @@
         <label class="checkbox"><input type="checkbox" id="reset-bookmarks"> Bookmarks (remove saved flags; delete saved stories too if Story history is selected)</label>
         <label class="checkbox"><input type="checkbox" id="reset-runs" checked> Collection/review runs and source check history</label>
         <label class="checkbox"><input type="checkbox" id="reset-topics"> Interest topics and ranks</label>
+        <label class="checkbox"><input type="checkbox" id="reset-feedback"> Article ratings, reasons, and learned preferences</label>
         <label class="checkbox"><input type="checkbox" id="reset-guidance"> Editorial guidance</label>
         <label class="checkbox"><input type="checkbox" id="reset-exclusions"> Exclusions</label>
         <label class="checkbox"><input type="checkbox" id="reset-sources"> Configured sources (preserve labels on any retained stories)</label>
@@ -190,12 +202,23 @@
     </div>
     <div class="dialog-actions"><button class="danger" type="submit">Reset selected data</button><button type="button" data-close="clear-history-dialog">Cancel</button></div>
   </form></dialog>
+  <dialog id="feedback-dialog"><form id="feedback-form" class="dialog-layout">
+    <div class="dialog-heading"><h2 id="feedback-title">Article feedback</h2><button type="button" data-close="feedback-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p id="feedback-headline"></p><label>Reason (optional)<textarea id="feedback-reason" rows="4" maxlength="320" placeholder="What did you like or dislike: the topic, the article, or the summary?"></textarea></label><p class="muted">Feedback refines future relevance reviews. It does not immediately rescore saved stories.</p></div>
+    <div class="dialog-actions"><button id="feedback-remove" type="button">Remove feedback</button><button type="button" data-close="feedback-dialog">Cancel</button><button type="submit" class="primary">Save</button></div>
+  </form></dialog>
+  <dialog id="feedback-reset-dialog"><div class="dialog-layout">
+    <div class="dialog-heading"><h2>Reset feedback?</h2><button data-close="feedback-reset-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Remove all article ratings, reasons, and the learned preference profile. Written interests, guidance, bookmarks, and stories are kept.</p></div>
+    <div class="dialog-actions"><button data-close="feedback-reset-dialog">Cancel</button><button id="feedback-confirm-reset" class="danger">Reset feedback</button></div>
+  </div></dialog>
   <dialog id="help-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Help - NewsReview</h2><button data-close="help-dialog" aria-label="Close">×</button></div>
     <div class="dialog-body help-content">
       <h3>What AI reviews do</h3>
-      <p>Your local model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, explains why it matters, adds topic tags, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage.</p>
+      <p>Your local model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, adds topic tags, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage.</p>
       <p>Filtered stories remain in the database but are hidden in the normal feed. Open Filter... and select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
+      <h3>Article feedback</h3><p>Use thumbs up/down on a tile and optionally explain why. Ratings and reasons stay saved; a compact preference profile is refreshed once before a review batch when needed. Edit, disable, update, or reset it in Settings, Interests. Written interests and guidance take priority. All stories show a summary without a separate Why it matters section.</p>
       <h3>Adding sources</h3>
       <p>Open Settings, Sources, then Add source. Use a homepage, news section, or category page that lists multiple articles, rather than a single article URL. Enter a name and category, choose a collection method, and use Preview stories before saving.</p>
       <p>Automatic prefers a supplied or advertised RSS/Atom feed. If it fails, is empty, or becomes stale according to the source warning interval, it also checks the website listing. Website results are merged with usable feed entries; if the website cannot be read, feed entries are kept and the limitation is shown. RSS/Atom only reports feed failures. Website page reads article cards, headline links, and structured lists directly from downloaded HTML. An optional Article URL contains filter, such as /news/, narrows website candidates.</p>

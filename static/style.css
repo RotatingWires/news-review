@@ -184,7 +184,7 @@ footer {
 .story-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--face); margin: -10px -10px 12px; padding: 3px 6px; }
 .source-name { color: var(--ink); font-size: 12px; font-weight: bold; }
 .story-controls { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.bookmark, .relevance-indicator { width: 28px; height: 28px; min-height: 28px; padding: 0; flex-shrink: 0; display: inline-grid; place-items: center; }
+.feedback-button, .bookmark, .relevance-indicator { width: 28px; height: 28px; min-height: 28px; padding: 0; flex-shrink: 0; display: inline-grid; place-items: center; }
 .bookmark { font-size: 18px; line-height: 1; }
 .relevance-indicator { border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); user-select: none; -webkit-user-select: none; }
 .relevance-high { background: #259b43; }
@@ -198,8 +198,6 @@ footer {
 .bookmark[aria-pressed="true"] { color: var(--link); }
 .story h3 { font-size: 17px; line-height: 1.4; margin-bottom: 10px; }
 .story-summary { color: var(--ink); overflow-wrap: anywhere; margin-bottom: 12px; }
-.significance { padding: 8px; margin-bottom: 12px; border-left: 3px solid var(--title); background: var(--surface-alt); font-size: 13px; }
-.significance strong { display: block; margin-bottom: 3px; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; margin-bottom: 12px; }
 .tag { font-size: 11px; padding: 2px 6px; min-height: 25px; }
 .story-bottom { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px solid var(--shadow); font-size: 11px; color: var(--muted); }
@@ -330,3 +328,6 @@ input:not([type="checkbox"]), textarea { user-select: text; -webkit-user-select:
 .footer-status.has-error #status-message { white-space: normal; overflow-wrap: anywhere; max-height: min(30dvh, 160px); overflow: auto; }
 .footer-status.has-error .status-dot { margin-top: 5px; }
 #dismiss-status { flex-shrink: 0; min-height: 24px; padding: 1px 6px; font-size: 12px; }
+
+.feedback-button { font-size: 15px; line-height: 1; }
+.feedback-button[aria-pressed="true"] { background: var(--title); color: var(--title-text); }

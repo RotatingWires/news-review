@@ -61,7 +61,7 @@ for additions in SOURCE_UPDATES.values():
     SOURCES.extend(additions)
 
 INTERESTS = {
-    "guidance": "Favor substantive technical developments, interesting engineering, useful projects, and niche news. Explain what changed and why it matters. Routine phone refreshes, rumors, funding announcements and marketing are low priority. Distinguish proposals, approved standards, experimental support and shipped features.",
+    "guidance": "Favor substantive technical developments, interesting engineering, useful projects, and niche news. Summarize what changed factually and concisely. Routine phone refreshes, rumors, funding announcements and marketing are low priority. Distinguish proposals, approved standards, experimental support and shipped features.",
     "topics": [
         {"name": name, "preference": "favor"} for name in [
             "Cybersecurity and privacy", "Protocols, HTTP and DNS", "Image/video formats and compression",

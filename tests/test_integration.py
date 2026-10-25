@@ -82,7 +82,9 @@ class FixtureHandler(BaseHTTPRequestHandler):
         if payload.get('model') == 'broken':
             self.respond('{"message":{"content":"not JSON"}}', 'application/json')
             return
-        result = review()
+        result = {'profile': 'Favor practical SDR projects. Avoid shopping lists, while retaining interest in radio technology.'} if payload.get('messages', [{}])[0].get('content', '').startswith('Summarize article ratings') else review()
+        if payload.get('model') == 'bad-profile' and payload.get('messages', [{}])[0].get('content', '').startswith('Summarize article ratings'):
+            result = {'profile': 42}
         if self.path == '/api/chat':
             value = {"message": {"content": json.dumps(result)}, "prompt_eval_count": 100, "eval_count": 30}
         elif self.path == '/v1/chat/completions':
@@ -393,6 +395,61 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.store.pending(10)), 1)
         self.assertFalse(self.collector.schedule_due(datetime.now().astimezone()))
 
+    def test_article_feedback_api_and_cached_profile_in_model_requests(self):
+        self.start_api()
+        self.store.save_settings({'ai': self.model_config()})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source, {'headline': 'An SDR hardware project', 'url': self.root + '/rated',
+                                        'excerpt': 'Practical radio hardware details.', 'published_at': None, 'category': 'Radio'}, '2026-10-25')
+        with self.store.connect() as db:
+            identifier = db.execute("SELECT id FROM stories WHERE url=?", (self.root + '/rated',)).fetchone()[0]
+            db.execute("UPDATE stories SET status='reviewed' WHERE id=?", (identifier,))
+        path = '/api/feedback/story/' + str(identifier)
+        self.assertEqual(self.request(path, 'PUT', {'vote': True})[0], 400)
+        self.assertEqual(self.request(path, 'PUT', {'vote': 1, 'reason': 'x' * 1001})[0], 400)
+        self.assertEqual(self.request(path, 'PUT', {'vote': 1}, {'Cookie': ''})[0], 401)
+        self.assertEqual(self.request(path, 'PUT', {'vote': 1}, {'Origin': 'https://other.example'})[0], 403)
+        self.assertEqual(self.request(path, 'PUT', {'vote': 1, 'reason': 'I like cheap practical hardware projects'})[0], 200)
+        self.assertEqual(self.request('/api/feedback')[1]['count'], 1)
+        for number in range(2):
+            self.store.insert_story(source, {'headline': f'Experimental protocol {number}', 'url': self.root + f'/review-feedback-{number}',
+                                            'excerpt': 'A substantive experimental technical feature is available for testing.', 'published_at': None, 'category': 'Protocols'}, '2026-10-25')
+        start = len(self.fixture.requests)
+        self.collect('review')
+        chats = [payload for url, payload in self.fixture.requests[start:] if url == '/api/chat']
+        self.assertEqual(len(chats), 3)
+        profile_request = json.loads(chats[0]['messages'][1]['content'])
+        self.assertEqual(len(profile_request['feedback']), 1)
+        self.assertEqual(profile_request['feedback'][0]['vote'], 1)
+        for payload in chats[1:]:
+            interests = json.loads(payload['messages'][1]['content'])['reader_interests']
+            self.assertIn('learned_profile', interests)
+            self.assertNotIn('feedback', interests)
+            self.assertNotIn('I like cheap practical hardware projects', json.dumps(interests))
+        value = self.store.feedback_state()
+        self.assertEqual(value['profile_revision'], value['revision'])
+        self.store.requeue(False)
+        start = len(self.fixture.requests)
+        self.collect('review')
+        chats = [payload for url, payload in self.fixture.requests[start:] if url == '/api/chat']
+        self.assertTrue(chats)
+        self.assertTrue(all(not payload['messages'][0]['content'].startswith('Summarize article ratings') for payload in chats))
+        self.assertEqual(self.request('/api/feedback/profile', 'PUT', {'profile': 'Manual profile', 'enabled': True, 'auto_update': False})[0], 200)
+        self.assertEqual(self.request('/api/feedback')[1]['profile'], 'Manual profile')
+
+    def test_failed_feedback_profile_preserves_existing_preferences_and_reviews(self):
+        self.store.save_settings({'ai': self.model_config(model='bad-profile')})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source, {'headline': 'A technical update', 'url': self.root + '/profile-failure',
+                                        'excerpt': 'A technical improvement is available for experimental use.', 'published_at': None, 'category': 'Protocols'}, '2026-10-25')
+        identifier = self.store.stories()['items'][0]['id']
+        self.store.save_feedback_profile('Keep an existing preference profile')
+        self.store.rate_story(identifier, 1, 'More useful protocols')
+        self.collect('review')
+        self.assertEqual(self.store.feedback_state()['profile'], 'Keep an existing preference profile')
+        self.assertEqual(self.store.stories()['items'][0]['status'], 'reviewed')
+        self.assertIn('Feedback profile update failed', self.store.overview()['runs'][0]['details']['errors'][0])
+
     def test_model_test_uses_real_adapter_contract(self):
         for provider in ('ollama', 'compatible'):
             with self.subTest(provider=provider):
@@ -407,6 +464,7 @@ class IntegrationTests(unittest.TestCase):
                     self.assertEqual(payload['keep_alive'], 0)
                     self.assertEqual(payload['options']['num_predict'], 2400)
                     self.assertEqual(payload['format']['type'], 'object')
+                    self.assertNotIn('why_it_matters', payload['format']['properties'])
                 else:
                     self.assertEqual(path, '/v1/chat/completions')
                     self.assertNotIn('think', payload)

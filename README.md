@@ -81,4 +81,6 @@ The **Filter...** dropdown combines topic selection, relevance levels, and Inclu
 
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 
-While AI reviews run, **Review pending** becomes **Stop review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Generated **Why it matters** text targets 3–4 short English sentences, with a 90-word limit and complete sentence endings.
+While AI reviews run, **Review pending** becomes **Stop review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Tiles show the article summary without a separate Why it matters section.
+
+Use the thumbs-up/down buttons on any story to save a rating and optional reason. **Settings → Interests → Learned preferences** lets you edit, update, disable, or reset the cached profile. Automatic updates use the 10 most recent ratings once before a review batch; individual reviews receive only the profile. Explicit interests and guidance take priority. Ratings/reasons are included in ZIP backups and are separate from bookmarks.

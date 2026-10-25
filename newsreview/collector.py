@@ -6,6 +6,7 @@ import logging
 import re
 import threading
 
+from .feedback import for_model
 from .feeds import extract_article
 from .sources import read_source
 from .store import StorageUnavailable
@@ -108,6 +109,17 @@ class Collector:
                 pending = self.store.pending(config["max_reviews"], source_ids=source_ids if unchecked_only else None)
                 consecutive_failures = 0
                 self.update(reviewing=bool(pending))
+                feedback = self.store.feedback_state()
+                if pending and feedback['enabled'] and feedback['auto_update'] and feedback['ratings'] and feedback['profile_revision'] != feedback['revision']:
+                    self.update(message='Updating learned preferences from recent feedback')
+                    model_used = True
+                    try:
+                        profile = self.reviewer.learn_preferences(ai, feedback, keep_loaded=True)
+                        self.store.save_feedback_profile(profile, revision=feedback['revision'])
+                    except Exception as exc:
+                        logger.warning('Feedback profile update failed: %s', exc)
+                        details['errors'].append('Feedback profile update failed; existing preferences kept: ' + str(exc)[:200])
+                editorial_interests = for_model(self.store.settings()['interests'])
                 for number, story in enumerate(pending, 1):
                     if self.stop_event.is_set() or self.review_stop_event.is_set():
                         break
@@ -125,15 +137,15 @@ class Collector:
                         if not text.strip():
                             raise ValueError("No readable article or source excerpt; showing headline and link only")
                         if NOISE.search(story["headline"]):
-                            result = {"summary": "Excluded by the headline filter.", "why_it_matters": "", "tags": [story["category"]], "status": "filtered", "score": 0, "milestone": "not applicable"}
+                            result = {"summary": "Excluded by the headline filter.", "tags": [story["category"]], "status": "filtered", "score": 0, "milestone": "not applicable"}
                         else:
                             candidates = candidates_for(story["headline"], recent)
                             model_used = True
-                            result = self.reviewer.review(ai, settings["interests"], {
+                            result = self.reviewer.review(ai, editorial_interests, {
                                 "headline": story["headline"], "text": text[:ai["max_input_chars"]],
                                 "content_basis": basis, "published_at": story["published_at"],
                             }, candidates, keep_loaded=True)
-                        self.store.review_result(story["id"], result, ai, settings["interests"], text[:100000], basis)
+                        self.store.review_result(story["id"], result, ai, editorial_interests, text[:100000], basis)
                         details[{"reviewed": "reviewed", "duplicate": "duplicates", "filtered": "filtered"}[result["status"]]] += 1
                         if result["status"] == "reviewed":
                             recent.insert(0, {"id": story["id"], "headline": story["headline"], "summary": result["summary"]})
