@@ -206,7 +206,12 @@ export class Feed {
     relevance.setAttribute('aria-label', description);
     const controls = el('span', 'story-controls');
     [1, -1].forEach(vote => {
-      const button = el('button', 'feedback-button', vote > 0 ? '👍' : '👎');
+      const button = el('button', 'feedback-button');
+      const icon = el('img');
+      icon.src = vote > 0 ? '/thumb-up.png' : '/thumb-down.png';
+      icon.alt = '';
+      icon.draggable = false;
+      button.append(icon);
       button.type = 'button';
       button.setAttribute('aria-label', (vote > 0 ? 'Like: ' : 'Dislike: ') + story.headline);
       button.setAttribute('aria-pressed', String(story.feedback_vote === vote));

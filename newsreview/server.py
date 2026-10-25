@@ -248,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send(302, b"", "text/plain", {"Location": target})
             return
         # Explicit flat asset allowlist: never serve runtime data, source or dotfiles.
-        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "dropdowns.js", "icon.svg", "login.html", "login.js", "auth.css", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png"}:
+        if name not in {"index.html", "style.css", "app.js", "shared.js", "feed.js", "settings.js", "transfer.js", "dropdowns.js", "icon.svg", "login.html", "login.js", "auth.css", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "thumb-up.png", "thumb-down.png"}:
             self.send(404, {"error": "Not found"})
             return
         content_type = "application/manifest+json" if name == "manifest.webmanifest" else mimetypes.guess_type(name)[0] or "application/octet-stream"

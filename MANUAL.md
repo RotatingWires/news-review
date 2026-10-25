@@ -530,6 +530,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.9.1
+
+- Replace feedback emoji with the supplied thumb-up/thumb-down PNG icons, retaining accessible labels and contrast in dark and selected states.
+
 ### v0.9.0
 
 - Add thumbs-up/down ratings with optional reasons, cached learned-preference generation, manual editing/disable/reset controls, and selective Fresh start reset. Include feedback in SQLite/ZIP backups while retaining old archive compatibility.
