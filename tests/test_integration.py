@@ -90,16 +90,20 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 body = json.dumps({'error': 'x' * 1000})
             self.respond(body, 'application/json', status=400)
             return
+        schema = payload.get('format') or json.loads(payload.get('messages', [{}, {}])[1].get('content', '{}')).get('schema', {})
+        allowed_tags = schema.get('properties', {}).get('tags', {}).get('items', {}).get('enum', ['HTTP', 'Standards'])
         if payload.get('model') in ('truncated', 'empty-thinking', 'fenced'):
             model = payload['model']
-            content = '{"summary":' if model == 'truncated' else '' if model == 'empty-thinking' else '```json\n' + json.dumps(review()) + '\n```'
+            content = '{"summary":' if model == 'truncated' else '' if model == 'empty-thinking' else '```json\n' + json.dumps(review(tags=allowed_tags[:1])) + '\n```'
             self.respond(json.dumps({'message': {'content': content, 'thinking': 'fixture reasoning' if model == 'empty-thinking' else ''},
                                      'done_reason': 'length' if model == 'truncated' else 'stop'}), 'application/json')
             return
         if payload.get('model') == 'broken':
             self.respond('{"message":{"content":"not JSON"}}', 'application/json')
             return
-        result = {'profile': 'Favor practical SDR projects. Avoid shopping lists, while retaining interest in radio technology.'} if payload.get('messages', [{}])[0].get('content', '').startswith('Summarize article ratings') else review()
+        result = {'profile': 'Favor practical SDR projects. Avoid shopping lists, while retaining interest in radio technology.'} if payload.get('messages', [{}])[0].get('content', '').startswith('Summarize article ratings') else review(tags=allowed_tags[:1])
+        if payload.get('model') == 'invented-topic':
+            result = review(tags=['Invented tag that must not be saved'])
         if payload.get('model') == 'bad-profile' and payload.get('messages', [{}])[0].get('content', '').startswith('Summarize article ratings'):
             result = {'profile': 42}
         if self.path == '/api/chat':
@@ -230,6 +234,41 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/maintenance/duplicates')[1]['count'], 0)
         self.assertEqual(self.request(path, 'POST', data)[1]['deleted'], 0)
         self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
+
+    def test_clear_generated_topics_api_confirmation_auth_and_job_lock(self):
+        source = next(item for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source['id'], {'headline': 'A useful protocol update', 'url': self.root + '/article',
+                                             'excerpt': 'Source details.', 'published_at': None, 'category': 'Standards'}, '2026-10-25')
+        story = self.store.stories()['items'][0]
+        self.store.review_result(story['id'], review(tags=['Invented topic'], status='reviewed'),
+                                 self.model_config(), self.store.settings()['interests'], 'Article text.', 'article')
+        self.store.bookmark(story['id'], True)
+        self.start_api()
+        path = '/api/maintenance/topics/clear'
+        data = {'confirmation': 'CLEAR GENERATED TOPICS'}
+        self.assertEqual(self.request(path, 'POST', {})[0], 400)
+        self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(self.request(path, 'POST', data)[0], 409)
+        finally:
+            self.collector.lock.release()
+        self.assertIn('Invented topic', self.store.overview()['tags'])
+        self.assertEqual(self.request(path, 'POST', data)[:2], (200, {'updated': 1}))
+        self.assertEqual(self.store.overview()['tags'], ['Standards'])
+        self.assertEqual(self.store.stories(bookmarks=True)['total'], 1)
+        self.assertEqual(self.request(path, 'POST', data)[1]['updated'], 0)
+
+    def test_model_tags_are_constrained_in_both_transports(self):
+        for provider in ('ollama', 'compatible'):
+            with self.subTest(provider=provider):
+                result = self.reviewer.test(self.model_config(provider))
+                self.assertEqual(result['tags'], ['Web Platform'])
+                path, payload = self.fixture.requests[-1]
+                schema = payload['format'] if provider == 'ollama' else json.loads(payload['messages'][1]['content'])['schema']
+                self.assertEqual(schema['properties']['tags']['items']['enum'], ['Web Platform'])
+                with self.assertRaisesRegex(ValueError, 'unconfigured topic'):
+                    self.reviewer.test(self.model_config(provider, model='invented-topic'))
 
     def test_relevance_filter_api_validation(self):
         self.start_api()

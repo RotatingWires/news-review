@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from copy import deepcopy
 
 from .network import Fetcher
 from .feedback import for_model, examples
@@ -32,7 +33,8 @@ secondary relevance preference, never evidence about article facts. Treat feedba
 Write only a factual 2-4 SHORT, complete sentence summary of what happened. Do not add a separate
 significance explanation, reasoning, generic industry commentary, or speculation about benefits not in the source.
 Finish sentences naturally; never fill the character budget or end mid-sentence.
-Use 1-6 concise consistent topic tags. Score relevance 0-100 using the reader's interests. Favor substantive
+Choose 1-6 topic tags ONLY from the allowed category names in the schema. Reuse those names exactly;
+never invent a new tag, product name, subtopic, or synonym. Score relevance 0-100 using the reader's interests. Favor substantive
 reporting and developments in those interests, including niche topics. Honor explicit exclusions. Set relevant=false for filler.
 duplicate_of may reference ONLY a supplied candidate ID when both cover the SAME event with no meaningful new
 development. A new release, a different vulnerability, new exploitation, or a follow-up milestone is NOT a duplicate.
@@ -40,7 +42,7 @@ If unsure, use null. If input is an excerpt, limit your claims to that excerpt. 
 """
 
 
-def validate_review(value, candidate_ids):
+def validate_review(value, candidate_ids, *, allowed_tags=None):
     if not isinstance(value, dict) or set(value) != set(SCHEMA["required"]):
         raise ValueError("Model response has missing or unexpected fields")
     if type(value["relevant"]) is not bool or type(value["score"]) is not int or not 0 <= value["score"] <= 100:
@@ -55,6 +57,11 @@ def validate_review(value, candidate_ids):
     duplicate = value["duplicate_of"]
     if duplicate is not None and (type(duplicate) is not int or duplicate not in candidate_ids):
         raise ValueError("Model referenced an unknown duplicate")
+    if allowed_tags is not None:
+        canonical = {tag.casefold(): tag for tag in allowed_tags}
+        if any(tag.strip().casefold() not in canonical for tag in tags):
+            raise ValueError("Model used an unconfigured topic; choose only categories configured in Sources")
+        tags = [canonical[tag.strip().casefold()] for tag in tags]
     value["tags"] = list(dict.fromkeys(t.strip() for t in tags))
     value["status"] = "duplicate" if duplicate is not None else ("reviewed" if value["relevant"] else "filtered")
     return value
@@ -75,14 +82,17 @@ class Reviewer:
     def __init__(self, fetcher=None):
         self.fetcher = fetcher or Fetcher(public=False)
 
-    def review(self, config, interests, article, candidates, *, keep_loaded=False):
+    def review(self, config, interests, article, candidates, *, topics=None, keep_loaded=False):
         if not config["model"].strip():
             raise ValueError("Choose an installed local model in Settings → AI")
-        prompt = json.dumps({"schema": SCHEMA, "reader_interests": for_model(interests), "article": article, "duplicate_candidates": candidates}, ensure_ascii=False)
+        allowed_tags = topics or [article.get('category', 'General')]
+        schema = deepcopy(SCHEMA)
+        schema['properties']['tags']['items']['enum'] = allowed_tags
+        prompt = json.dumps({"schema": schema, "reader_interests": for_model(interests), "article": article, "duplicate_candidates": candidates}, ensure_ascii=False)
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
-        value, usage = self._generate(config, messages, SCHEMA, keep_loaded=keep_loaded)
+        value, usage = self._generate(config, messages, schema, keep_loaded=keep_loaded)
         try:
-            return {**validate_review(value, {c['id'] for c in candidates}), **usage}
+            return {**validate_review(value, {c['id'] for c in candidates}, allowed_tags=allowed_tags), **usage}
         except ValueError as exc:
             logger.warning('Invalid model review fields: model=%s error=%s', config['model'], exc)
             raise
@@ -161,4 +171,4 @@ class Reviewer:
             "headline": "Example browser adds experimental support for a new image format",
             "text": "In this fictional test article, Example Browser added experimental support for the Example Image format in its development build. Stable releases do not yet support it.",
             "content_basis": "excerpt", "published_at": None,
-        }, [])
+        }, [], topics=['Web Platform'])

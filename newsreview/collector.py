@@ -120,6 +120,7 @@ class Collector:
                         logger.warning('Feedback profile update failed: %s', exc)
                         details['errors'].append('Feedback profile update failed; existing preferences kept: ' + str(exc)[:200])
                 editorial_interests = for_model(self.store.settings()['interests'])
+                topics = self.store.topic_categories()
                 for number, story in enumerate(pending, 1):
                     if self.stop_event.is_set() or self.review_stop_event.is_set():
                         break
@@ -143,8 +144,8 @@ class Collector:
                             model_used = True
                             result = self.reviewer.review(ai, editorial_interests, {
                                 "headline": story["headline"], "text": text[:ai["max_input_chars"]],
-                                "content_basis": basis, "published_at": story["published_at"],
-                            }, candidates, keep_loaded=True)
+                                "content_basis": basis, "published_at": story["published_at"], "category": story['category'],
+                            }, candidates, topics=topics, keep_loaded=True)
                         self.store.review_result(story["id"], result, ai, editorial_interests, text[:100000], basis)
                         details[{"reviewed": "reviewed", "duplicate": "duplicates", "filtered": "filtered"}[result["status"]]] += 1
                         if result["status"] == "reviewed":

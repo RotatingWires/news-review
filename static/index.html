@@ -136,6 +136,7 @@
         <div class="maintenance"><h3>Import/Export</h3><p>Download a ZIP backup or restore a saved NewsReview archive.</p><button id="transfer-nav" type="button">Import/Export...</button></div>
         <h3>Recent runs</h3><div id="run-history"></div>
         <div class="maintenance"><h3>Purge duplicates</h3><p>Remove AI-marked duplicate stories while keeping bookmarks and stories referenced by other saved stories. Compact the database to reclaim unused space.</p><button id="purge-duplicates" class="danger">Purge duplicates...</button></div>
+        <div class="maintenance"><h3>Generated topics</h3><p>Clear accumulated AI tags by resetting each story to its source category. Future reviews only choose categories configured in Sources.</p><button id="clear-topics" class="danger">Clear generated topics...</button></div>
         <div class="maintenance"><h3>Fresh start</h3><p>Choose which history and preferences to clear. Bookmarked stories can be kept while other history is removed.</p><button id="clear-history" class="danger">Fresh start...</button></div>
       </section>
       </fieldset>
@@ -179,6 +180,11 @@
       <p>The database is compacted afterward to reclaim space. This can take time. Deleted articles may be collected again if they are still listed by a source. Export a backup first if you may want them back.</p>
     </div>
     <div class="dialog-actions"><button type="button" data-close="purge-duplicates-dialog">Cancel</button><button id="confirm-purge-duplicates" class="danger" type="submit">Purge duplicates</button></div>
+  </form></dialog>
+  <dialog id="clear-topics-dialog"><form id="clear-topics-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Clear generated topics</h2><button type="button" data-close="clear-topics-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Replace all saved story tags with each story's source category, including bookmarked stories.</p><p>Stories, summaries, scores, bookmarks, read markers, interests, and feedback are kept. The previous tags cannot be recovered in the app; export a ZIP first if you want to keep them.</p></div>
+    <div class="dialog-actions"><button type="button" data-close="clear-topics-dialog">Cancel</button><button id="confirm-clear-topics" class="danger" type="submit">Clear topics</button></div>
   </form></dialog>
   <dialog id="clear-history-dialog"><form id="clear-history-form" class="dialog-layout">
     <div class="dialog-heading"><h2>Fresh start</h2><button type="button" data-close="clear-history-dialog" aria-label="Close">×</button></div>

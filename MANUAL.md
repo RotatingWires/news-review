@@ -123,6 +123,10 @@ Collection/review messages and their blinking activity light appear only in the 
 
 The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
 
+Topic names come from the categories configured on your sources, including archived source categories. AI reviews receive those names as the only permitted tag values, and response validation rejects invented topics. Edit a source's Default category to manage the vocabulary. Interest descriptions guide relevance scoring; they do not create new filter topics.
+
+To clean up tags accumulated by older versions, open **Settings → Collection & history → Clear generated topics...**, then confirm **Clear topics**. This replaces tags on all saved stories, including bookmarks, with each story's current source category; a missing source uses General. It preserves story text, summaries, scores, dates, bookmarks, read markers, review state, interests, and feedback. The filter list updates immediately. Previous tag assignments are lost, so export a ZIP first if you want to retain them. Cancel leaves them unchanged. Collection/review and restore must finish before cleanup runs. Older ZIP backups retain their tags and can bring them back on restore; run cleanup again if needed. No model call or reassessment is required.
+
 ### When the browser refreshes
 
 NewsReview does **not** poll `/api/overview` while idle. Opening the app or changing the main view reads current state. Returning focus to the window or bringing a hidden tab back refreshes the overview and visible feed; paired focus/visibility events are combined into one refresh. Unsaved interest/model/collection forms are preserved unless a reset or restored dataset requires a reload.
@@ -286,7 +290,7 @@ Clearing history or runs restarts the automatic collection interval from the res
 4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured local model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
-7. Validate exact output fields, types, tag limits, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them.
+7. Validate exact output fields, types, tag limits and membership in the configured source-category vocabulary, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them.
 
 The model receives article content as untrusted data, has no tools, and is instructed to ignore embedded commands. The app renders publisher/model text using DOM text nodes, never as executable HTML. Model output validation catches structural problems, not every factual or editorial error.
 
@@ -536,6 +540,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.9.7
+
+- Add Clear generated topics in Collection & history with Cancel/confirm controls. Reset stored tags to each story's source category while preserving stories and all other reading/preferences data.
+- Constrain AI topic choices to configured source categories in the structured schema and validate membership for both model transports, preventing uncontrolled topic growth.
+- Cover cleanup preservation/idempotency, archived/missing sources, authenticated confirmation and job locking, model vocabulary enforcement, and the desktop/mobile workflow.
 
 ### v0.9.6
 

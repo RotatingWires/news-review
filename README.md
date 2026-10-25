@@ -79,6 +79,8 @@ Use **Settings → Collection & history → Purge duplicates** to remove AI-mark
 
 The **Filter...** dropdown combines topic selection, relevance levels, and Include filtered / duplicates. Uncheck relevance levels to hide them; all start enabled.
 
+To remove accumulated AI-created topics, use **Settings → Collection & history → Clear generated topics...**. This resets saved story tags to their source category while keeping stories, summaries, bookmarks, read markers, interests, and feedback. Future AI reviews can only choose category names configured in Sources; they cannot invent new topics.
+
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 
 Model HTTP failures include the server's JSON error message, when available, in Recent runs, sample-test errors, and `logs/console.log`. An HTTP 400 means the server rejected a request; check its explanation before changing settings. Three consecutive review failures stop the batch and keep remaining stories queued.
