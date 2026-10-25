@@ -2,6 +2,7 @@
 
 import ipaddress
 import json
+import logging
 import socket
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -10,6 +11,7 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHand
 from . import __version__
 
 USER_AGENT = f"NewsReview/{__version__} (+self-hosted personal news reader)"
+logger = logging.getLogger(__name__)
 
 
 def valid_url(value):
@@ -77,8 +79,27 @@ class Fetcher:
                 charset = response.headers.get_content_charset() or "utf-8"
                 return content.decode(charset, errors="replace"), response.geturl(), response.headers.get_content_type()
         except HTTPError as exc:
-            exc.close()
-            raise ValueError(f"HTTP {exc.code} from {urlsplit(url).hostname}") from exc
+            message = f"HTTP {exc.code} from {urlsplit(url).hostname}"
+            # Local model APIs return useful JSON errors; never surface arbitrary
+            # publisher HTML or dump the request/article into diagnostics.
+            model_request = payload is not None and not self.public
+            try:
+                if model_request:
+                    value = json.loads(exc.read(8192))
+                    detail = value.get('error', value.get('message')) if isinstance(value, dict) else None
+                    if isinstance(detail, dict):
+                        detail = detail.get('message')
+                    if isinstance(detail, str):
+                        detail = ' '.join(''.join(c for c in detail if c.isprintable() or c.isspace()).split())
+                        if detail:
+                            message += ': ' + detail[:240]
+            except (ValueError, OSError):
+                pass  # Keep the original HTTP status if the error body is unreadable.
+            finally:
+                exc.close()
+            if model_request:
+                logger.warning('Model server request failed: %s', message)
+            raise ValueError(message) from exc
         except (URLError, TimeoutError, OSError) as exc:
             raise ValueError(f"Cannot reach {urlsplit(url).hostname}: {exc.reason if isinstance(exc, URLError) else type(exc).__name__}") from exc
 

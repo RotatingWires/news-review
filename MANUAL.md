@@ -76,6 +76,8 @@ Ollama normally retains a model for five minutes. To release one manually, run `
 
 Diagnostic logs record provider/model, finish reason, answer/thinking character counts, and the token limit, without dumping article text or model reasoning. These diagnostics help distinguish response truncation, missing final answers, and malformed output; a generic JSON error alone does not establish that a particular model or Ollama version is incompatible. If errors persist, note the exact installed model, Ollama version, and the diagnostic line from `logs/console.log`. An unload request failure is logged and shown in job status without discarding successful summaries. If a process exits abruptly or a request remains active after a network timeout, immediate unloading cannot be guaranteed; batch requests retain the bounded five-minute fallback.
 
+If the model server rejects a request with an HTTP error, NewsReview includes its JSON `error` or `message` explanation in sample-test errors, Recent runs, and `logs/console.log`. Explanations are normalized to one line and limited to 240 characters, with at most 8 KiB read from the error body. HTML, invalid JSON, and unrecognized error objects retain the HTTP status without exposing the body. Publisher error handling is unchanged. HTTP 400 indicates a rejected request, not necessarily a connection problem; use the returned explanation and the model server's own logs to identify the cause. After three consecutive review failures the batch stops, preserving stories and queued work. Fix the reported problem, test the model, and run Review pending again; stories that have reached three attempts need the existing retry/reassessment controls.
+
 ### LM Studio or another compatible local server
 
 Load a model and start the inference server. Set:
@@ -448,6 +450,7 @@ If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the
 | Check new sources is disabled | All enabled sources have a recorded check, or a collection/review job is running. Enable a new source or use Refresh sources to retry checked sources. |
 | Source preview works but no new tiles appear | Preview never saves history. Collect afterward; lookback/per-source limits, known URLs, the selected edition, topics/search, or hidden filtered/duplicate coverage may explain the result. |
 | Stories show excerpts and gray squares | AI is paused, not yet run, or queued for reassessment. Save a model, test it, then use Review pending. Check Recent runs for failures and retry limits. |
+| Reviews stop with HTTP 400 | The model server rejected the requests. Check the JSON explanation in Recent runs or `logs/console.log`, and the model server console if only the status appears. Confirm provider/model/settings, test with a sample, then retry. Previously recorded generic errors cannot recover a discarded response body. |
 | A visible story does not match a time search | Times use the tile timestamp and browser timezone; dates use the publication day, falling back to collection day. Clear other filters and include filtered/duplicate coverage if necessary. |
 | A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess history to queue the archive explicitly. |
 | Connection or storage error in the footer | Check the app process, address, logs, and data directory. A deleted running database requires stopping and restarting or restoring a backup; write actions are not replayed automatically. |
@@ -533,6 +536,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.9.5
+
+- Preserve bounded JSON explanations from rejected model requests in sample tests, run history, and server logs; retain status-only errors for unreadable or HTML bodies.
+- Direct stopped batches to their run errors and Local AI settings instead of assuming a connection failure. Preserve queued stories, the three-failure stop, and Ollama unloading.
+- Test both model API error formats, malformed/oversized bodies, message limits, and failure/queue persistence with real local HTTP fixtures.
 
 ### v0.9.4
 

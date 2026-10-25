@@ -73,6 +73,23 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 return
             self.respond('{"done":true,"done_reason":"unload"}', 'application/json')
             return
+        if payload.get('model', '').startswith('http-error'):
+            model = payload['model']
+            message = 'Input exceeds the model context window. Reduce input length.'
+            error = {'error': {'message': message}} if self.path == '/v1/chat/completions' else {'error': message}
+            body = json.dumps(error)
+            if model == 'http-error-message':
+                body = json.dumps({'message': 'Unsupported parameter:\n\tresponse_format'})
+            elif model == 'http-error-html':
+                body = '<html><body>Private proxy error page</body></html>'
+            elif model == 'http-error-huge':
+                body = json.dumps({'error': 'x' * 10000})
+            elif model == 'http-error-shape':
+                body = json.dumps({'error': ['Unexpected error shape']})
+            elif model == 'http-error-long':
+                body = json.dumps({'error': 'x' * 1000})
+            self.respond(body, 'application/json', status=400)
+            return
         if payload.get('model') in ('truncated', 'empty-thinking', 'fenced'):
             model = payload['model']
             content = '{"summary":' if model == 'truncated' else '' if model == 'empty-thinking' else '```json\n' + json.dumps(review()) + '\n```'
@@ -322,6 +339,41 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(requests[-1][0], '/api/generate')
             self.assertEqual(requests[-1][1]['keep_alive'], 0)
             self.assertEqual(requests[-1][1]['model'], model)
+
+    def test_model_http_errors_preserve_bounded_json_details(self):
+        for provider in ('ollama', 'compatible'):
+            with self.subTest(provider=provider), self.assertLogs('newsreview.network', level='WARNING') as logs:
+                with self.assertRaisesRegex(ValueError, 'HTTP 400 from 127.0.0.1: Input exceeds the model context window'):
+                    self.reviewer.test(self.model_config(provider, model='http-error'))
+                self.assertIn('Reduce input length.', logs.output[0])
+        with self.assertRaisesRegex(ValueError, 'Unsupported parameter: response_format'):
+            self.reviewer.test(self.model_config(model='http-error-message'))
+        for model in ('http-error-html', 'http-error-huge', 'http-error-shape'):
+            with self.subTest(model=model), self.assertRaises(ValueError) as error:
+                self.reviewer.test(self.model_config(model=model))
+            self.assertEqual(str(error.exception), 'HTTP 400 from 127.0.0.1')
+        with self.assertRaises(ValueError) as error:
+            self.reviewer.test(self.model_config(model='http-error-long'))
+        self.assertEqual(str(error.exception), 'HTTP 400 from 127.0.0.1: ' + 'x' * 240)
+
+    def test_rejected_model_requests_keep_queue_and_store_explanation(self):
+        self.store.save_settings({'ai': self.model_config(model='http-error')})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(4):
+            self.store.insert_story(source, {'headline': f'Protocol update {number}', 'url': self.root + f'/excerpt?error={number}',
+                                            'excerpt': 'An experimental protocol feature is available.', 'published_at': None,
+                                            'category': 'Protocols'}, '2026-10-25')
+        self.collect('review')
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(run['status'], 'partial')
+        self.assertEqual(len(run['details']['errors']), 3)
+        self.assertTrue(all('Input exceeds the model context window' in error for error in run['details']['errors']))
+        self.assertIn('Check the run errors and Local AI settings', run['details']['note'])
+        stories = self.store.stories()['items']
+        self.assertEqual(len(stories), 4)
+        self.assertTrue(all(story['status'] == 'pending' for story in stories))
+        self.assertEqual(sorted(story['attempts'] for story in stories), [0, 1, 1, 1])
+        self.assertEqual(self.fixture.requests[-1][0], '/api/generate')
 
     def test_unload_failure_does_not_discard_successful_reviews(self):
         self.store.save_settings({'ai': self.model_config(model='unload-error')})
