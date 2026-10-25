@@ -332,16 +332,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, result)
             finally:
                 self.server.collector.lock.release()
-        elif path == '/api/maintenance/topics/clear' and self.command == 'POST':
-            if data.get('confirmation') != 'CLEAR GENERATED TOPICS':
-                raise ValueError('Confirm clearing generated topics before continuing')
-            if not self.server.collector.lock.acquire(blocking=False):
-                self.send(409, {'error': 'Wait for collection/review or restore to finish before clearing topics'})
-                return
-            try:
-                self.send(200, {'updated': store.clear_generated_topics()})
-            finally:
-                self.server.collector.lock.release()
         elif path == '/api/reset' and self.command == 'POST':
             if data.get('confirmation') != 'RESET SELECTED':
                 raise ValueError('Type RESET SELECTED to confirm')

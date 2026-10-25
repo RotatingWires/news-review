@@ -89,16 +89,6 @@ export class Settings {
         notify(result.warning || `${result.deleted} duplicate ${result.deleted === 1 ? 'story' : 'stories'} removed.${result.compacted ? ' Database compacted.' : ''} Bookmarks and preferences were kept.`, Boolean(result.warning));
       }, 'Purging duplicate stories and compacting the database...');
     };
-    $('clear-topics').onclick = () => {
-      $('clear-topics-dialog').showModal();
-      $('clear-topics-dialog').querySelector('[data-close]').focus();
-    };
-    $('clear-topics-form').onsubmit = event => this.submit(event, async () => {
-      const result = await api('maintenance/topics/clear', 'POST', { confirmation: 'CLEAR GENERATED TOPICS' });
-      $('clear-topics-dialog').close();
-      await this.app.reloadDataset();
-      notify(`Generated topics cleared on ${result.updated} ${result.updated === 1 ? 'story' : 'stories'}. Source categories were kept.`);
-    });
     $('clear-history').onclick = () => {
       $('clear-history-form').reset();
       $('clear-history-error').textContent = '';

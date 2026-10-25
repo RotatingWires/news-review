@@ -304,12 +304,6 @@ class Store:
         with self.connect() as db:
             return [r[0] for r in db.execute("SELECT DISTINCT category COLLATE NOCASE FROM sources ORDER BY category COLLATE NOCASE")] or ['General']
 
-    def clear_generated_topics(self):
-        with self.connect() as db:
-            # Keep archived-source categories too; no story or preference is removed.
-            category = "json_array(COALESCE((SELECT category FROM sources WHERE id=stories.source_id),'General'))"
-            return db.execute(f"UPDATE stories SET tags={category} WHERE tags!={category}").rowcount
-
     def overview(self):
         with self.connect() as db:
             dates = [r[0] for r in db.execute("SELECT DISTINCT day FROM stories ORDER BY day DESC")]

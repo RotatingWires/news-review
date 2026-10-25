@@ -235,30 +235,6 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request(path, 'POST', data)[1]['deleted'], 0)
         self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
 
-    def test_clear_generated_topics_api_confirmation_auth_and_job_lock(self):
-        source = next(item for item in self.store.sources() if item['enabled'])
-        self.store.insert_story(source['id'], {'headline': 'A useful protocol update', 'url': self.root + '/article',
-                                             'excerpt': 'Source details.', 'published_at': None, 'category': 'Standards'}, '2026-10-25')
-        story = self.store.stories()['items'][0]
-        self.store.review_result(story['id'], review(tags=['Invented topic'], status='reviewed'),
-                                 self.model_config(), self.store.settings()['interests'], 'Article text.', 'article')
-        self.store.bookmark(story['id'], True)
-        self.start_api()
-        path = '/api/maintenance/topics/clear'
-        data = {'confirmation': 'CLEAR GENERATED TOPICS'}
-        self.assertEqual(self.request(path, 'POST', {})[0], 400)
-        self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
-        self.collector.lock.acquire()
-        try:
-            self.assertEqual(self.request(path, 'POST', data)[0], 409)
-        finally:
-            self.collector.lock.release()
-        self.assertIn('Invented topic', self.store.overview()['tags'])
-        self.assertEqual(self.request(path, 'POST', data)[:2], (200, {'updated': 1}))
-        self.assertEqual(self.store.overview()['tags'], ['Standards'])
-        self.assertEqual(self.store.stories(bookmarks=True)['total'], 1)
-        self.assertEqual(self.request(path, 'POST', data)[1]['updated'], 0)
-
     def test_model_tags_are_constrained_in_both_transports(self):
         for provider in ('ollama', 'compatible'):
             with self.subTest(provider=provider):

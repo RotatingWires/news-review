@@ -125,8 +125,6 @@ The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as oth
 
 Topic names come from the categories configured on your sources, including archived source categories. AI reviews receive those names as the only permitted tag values, and response validation rejects invented topics. Edit a source's Default category to manage the vocabulary. Interest descriptions guide relevance scoring; they do not create new filter topics.
 
-To clean up tags accumulated by older versions, open **Settings → Collection & history → Clear generated topics...**, then confirm **Clear topics**. This replaces tags on all saved stories, including bookmarks, with each story's current source category; a missing source uses General. It preserves story text, summaries, scores, dates, bookmarks, read markers, review state, interests, and feedback. The filter list updates immediately. Previous tag assignments are lost, so export a ZIP first if you want to retain them. Cancel leaves them unchanged. Collection/review and restore must finish before cleanup runs. Older ZIP backups retain their tags and can bring them back on restore; run cleanup again if needed. No model call or reassessment is required.
-
 ### When the browser refreshes
 
 NewsReview does **not** poll `/api/overview` while idle. Opening the app or changing the main view reads current state. Returning focus to the window or bringing a hidden tab back refreshes the overview and visible feed; paired focus/visibility events are combined into one refresh. Unsaved interest/model/collection forms are preserved unless a reset or restored dataset requires a reload.
@@ -540,6 +538,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.9.8
+
+- Remove the one-time Clear generated topics button, confirmation dialog, API endpoint, persistence operation, and obsolete cleanup tests.
+- Keep AI topic choices restricted to configured source categories, including canonicalization and validation for both model transports. Update current documentation to match.
 
 ### v0.9.7
 
