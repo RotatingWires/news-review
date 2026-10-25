@@ -382,6 +382,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, self.server.collector.reviewer.test(config))
             finally:
                 self.server.collector.lock.release()
+        elif path == '/api/jobs/stop-review' and self.command == 'POST':
+            stopped = self.server.collector.stop_review()
+            self.send(202 if stopped else 409, {'ok': stopped, 'error': None if stopped else 'No AI review is currently running'})
         elif path in ("/api/jobs/start", "/api/collect") and self.command == "POST":
             kind = data.get("kind", "collect")
             if kind not in ("collect", "review"):

@@ -23,8 +23,9 @@ class Collector:
         self.reviewer = reviewer or Reviewer()
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
+        self.review_stop_event = threading.Event()
         self.state_lock = threading.Lock()
-        self.state = {"running": False, "message": "Ready", "kind": None}
+        self.state = {"running": False, "message": "Ready", "kind": None, "reviewing": False, "review_stop_requested": False}
         self.worker = None
 
     def status(self):
@@ -46,10 +47,19 @@ class Collector:
         if scheduled and not self.schedule_due(datetime.now().astimezone()):
             self.lock.release()
             return False
-        self.update(running=True, kind=kind, message="Starting…")
+        self.review_stop_event.clear()
+        self.update(running=True, kind=kind, reviewing=False, review_stop_requested=False, message="Starting…")
         self.worker = threading.Thread(target=self._run, args=(kind, unchecked_only), daemon=True, name="news-collector")
         self.worker.start()
         return True
+
+    def stop_review(self):
+        with self.state_lock:
+            if not self.state['running'] or not self.state['reviewing']:
+                return False
+            self.review_stop_event.set()
+            self.state.update(review_stop_requested=True, message='Stopping AI review after the current article; remaining stories stay queued.')
+            return True
 
     def _run(self, kind, unchecked_only=False):
         run_id = None
@@ -97,8 +107,9 @@ class Collector:
                 recent = self.store.recent()
                 pending = self.store.pending(config["max_reviews"], source_ids=source_ids if unchecked_only else None)
                 consecutive_failures = 0
+                self.update(reviewing=bool(pending))
                 for number, story in enumerate(pending, 1):
-                    if self.stop_event.is_set():
+                    if self.stop_event.is_set() or self.review_stop_event.is_set():
                         break
                     self.update(message=f"Reviewing {number}/{len(pending)} · {story['headline'][:70]}")
                     text, basis = story["article_text"], story["content_basis"]
@@ -135,9 +146,13 @@ class Collector:
                         if consecutive_failures >= 3:
                             details["note"] = "Stopped review after three consecutive failures. Check the model connection; remaining stories are queued."
                             break
-            status = "interrupted" if self.stop_event.is_set() else ("partial" if details["errors"] else "complete")
+            self.update(reviewing=False)
+            if self.review_stop_event.is_set():
+                details['review_stopped'] = True
+                details['note'] = 'AI review stopped by the user. The current article finished; remaining stories are still queued.'
+            status = "interrupted" if self.stop_event.is_set() else ("partial" if details["errors"] or details.get('review_stopped') else "complete")
             self.store.finish_run(run_id, status, details)
-            self.update(message=(f"Checked {details['sources_checked']} new sources · " if unchecked_only else "") + f"Saved {details['added']} new stories · {details['reviewed']} reviewed" + (" · See run details for errors" if details["errors"] else ""))
+            self.update(message=(f"Checked {details['sources_checked']} new sources · " if unchecked_only else "") + f"Saved {details['added']} new stories · {details['reviewed']} reviewed" + (" · See run details for errors" if details["errors"] else "") + (" · AI review stopped; remaining stories are queued" if details.get("review_stopped") else ""))
         except Exception as exc:
             logger.exception("Collection failed")
             if run_id:
@@ -154,7 +169,7 @@ class Collector:
                 except Exception as exc:
                     logger.warning('Ollama model unload failed: %s', exc)
                     self.update(message=self.status()['message'] + ' · Model unload failed; see logs/console.log')
-            self.update(running=False)
+            self.update(running=False, reviewing=False, review_stop_requested=False)
             self.lock.release()
 
     def schedule_due(self, now):

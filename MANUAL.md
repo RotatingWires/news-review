@@ -151,6 +151,8 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 
 Tiles show the original headline and source, tags, the generated summary when available, why it matters, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
+**Why it matters** targets 3–4 short, complete English sentences, limited to 90 words and 650 characters; fewer sentences are preferred when the article supports little significance. The prompt forbids language switching, unsupported benefits, generic industry commentary, and lists of unrelated interests. Validation rejects excessive length, more than four sentences, and unfinished endings rather than truncating saved text. This is a formatting/quality check, not independent fact checking. Existing summaries are kept as saved; use **Settings → Collection & history → Reassess history** to regenerate them with the updated instructions. This queues model work and does not rewrite the archive immediately.
+
 No sample articles are inserted into your real database. The first edition starts empty until collection runs.
 
 Publication-date browsing and time search use standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
@@ -293,7 +295,8 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 ### Queue, retries, and scheduling
 
 - **Check sources / Refresh sources** fetches feeds or website listings and then reviews up to the saved limit.
-- **Review pending** skips feed collection and processes the existing queue.
+- **Review pending** skips feed collection and processes the existing queue. While reviews are running, the button becomes **Stop review** (also during the AI phase of a full collection). Stop finishes the article already being fetched/reviewed, then stops the batch and leaves unprocessed stories queued. The button shows **Stopping review...** until the in-flight article finishes. Network/model timeouts still apply; this does not forcibly terminate an Ollama process or interrupt its active request.
+- Completed reviews remain saved, the configured model-unload cleanup runs, and the review stop is recorded in run details as a partial run. Click Review pending again to resume. The collection scheduler stays enabled, so a later scheduled/full run can process pending stories. Review stopping never cancels source collection or disables future automatic work.
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
 - Each failed review increments an attempt count. After three attempts, use **Reset failed reviews** once the underlying issue is fixed.
 - Fresh/unattempted entries are processed first, newest first; older pending entries can wait on busy days. Increase the per-run limit or run additional review batches to catch up.
@@ -500,6 +503,8 @@ The authentication browser check (`python3 -m tests.browser_auth`) verifies firs
 
 The optional browser check `python3 -m tests.browser_purge` exercises purge confirmation, cancellation, bookmark preservation, empty state, and mobile layout using temporary data.
 
+The optional browser check `python3 -m tests.browser_review_stop` uses a blocked model HTTP fixture to verify the active Stop review button, stopping state, queue preservation, and resume behavior.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
@@ -509,6 +514,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.8.1
+
+- Request concise English significance text with 3–4 short sentences, capped at 90 words/650 characters. Reject unfinished or excessive output instead of saving clipped-looking prose.
+- Add Stop review during active AI batches. Finish the current article, preserve queued stories, run model cleanup, and allow later resume while keeping collection scheduling enabled.
 
 ### v0.8.0
 

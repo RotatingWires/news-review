@@ -80,3 +80,5 @@ Use **Settings → Collection & history → Purge duplicates** to remove AI-mark
 The **Filter...** dropdown combines topic selection, relevance levels, and Include filtered / duplicates. Uncheck relevance levels to hide them; all start enabled.
 
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
+
+While AI reviews run, **Review pending** becomes **Stop review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Generated **Why it matters** text targets 3–4 short English sentences, with a 90-word limit and complete sentence endings.

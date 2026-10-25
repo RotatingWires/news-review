@@ -64,6 +64,9 @@ class FixtureHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.server.requests.append((self.path, payload))
+        if payload.get('model') == 'blocking-review' and self.path == '/api/chat':
+            self.server.review_entered.set()
+            self.server.review_release.wait(8)
         if self.path == '/api/generate' and payload.get('keep_alive') == 0:
             if payload.get('model') == 'unload-error':
                 self.respond('Unload failed', status=503)
@@ -335,6 +338,60 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(self.request('/api/test-model', 'POST', self.model_config())[0], 409)
         finally:
             self.collector.lock.release()
+
+    def test_stop_review_finishes_current_article_preserves_queue_and_can_resume(self):
+        self.fixture.review_entered = threading.Event()
+        self.fixture.review_release = threading.Event()
+        config = self.model_config(model='blocking-review')
+        self.store.save_settings({'ai': config})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(3):
+            self.store.insert_story(source, {'headline': f'Protocol progress {number}', 'url': self.root + f'/article?stop={number}',
+                                            'excerpt': 'This is a substantive technical development with experimental support.', 'published_at': None, 'category': 'Protocols'}, '2026-10-25')
+        settings = self.store.settings()
+        self.start_api()
+        self.assertEqual(self.request('/api/jobs/stop-review', 'POST', {})[0], 409)
+        self.assertTrue(self.collector.start('review'))
+        try:
+            self.assertTrue(self.fixture.review_entered.wait(5))
+            self.assertTrue(self.collector.status()['reviewing'])
+            self.assertEqual(self.request('/api/jobs/stop-review', 'POST', {}, {'Cookie': ''})[0], 401)
+            self.assertEqual(self.request('/api/jobs/stop-review', 'POST', {}, {'Origin': 'https://evil.example'})[0], 403)
+            self.assertEqual(self.request('/api/jobs/stop-review', 'POST', {})[0], 202)
+            self.assertTrue(self.collector.status()['review_stop_requested'])
+            self.assertFalse(self.collector.stop_event.is_set())
+        finally:
+            self.fixture.review_release.set()
+            self.collector.worker.join(10)
+        self.assertFalse(self.collector.status()['running'])
+        self.assertEqual(len(self.store.pending(10)), 2)
+        self.assertEqual(self.store.overview()['runs'][0]['details']['reviewed'], 1)
+        self.assertTrue(self.store.overview()['runs'][0]['details']['review_stopped'])
+        self.assertEqual(self.fixture.requests[-1][0], '/api/generate')
+        self.assertEqual(self.store.settings(), settings)
+        self.collect('review')
+        self.assertEqual(len(self.store.pending(10)), 0)
+        self.assertFalse(self.collector.review_stop_event.is_set())
+
+    def test_stop_during_collection_review_keeps_source_results_and_schedule_anchor(self):
+        self.fixture.review_entered = threading.Event()
+        self.fixture.review_release = threading.Event()
+        self.store.save_settings({'ai': self.model_config(model='blocking-review')})
+        self.start_api()
+        self.assertTrue(self.collector.start('collect'))
+        try:
+            self.assertTrue(self.fixture.review_entered.wait(5))
+            self.assertEqual(self.request('/api/jobs/stop-review', 'POST', {})[0], 202)
+        finally:
+            self.fixture.review_release.set()
+            self.collector.worker.join(10)
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(run['kind'], 'collect')
+        self.assertEqual(run['details']['added'], 2)
+        self.assertEqual(run['details']['reviewed'], 1)
+        self.assertEqual(run['status'], 'partial')
+        self.assertEqual(len(self.store.pending(10)), 1)
+        self.assertFalse(self.collector.schedule_due(datetime.now().astimezone()))
 
     def test_model_test_uses_real_adapter_contract(self):
         for provider in ('ollama', 'compatible'):

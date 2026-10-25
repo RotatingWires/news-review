@@ -80,6 +80,22 @@ class ReviewTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate_review(value, {8})
 
+    def test_significance_is_concise_and_ends_with_a_complete_sentence(self):
+        valid = 'This enables early testing. Developers can check compatibility. Stable support is not available yet.'
+        self.assertEqual(validate_review(review(why_it_matters=valid), set())['why_it_matters'], valid)
+        abbreviations = 'U.S. developers can test v2.1. Dr. Smith reports experimental support. Stable releases are unchanged.'
+        validate_review(review(why_it_matters=abbreviations), set())
+        invalid = [
+            'The new version allows testing but it does not',
+            'This is useful but it is a 短板',
+            'One. Two. Three. Four. Five.',
+            'word ' * 91 + '.',
+            'x' * 650 + '.',
+        ]
+        for text in invalid:
+            with self.subTest(text=text[:50]), self.assertRaises(ValueError):
+                validate_review(review(why_it_matters=text), set())
+
     def test_candidates_require_shared_terms(self):
         recent = [{"id": 1, "headline": "Browser adds experimental image format", "summary": "A"},
                   {"id": 2, "headline": "Phone pricing changes", "summary": "B"}]

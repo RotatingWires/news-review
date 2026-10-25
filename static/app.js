@@ -55,7 +55,7 @@ class App {
     $('dismiss-status').onclick = dismissStatus;
     $('help-nav').onclick = () => $('help-dialog').showModal();
     $('collect').onclick = () => this.collect('collect', $('collect'));
-    $('review-pending').onclick = () => this.collect('review', $('review-pending'));
+    $('review-pending').onclick = () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('review-pending'));
     $('logout').onclick = async () => {
       try {
         await api('auth/logout', 'POST', {});
@@ -105,7 +105,10 @@ class App {
     const pending = this.overview.counts.pending || 0;
     setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
     $('collect').disabled = state.running;
-    $('review-pending').disabled = state.running || pending === 0;
+    $('review-pending').textContent = state.reviewing ? state.review_stop_requested ? 'Stopping review...' : 'Stop review' : 'Review pending';
+    $('review-pending').classList.toggle('danger', Boolean(state.reviewing));
+    $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your local model';
+    $('review-pending').disabled = state.reviewing ? Boolean(state.review_stop_requested) : state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
     $('refresh-sources').disabled = state.running;
@@ -188,6 +191,14 @@ class App {
         await this.feed.load();
       }
     } catch (error) { notify(error.message, true); }
+  }
+
+  async stopReview() {
+    await busy($('review-pending'), async () => {
+      await api('jobs/stop-review', 'POST', {});
+    }, 'Stopping AI review after the current article; remaining stories stay queued.');
+    try { await this.refreshOverview(); }
+    catch (error) { notify(error.message, true); }
   }
 
   async collect(kind, button, uncheckedOnly = false) {
