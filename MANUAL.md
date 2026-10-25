@@ -66,6 +66,16 @@ In **Settings → Local AI**:
 
 The adapter calls `/api/chat` with streaming disabled, `think: false`, and the requested JSON schema in `format`. This requests a direct review without a separate thinking phase on models that support disabling it. The same setting applies to the sample-article test and normal reviews. See [Ollama's chat API](https://docs.ollama.com/api/chat), [thinking controls](https://docs.ollama.com/capabilities/thinking), and [structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
+### Ollama memory and response troubleshooting
+
+**Unload Ollama model after a test or review batch** is enabled by default, including for existing installations. Sample tests send `keep_alive: 0` with the chat request so Ollama releases the model after responding, including when NewsReview rejects the answer. Review batches keep it warm between articles (`keep_alive: 5m`) and send an empty `/api/generate` request with `keep_alive: 0` in batch cleanup, including after failed reviews. The model loads again when needed; Ollama itself remains running. Uncheck the option to leave model residency to Ollama/server configuration. This control applies only to native Ollama, not compatible servers. Model tests are blocked while collection/review or maintenance holds the shared job lock, preventing a sample test from unloading an active batch. Other applications using the same model can still affect its residency.
+
+Ollama normally retains a model for five minutes. To release one manually, run `ollama stop <model-name>` on the Ollama host (inside its container if applicable). Check `ollama ps` to see loaded models. Unloading releases model allocations, but the service and operating-system caches can still use some memory. The API behavior is documented in [Ollama’s memory FAQ](https://docs.ollama.com/faq#how-do-i-keep-a-model-loaded-in-memory-or-make-it-unload-immediately).
+
+**Maximum response tokens** defaults to 2400 (previously a fixed 1200), adjustable from 256 to 8192. A response ending with `length`/`max_tokens` is reported as truncated; increase the limit and allow enough request time on slower hardware. An empty answer is reported separately, including whether the server returned only thinking text. Invalid JSON reports its line/column and finish reason. A single JSON Markdown fence is accepted, but the object still must pass the full schema and duplicate-ID validation; arbitrary text or partial JSON is never treated as a valid review. Schema string lengths now match the stored review limits.
+
+Diagnostic logs record provider/model, finish reason, answer/thinking character counts, and the token limit, without dumping article text or model reasoning. These diagnostics help distinguish response truncation, missing final answers, and malformed output; a generic JSON error alone does not establish that a particular model or Ollama version is incompatible. If errors persist, note the exact installed model, Ollama version, and the diagnostic line from `logs/console.log`. An unload request failure is logged and shown in job status without discarding successful summaries. If a process exits abruptly or a request remains active after a network timeout, immediate unloading cannot be guaranteed; batch requests retain the bounded five-minute fallback.
+
 ### LM Studio or another compatible local server
 
 Load a model and start the inference server. Set:
@@ -499,6 +509,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.8.0
+
+- Add native Ollama unloading after tests/batches, with warm reuse between articles and a setting to retain server defaults. Keep sample tests from interrupting active jobs.
+- Add configurable response token limits, schema string bounds, and specific diagnostics for truncated, empty/thinking-only, malformed, and schema-invalid responses. Preserve strict review validation.
 
 ### v0.7.6
 

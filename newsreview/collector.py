@@ -53,6 +53,8 @@ class Collector:
 
     def _run(self, kind, unchecked_only=False):
         run_id = None
+        model_used = False
+        ai = None
         details = {"added": 0, "reviewed": 0, "duplicates": 0, "filtered": 0, "errors": [], "scope": "unchecked" if unchecked_only else "all", "sources_checked": 0}
         try:
             run_id = self.store.start_run(kind, details)
@@ -115,10 +117,11 @@ class Collector:
                             result = {"summary": "Excluded by the headline filter.", "why_it_matters": "", "tags": [story["category"]], "status": "filtered", "score": 0, "milestone": "not applicable"}
                         else:
                             candidates = candidates_for(story["headline"], recent)
+                            model_used = True
                             result = self.reviewer.review(ai, settings["interests"], {
                                 "headline": story["headline"], "text": text[:ai["max_input_chars"]],
                                 "content_basis": basis, "published_at": story["published_at"],
-                            }, candidates)
+                            }, candidates, keep_loaded=True)
                         self.store.review_result(story["id"], result, ai, settings["interests"], text[:100000], basis)
                         details[{"reviewed": "reviewed", "duplicate": "duplicates", "filtered": "filtered"}[result["status"]]] += 1
                         if result["status"] == "reviewed":
@@ -145,6 +148,12 @@ class Collector:
                     pass
             self.update(message=str(exc) if isinstance(exc, StorageUnavailable) else "Collection failed. See run history and server log.")
         finally:
+            if model_used:
+                try:
+                    self.reviewer.unload(ai)
+                except Exception as exc:
+                    logger.warning('Ollama model unload failed: %s', exc)
+                    self.update(message=self.status()['message'] + ' · Model unload failed; see logs/console.log')
             self.update(running=False)
             self.lock.release()
 

@@ -64,6 +64,18 @@ class FixtureHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.server.requests.append((self.path, payload))
+        if self.path == '/api/generate' and payload.get('keep_alive') == 0:
+            if payload.get('model') == 'unload-error':
+                self.respond('Unload failed', status=503)
+                return
+            self.respond('{"done":true,"done_reason":"unload"}', 'application/json')
+            return
+        if payload.get('model') in ('truncated', 'empty-thinking', 'fenced'):
+            model = payload['model']
+            content = '{"summary":' if model == 'truncated' else '' if model == 'empty-thinking' else '```json\n' + json.dumps(review()) + '\n```'
+            self.respond(json.dumps({'message': {'content': content, 'thinking': 'fixture reasoning' if model == 'empty-thinking' else ''},
+                                     'done_reason': 'length' if model == 'truncated' else 'stop'}), 'application/json')
+            return
         if payload.get('model') == 'broken':
             self.respond('{"message":{"content":"not JSON"}}', 'application/json')
             return
@@ -276,6 +288,54 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.store.stories()['total'], 2)
         self.assertEqual(self.store.overview()['runs'][0]['status'], 'partial')
 
+    def test_ollama_diagnostics_and_fenced_json_validation(self):
+        for model, message in [('truncated', 'cut off'), ('empty-thinking', 'thinking output'), ('broken', 'invalid JSON')]:
+            with self.subTest(model=model):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.reviewer.test(self.model_config(model=model))
+                self.assertEqual(self.fixture.requests[-1][1]['keep_alive'], 0)
+        self.assertEqual(self.reviewer.test(self.model_config(model='fenced'))['status'], 'reviewed')
+        config = {**self.model_config(), 'unload_after_use': False, 'max_output_tokens': 3000}
+        self.reviewer.test(config)
+        payload = self.fixture.requests[-1][1]
+        self.assertNotIn('keep_alive', payload)
+        self.assertEqual(payload['options']['num_predict'], 3000)
+
+    def test_batch_keeps_ollama_warm_and_unloads_after_success_or_failure(self):
+        for model in ('fixture', 'broken'):
+            config = self.model_config(model=model)
+            self.store.save_settings({'ai': config})
+            source = next(item['id'] for item in self.store.sources() if item['enabled'])
+            self.store.insert_story(source, {'headline': 'A useful protocol update', 'url': self.root + '/article?case=' + model,
+                                            'excerpt': 'A useful protocol update supports experimental deployment.', 'published_at': None, 'category': 'Protocols'}, '2026-10-24')
+            start = len(self.fixture.requests)
+            self.collect('review')
+            requests = self.fixture.requests[start:]
+            chats = [payload for path, payload in requests if path == '/api/chat']
+            self.assertTrue(chats)
+            self.assertTrue(all(payload['keep_alive'] == '5m' for payload in chats))
+            self.assertEqual(requests[-1][0], '/api/generate')
+            self.assertEqual(requests[-1][1]['keep_alive'], 0)
+            self.assertEqual(requests[-1][1]['model'], model)
+
+    def test_unload_failure_does_not_discard_successful_reviews(self):
+        self.store.save_settings({'ai': self.model_config(model='unload-error')})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source, {'headline': 'Protocol testing update', 'url': self.root + '/excerpt',
+                                        'excerpt': 'This protocol has added support for experimental features.', 'published_at': None, 'category': 'Protocols'}, '2026-10-24')
+        self.collect('review')
+        self.assertEqual(self.store.stories()['items'][0]['status'], 'reviewed')
+        self.assertIn('Model unload failed', self.collector.status()['message'])
+        self.assertFalse(self.collector.lock.locked())
+
+    def test_model_test_cannot_unload_an_active_review_batch(self):
+        self.start_api()
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(self.request('/api/test-model', 'POST', self.model_config())[0], 409)
+        finally:
+            self.collector.lock.release()
+
     def test_model_test_uses_real_adapter_contract(self):
         for provider in ('ollama', 'compatible'):
             with self.subTest(provider=provider):
@@ -287,6 +347,8 @@ class IntegrationTests(unittest.TestCase):
                 if provider == 'ollama':
                     self.assertEqual(path, '/api/chat')
                     self.assertIs(payload['think'], False)
+                    self.assertEqual(payload['keep_alive'], 0)
+                    self.assertEqual(payload['options']['num_predict'], 2400)
                     self.assertEqual(payload['format']['type'], 'object')
                 else:
                     self.assertEqual(path, '/v1/chat/completions')

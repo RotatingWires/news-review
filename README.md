@@ -78,3 +78,5 @@ Keyword and time-only searches stay within the selected day. Enter a date range 
 Use **Settings → Collection & history → Purge duplicates** to remove AI-marked duplicate stories and compact the database. Bookmarks and stories referenced by other saved stories are kept.
 
 The **Filter...** dropdown combines topic selection, relevance levels, and Include filtered / duplicates. Uncheck relevance levels to hide them; all start enabled.
+
+Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.

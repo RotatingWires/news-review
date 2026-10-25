@@ -157,6 +157,8 @@ export class Settings {
       $('ai-model').value = ai.model;
       $('ai-timeout').value = ai.timeout_seconds;
       $('ai-input').value = ai.max_input_chars;
+      $('ai-output').value = ai.max_output_tokens ?? 2400;
+      $('ai-unload').checked = ai.unload_after_use ?? true;
       this.aiHelp();
       $('schedule-enabled').checked = collection.enabled;
       $('schedule-interval').value = collection.interval_hours ?? 24;
@@ -195,10 +197,11 @@ export class Settings {
 
   aiValues() {
     return { provider: $('ai-provider').value, base_url: $('ai-url').value,
-      model: $('ai-model').value.trim(), timeout_seconds: Number($('ai-timeout').value), max_input_chars: Number($('ai-input').value) };
+      model: $('ai-model').value.trim(), timeout_seconds: Number($('ai-timeout').value), max_input_chars: Number($('ai-input').value), max_output_tokens: Number($('ai-output').value), unload_after_use: $('ai-unload').checked };
   }
 
   aiHelp() {
+    $('ai-unload-row').hidden = $('ai-provider').value !== 'ollama';
     $('ai-help').textContent = $('ai-provider').value === 'ollama'
       ? 'Ollama: use the server root, such as http://127.0.0.1:11434. Enter the exact installed model name. The app uses /api/chat with a JSON schema.'
       : 'Compatible server: include the API prefix, such as http://127.0.0.1:1234/v1 for LM Studio. The app uses /chat/completions and JSON output. Your model must follow the requested schema.';

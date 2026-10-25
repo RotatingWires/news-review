@@ -375,7 +375,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {**result, 'entries': result['entries'][:8]})
         elif path == "/api/test-model" and self.command == "POST":
             config = validation.settings({"ai": data}, store.settings())["ai"]
-            self.send(200, self.server.collector.reviewer.test(config))
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {'error': 'Wait for collection/review or maintenance to finish before testing a model'})
+                return
+            try:
+                self.send(200, self.server.collector.reviewer.test(config))
+            finally:
+                self.server.collector.lock.release()
         elif path in ("/api/jobs/start", "/api/collect") and self.command == "POST":
             kind = data.get("kind", "collect")
             if kind not in ("collect", "review"):

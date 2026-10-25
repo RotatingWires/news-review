@@ -51,6 +51,8 @@ def settings(value, current):
             "model": text(ai.get("model"), "Model", 200, empty=True),
             "timeout_seconds": integer(ai.get("timeout_seconds"), "Model timeout", 10, 600),
             "max_input_chars": integer(ai.get("max_input_chars"), "Article input length", 2000, 40000),
+            "max_output_tokens": integer(ai.get("max_output_tokens", 2400), "Response tokens", 256, 8192),
+            "unload_after_use": boolean(ai.get("unload_after_use", True), "Unload after use"),
         }
     if "collection" in value:
         c = value["collection"]

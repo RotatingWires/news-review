@@ -102,6 +102,8 @@
           <label>Model name<input id="ai-model" placeholder="Exact name of your installed model" maxlength="200"></label>
           <label>Request timeout (seconds)<input id="ai-timeout" type="number" min="10" max="600" required></label>
           <label>Maximum article characters<input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
+          <label>Maximum response tokens<input id="ai-output" type="number" min="256" max="8192" required></label>
+          <label id="ai-unload-row" class="checkbox full"><input id="ai-unload" type="checkbox" checked> Unload Ollama model after a test or review batch</label>
           <p id="ai-help" class="callout full"></p>
           <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
