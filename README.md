@@ -27,7 +27,7 @@ You can collect without a model: stories show source excerpts marked **awaiting 
 
 Automatic collection initially runs **every 24 hours**. Change **Settings → Collection & history → Collect every (hours)** to any whole-number interval from 1 to 8760, such as 3 hours. Overdue work catches up about 20 seconds after startup. To set up without automatic collection, run `python3 -m newsreview --no-scheduler`. Only one process should use a data directory.
 
-Data and logs live in `./data`. Back up through **Settings → Collection & history → Import/Export...**. On hosts without system timezone data, install `tzdata` for publication-date browsing and time-range search (`python3 -m pip install tzdata`, or `py -3 -m pip install tzdata` on Windows).
+Data lives in `./data`; runtime logs use `./logs/console.log`, matching TaskList. Only one log file is kept: it truncates in place when the next entry would exceed 10 MiB. Back up through **Settings → Collection & history → Import/Export...**. On hosts without system timezone data, install `tzdata` for publication-date browsing and time-range search (`python3 -m pip install tzdata`, or `py -3 -m pip install tzdata` on Windows).
 
 ## Security and privacy
 
@@ -49,7 +49,7 @@ PowerShell:
 py -3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
-On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `server.log` (a service manager may capture console output).
+On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
 
 The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
 

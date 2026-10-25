@@ -17,7 +17,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/newsreview
+# Create /opt/newsreview/logs and make it writable by the service account.
+ReadWritePaths=/var/lib/newsreview /opt/newsreview/logs
 
 [Install]
 WantedBy=multi-user.target

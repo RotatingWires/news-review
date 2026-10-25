@@ -307,11 +307,11 @@ data/
   newsreview.db         stories, sources, settings, bookmarks, run history
   newsreview.db-wal     SQLite's live write-ahead log, when present
   newsreview.db-shm     SQLite's shared-memory file, when present
-  server.log          application/HTTP logs, up to 5 MB
-  server.log.1        one previous log file, up to 5 MB
+logs/
+  console.log          application/HTTP logs, one file up to 10 MiB
 ```
 
-The directory is Git-ignored. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
+Both directories are Git-ignored. Runtime logs match TaskList: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` relative to the working directory. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database and credentials, not the log directory. File logging failures leave console logging available. Old `data/server.log` and `data/server.log.1` files are no longer written or removed automatically. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
 `SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (2); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
@@ -340,7 +340,7 @@ PowerShell:
 py -3 -m newsreview --host 0.0.0.0 --port 8714
 ```
 
-On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `server.log` (a service manager may capture console output).
+On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
 
 The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
 
@@ -361,7 +361,7 @@ The app must stay running for its scheduler to run. It can also be launched at l
 `deploy/newsreview.service` is a template, not an installer:
 
 1. Create a dedicated service account and a private writable data directory.
-2. Place the checkout at the desired application path.
+2. Place the checkout at the desired application path and create its `logs/` directory, writable by the service account.
 3. Edit `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match those paths. `ProtectHome=true` means this template expects code outside `/home`, such as `/opt/newsreview`.
 4. If needed, put variables in `/etc/newsreview.env`, readable only by the service administrator. The template loads it as an optional environment file.
 5. Install the unit using your normal system administration process, then enable/start it.
@@ -402,7 +402,7 @@ To restore: stop the app, move the entire existing data directory aside as a rec
 
 Before an update, make a backup, pull the code, and restart. Runtime data is ignored by Git, and saved defaults are not reset. There is no browser service worker caching old application files.
 
-**Do not delete the data folder while the app is running.** This removes its database, preferences, and logs outside the application's lifecycle. If this happened, stop and restart NewsReview to create a fresh database, or restore a backup before restarting. The running server now returns an actionable HTTP 503 instead of silently recreating an empty SQLite file or reporting a generic internal error. Use **Fresh start** in Settings when you only want to clear reading history and retain configuration.
+**Do not delete the data folder while the app is running.** This removes its database and preferences outside the application's lifecycle. If this happened, stop and restart NewsReview to create a fresh database, or restore a backup before restarting. The running server now returns an actionable HTTP 503 instead of silently recreating an empty SQLite file or reporting a generic internal error. Use **Fresh start** in Settings when you only want to clear reading history and retain configuration.
 
 ### Upgrade from the first version
 
@@ -452,6 +452,7 @@ GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local ve
 newsreview/
   __init__.py       authoritative application version
   __main__.py       CLI, server startup, logging, interval scheduler startup
+  runtime_logging.py single-file logging with in-place 10 MiB truncation
   defaults.py       initial source list, interests, collection/model defaults
   store.py          SQLite schema, queries, queue and settings persistence
   migration.py      safe import of the first-version database filename
@@ -498,6 +499,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.7.6
+
+- Match TaskList runtime logging at logs/console.log: retain normal console output and keep one file, truncating in place at 10 MiB instead of rotating backup logs. Keep setup tokens console-only and allow console logging to continue if file output fails.
 
 ### v0.7.5
 

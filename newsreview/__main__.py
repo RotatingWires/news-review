@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import threading
@@ -12,6 +11,7 @@ from .collector import Collector
 from .server import AppServer
 from .store import Store
 from .migration import database_path
+from .runtime_logging import configure_logging
 
 
 def main():
@@ -27,8 +27,7 @@ def main():
         parser.error("Port must be 1–65535")
     directory = Path(args.data_dir).resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(directory / "server.log", maxBytes=5_000_000, backupCount=1, encoding="utf-8")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=[logging.StreamHandler(), handler])
+    configure_logging()
     store = Store(database_path(directory))
     collector = Collector(store)
     server = AppServer((args.host, args.port), store, collector, password)

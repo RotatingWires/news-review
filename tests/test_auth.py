@@ -89,9 +89,11 @@ assert not list(path.parent.glob('.auth-*'))
                 reservation.bind(('127.0.0.1', 0))
                 port = reservation.getsockname()[1]
             environment = {key: value for key, value in os.environ.items() if key != 'NEWSREVIEW_PASSWORD'}
+            project = str(Path(__file__).resolve().parent.parent)
+            environment['PYTHONPATH'] = os.pathsep.join(filter(None, [project, environment.get('PYTHONPATH')]))
             process = subprocess.Popen([sys.executable, '-m', 'newsreview', '--host', '0.0.0.0',
                                         '--port', str(port), '--data-dir', directory, '--no-scheduler'],
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment, cwd=directory)
             try:
                 for _ in range(100):
                     if process.poll() is not None:
@@ -109,7 +111,7 @@ assert not list(path.parent.glob('.auth-*'))
                 output, errors = process.communicate(timeout=5)
             token = re.search(r'setup token: ([A-F0-9-]+)', output)
             self.assertIsNotNone(token, output + errors)
-            self.assertNotIn(token[1], (Path(directory) / 'server.log').read_text())
+            self.assertNotIn(token[1], (Path(directory) / 'logs' / 'console.log').read_text())
             self.assertFalse((Path(directory) / 'auth.json').exists())
 
     def test_first_run_http_setup_protects_lan_and_persists(self):
