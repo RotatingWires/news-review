@@ -358,6 +358,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.collector.lock.release()
         elif path in ("/api/logout", "/api/auth/logout") and self.command == "POST":
             self.send(200, {"ok": True}, headers={"Set-Cookie": "newsreview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
+        elif path.startswith('/api/read/') and self.command == 'POST':
+            self.send(200, {'read_at': store.mark_read(int(path.rsplit('/', 1)[1]))})
         elif path.startswith('/api/feedback/story/') and self.command == 'PUT':
             vote = validation.integer(data.get('vote'), 'Vote', -1, 1)
             reason = validation.text(data.get('reason', ''), 'Feedback reason', 320, empty=True)

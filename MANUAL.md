@@ -305,6 +305,8 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - The schedule survives restarts through the SQLite run history. Partial/failed full runs also restart the interval to avoid rapid retries; retry manually if needed. Missed intervals produce one catch-up run, not a replay of every missed run. An interrupted process is marked interrupted at the next startup.
 - Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
 
+Opening a story headline with a click, keyboard activation, or middle click adds **Read** beneath the publisher after the save succeeds. The first-open timestamp persists across reloads/devices and ZIP backups, and is preserved when a story is reviewed again or bookmarked. Opening additional-source links marks that linked story, not the main article. No Unread label or automatic read-content detection is added; this tracks openings through NewsReview. Clearing/deleting a story also removes its marker. Existing stories begin with no marker. Schema-2 backups remain importable and get empty read markers.
+
 ## Article feedback and learned preferences
 
 Each Daily Feed and Bookmarks tile has thumbs-up/down buttons, separate from bookmarking. Click one, optionally explain what you liked or disliked, then Save. You can edit the vote/reason or remove that article’s feedback from the same dialog. Reasons can distinguish the topic from the article’s quality or an incorrect AI summary. Feedback affects future review prompts; it does not instantly change existing scores, summaries, or sorting. Reassess history explicitly if you want older stories reviewed again.
@@ -315,7 +317,7 @@ Under **Settings → Interests → Learned preferences**, view/edit the compact 
 
 **Update from feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing Local AI controls, with warm reuse within a review batch.
 
-**Reset feedback...** confirms before clearing all votes, reasons, and the profile. Fresh start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, database schema version 2 and older ZIP table layouts remain compatible.
+**Reset feedback...** confirms before clearing all votes, reasons, and the profile. Fresh start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, the read-marker schema update preserves import support for version-2 ZIP table layouts.
 
 ## Purging duplicate stories
 
@@ -338,7 +340,7 @@ logs/
 
 Both directories are Git-ignored. Runtime logs match TaskList: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` relative to the working directory. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database and credentials, not the log directory. File logging failures leave console logging available. Old `data/server.log` and `data/server.log.1` files are no longer written or removed automatically. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (2); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (3); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
 
 The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
@@ -520,6 +522,8 @@ The optional browser check `python3 -m tests.browser_review_stop` uses a blocked
 
 The optional browser check `python3 -m tests.browser_feedback` verifies article rating/reason edits, profile generation and manual settings, reset cancellation, persistence after reload, and summary-only mobile tiles.
 
+The optional browser check `python3 -m tests.browser_read` verifies headline activation, read-label placement, reload/Bookmarks persistence, and unchanged unopened stories.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
@@ -529,6 +533,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.9.3
+
+- Track article openings and show a small Read label beneath the publisher on Daily Feed and Bookmarks. Save first-open timestamps in SQLite, retain them through reviews/bookmark changes, and include them in ZIP backups.
+- Migrate to schema 3 while accepting schema-2 backup imports with empty read markers.
 
 ### v0.9.2
 

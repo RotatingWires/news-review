@@ -125,6 +125,7 @@ def _validate_rows(database):
         _check_date(value['discovered_at'], required=True)
         _check_date(value['published_at'])
         _check_date(value['reviewed_at'])
+        _check_date(value.get('read_at'))
         datetime.strptime(value['day'], '%Y-%m-%d')
     for row in database.execute('SELECT * FROM runs'):
         if row['status'] not in ('running', 'complete', 'partial', 'failed', 'interrupted') or row['kind'] not in ('collect', 'review'):
@@ -149,7 +150,7 @@ def extract_and_validate(store, upload, directory):
                 if member.file_size > limit or member.flag_bits & 1 or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
                     raise ValueError('Backup member is encrypted, unsupported, or exceeds its size limit')
             manifest = json.loads(archive.read('manifest.json'))
-            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') != SCHEMA_VERSION:
+            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') not in (2, SCHEMA_VERSION):
                 raise ValueError('This is not a supported NewsReview backup format')
             if _version(manifest.get('application_version')) > _version(__version__):
                 raise ValueError('This backup is from a newer NewsReview version. Update the application first.')
@@ -168,12 +169,14 @@ def extract_and_validate(store, upload, directory):
                 raise ValueError('Backup has unexpected tables, triggers, or views')
             if any(r['sql'] and 'VIRTUAL TABLE' in r['sql'].upper() for r in objects):
                 raise ValueError('Virtual tables are not accepted in backups')
-            if imported.execute('PRAGMA user_version').fetchone()[0] != SCHEMA_VERSION or imported.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+            if imported.execute('PRAGMA user_version').fetchone()[0] != manifest['schema_version'] or imported.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('Backup database schema/integrity check failed')
             if imported.execute('PRAGMA foreign_key_check').fetchone():
                 raise ValueError('Backup contains invalid source/duplicate relationships')
             for table in TABLES:
                 expected = [tuple(r) for r in live.execute(f'PRAGMA table_info({table})')]
+                if table == 'stories' and manifest['schema_version'] == 2:
+                    expected = [column for column in expected if column[1] != 'read_at']
                 actual = [tuple(r) for r in imported.execute(f'PRAGMA table_info({table})')]
                 if expected != actual:
                     raise ValueError(f'Backup table layout does not match: {table}')
@@ -206,8 +209,10 @@ def restore_archive(store, upload):
                 columns = [r['name'] for r in live.execute(f'PRAGMA table_info({table})')]
                 placeholders = ','.join('?' for _ in columns)
                 names = ','.join('"' + column + '"' for column in columns)
+                imported_columns = {row['name'] for row in imported.execute(f'PRAGMA table_info({table})')}
+                selected = ','.join('"' + column + '"' if column in imported_columns else 'NULL AS "read_at"' for column in columns)
                 live.executemany(f'INSERT INTO {table}({names}) VALUES ({placeholders})',
-                                 (tuple(row) for row in imported.execute(f'SELECT {names} FROM {table}')))
+                                 (tuple(row) for row in imported.execute(f'SELECT {selected} FROM {table}')))
             live.execute("INSERT INTO settings(key,value) VALUES ('data_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(secrets.token_hex(16)),))
             live.execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", (datetime.now(timezone.utc).isoformat(),))
             if live.execute('PRAGMA foreign_key_check').fetchone():

@@ -12,7 +12,7 @@ from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
 from . import feedback
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PURGEABLE_DUPLICATES = """s.status='duplicate' AND s.bookmarked=0
     AND NOT EXISTS (SELECT 1 FROM stories child WHERE child.duplicate_of=s.id)"""
 
@@ -51,7 +51,7 @@ class Store:
                     score INTEGER NOT NULL DEFAULT 50, bookmarked INTEGER NOT NULL DEFAULT 0,
                     milestone TEXT NOT NULL DEFAULT 'not applicable', duplicate_of INTEGER REFERENCES stories(id),
                     review_error TEXT, attempts INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT,
-                    provider TEXT, model TEXT, interests_snapshot TEXT, input_tokens INTEGER, output_tokens INTEGER);
+                    provider TEXT, model TEXT, interests_snapshot TEXT, input_tokens INTEGER, output_tokens INTEGER, read_at TEXT);
                 CREATE INDEX IF NOT EXISTS stories_day ON stories(day);
                 CREATE INDEX IF NOT EXISTS stories_status ON stories(status, attempts);
                 CREATE INDEX IF NOT EXISTS stories_duplicate ON stories(duplicate_of);
@@ -59,6 +59,8 @@ class Store:
                     id INTEGER PRIMARY KEY, kind TEXT NOT NULL, started_at TEXT NOT NULL,
                     finished_at TEXT, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}');
             """)
+            if version < 3 and 'read_at' not in {row['name'] for row in db.execute('PRAGMA table_info(stories)')}:
+                db.execute('ALTER TABLE stories ADD COLUMN read_at TEXT')
             columns = {r['name'] for r in db.execute('PRAGMA table_info(sources)')}
             additions = {
                 'mode': "TEXT NOT NULL DEFAULT 'auto'", 'link_pattern': "TEXT NOT NULL DEFAULT ''",
@@ -246,6 +248,12 @@ class Store:
         with self.connect() as db:
             if not db.execute("UPDATE stories SET bookmarked=? WHERE id=?", (int(value), story_id)).rowcount:
                 raise ValueError("Story not found")
+
+    def mark_read(self, story_id):
+        with self.connect() as db:
+            if not db.execute('UPDATE stories SET read_at=COALESCE(read_at,?) WHERE id=?', (utcnow(), story_id)).rowcount:
+                raise ValueError('Story not found')
+            return db.execute('SELECT read_at FROM stories WHERE id=?', (story_id,)).fetchone()[0]
 
     def feedback_state(self):
         return feedback.state(self.settings()['interests'])

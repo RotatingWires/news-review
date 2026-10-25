@@ -68,6 +68,25 @@ export class Feed {
     $('page-next').onclick = () => { this.page++; this.loadSafe(); };
   }
 
+  articleLink(story, onRead = () => {}) {
+    const link = externalLink(story.url, story.headline);
+    let saving = false;
+    const markRead = async event => {
+      if (event.type === 'auxclick' && event.button !== 1) return;
+      if (story.read_at || saving) return;
+      saving = true;
+      try {
+        const result = await api('read/' + story.id, 'POST', {});
+        story.read_at = result.read_at;
+        onRead();
+      } catch (error) { notify(error.message, true); }
+      finally { saving = false; }
+    };
+    link.addEventListener('click', markRead);
+    link.addEventListener('auxclick', markRead);
+    return link;
+  }
+
   editFeedback(story, vote) {
     this.feedbackStory = story;
     this.feedbackVote = vote;
@@ -220,9 +239,13 @@ export class Feed {
       controls.append(button);
     });
     controls.append(bookmark, relevance);
-    top.append(el('span', 'source-name', story.source_name || 'Source'), controls);
+    const publisher = el('div', 'story-publisher');
+    publisher.append(el('span', 'source-name', story.source_name || 'Source'));
+    const showRead = () => { if (story.read_at && !publisher.querySelector('.read-label')) publisher.append(el('span', 'read-label', 'Read')); };
+    showRead();
+    top.append(publisher, controls);
     const heading = el('h3');
-    heading.append(externalLink(story.url, story.headline));
+    heading.append(this.articleLink(story, showRead));
     card.append(top, heading);
     if (story.status === 'pending') {
       card.append(el('div', 'basis', story.summary ? 'Queued for reassessment · previous summary' : 'Source excerpt · awaiting AI review'));
@@ -258,7 +281,7 @@ export class Feed {
         loaded = true;
         try {
           const links = await api('related/' + story.id);
-          links.forEach(item => related.append(externalLink(item.url, `${item.source_name}: ${item.headline}`)));
+          links.forEach(item => related.append(this.articleLink({ ...item, headline: `${item.source_name}: ${item.headline}` })));
         } catch (error) { loaded = false; notify(error.message, true); }
       };
       card.append(related);

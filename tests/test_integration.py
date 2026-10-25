@@ -450,6 +450,25 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.store.stories()['items'][0]['status'], 'reviewed')
         self.assertIn('Feedback profile update failed', self.store.overview()['runs'][0]['details']['errors'][0])
 
+    def test_read_markers_are_persistent_idempotent_and_guarded(self):
+        self.start_api()
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source, {'headline': 'Read tracking fixture', 'url': 'https://example.com/read',
+                                        'excerpt': 'Useful details.', 'published_at': None, 'category': 'Protocols'}, '2026-10-25')
+        story = self.store.stories()['items'][0]
+        self.assertIsNone(story['read_at'])
+        path = '/api/read/' + str(story['id'])
+        self.assertEqual(self.request(path, 'POST', {}, {'Cookie': ''})[0], 401)
+        self.assertEqual(self.request(path, 'POST', {}, {'Origin': 'https://other.example'})[0], 403)
+        status, result, _ = self.request(path, 'POST', {})
+        self.assertEqual(status, 200)
+        self.assertTrue(result['read_at'])
+        self.assertEqual(self.request(path, 'POST', {})[1], result)
+        self.store.bookmark(story['id'], True)
+        self.store.requeue(False)
+        self.assertEqual(Store(self.store.path).stories()['items'][0]['read_at'], result['read_at'])
+        self.assertEqual(self.request('/api/read/99999999', 'POST', {})[0], 400)
+
     def test_model_test_uses_real_adapter_contract(self):
         for provider in ('ollama', 'compatible'):
             with self.subTest(provider=provider):

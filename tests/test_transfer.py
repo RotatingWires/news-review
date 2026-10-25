@@ -39,6 +39,38 @@ class TransferTests(unittest.TestCase):
         restore_archive(self.store, recovery)
         self.assertEqual(self.store.stories(show_hidden=True)['total'], 0)
 
+    def test_read_markers_roundtrip_and_schema_two_backups_still_restore(self):
+        timestamp = self.store.mark_read(self.story)
+        self.assertEqual(self.store.mark_read(self.story), timestamp)
+        current = self.root / 'read.zip'
+        create_archive(self.store, current)
+        self.store.reset({'history': True, 'bookmarks': True})
+        restore_archive(self.store, current)
+        self.assertEqual(self.store.stories()['items'][0]['read_at'], timestamp)
+        import sqlite3
+        with zipfile.ZipFile(current) as archive:
+            manifest = json.loads(archive.read('manifest.json'))
+            legacy = self.root / 'legacy.db'
+            legacy.write_bytes(archive.read('newsreview.db'))
+        with closing(sqlite3.connect(legacy)) as database:
+            database.execute('ALTER TABLE stories DROP COLUMN read_at')
+            database.execute('PRAGMA user_version=2')
+            database.commit()
+        manifest['schema_version'] = 2
+        manifest['application_version'] = '0.9.2'
+        manifest['sha256'] = hashlib.sha256(legacy.read_bytes()).hexdigest()
+        upload = self.root / 'legacy.zip'
+        with zipfile.ZipFile(upload, 'w') as archive:
+            archive.write(legacy, 'newsreview.db')
+            archive.writestr('manifest.json', json.dumps(manifest))
+        restore_archive(self.store, upload)
+        self.assertIsNone(self.store.stories()['items'][0]['read_at'])
+        with self.store.connect() as database:
+            self.assertEqual(database.execute('PRAGMA user_version').fetchone()[0], 3)
+        # The same version-2 file also upgrades normally when starting the app.
+        upgraded = Store(legacy)
+        self.assertIsNone(upgraded.stories()['items'][0]['read_at'])
+
     def test_rejects_bad_checksum_extra_files_newer_version_and_sql_objects(self):
         with zipfile.ZipFile(self.archive) as archive:
             original_db = archive.read('newsreview.db')
