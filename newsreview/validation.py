@@ -24,6 +24,14 @@ def boolean(value, name):
     return value
 
 
+def topic_names(value):
+    if not isinstance(value, list) or any(not isinstance(name, str) or not name.strip() or len(name) > 60 for name in value):
+        raise ValueError('Topics must be a list of names, each 1–60 characters')
+    if len(set(value)) != len(value):
+        raise ValueError('Topic names must be unique')
+    return value
+
+
 def source(value):
     if not isinstance(value, dict):
         raise ValueError("Expected a source object")

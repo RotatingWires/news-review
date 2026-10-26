@@ -25,6 +25,15 @@ def utcnow():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def initialize_topics(db):
+    """Import existing labels once, without promoting future source/model output."""
+    if db.execute("SELECT 1 FROM settings WHERE key='topics'").fetchone():
+        return
+    names = {row[0] for row in db.execute('SELECT category FROM sources')}
+    names.update(row[0] for row in db.execute('SELECT DISTINCT value FROM stories,json_each(stories.tags)'))
+    db.execute("INSERT INTO settings VALUES ('topics',?)", (json.dumps(sorted(names, key=str.casefold)),))
+
+
 class Store:
     def __init__(self, path):
         self.path = Path(path)
@@ -82,6 +91,7 @@ class Store:
                 if not db.execute("SELECT 1 FROM settings WHERE key=?", (marker,)).fetchone():
                     db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", additions)
                     db.execute("INSERT INTO settings VALUES (?, 'true')", (marker,))
+            initialize_topics(db)
             if version < 2:
                 # Retain historical source names/relationships, but remove these
                 # requested sources from active configuration on existing installs.
@@ -157,10 +167,12 @@ class Store:
 
     def insert_story(self, source_id, item, day):
         with self.connect() as db:
+            topics = json.loads(db.execute("SELECT value FROM settings WHERE key='topics'").fetchone()[0])
+            tags = [name for name in topics if name.casefold() == item['category'].casefold()][:1]
             return bool(db.execute("""INSERT OR IGNORE INTO stories
                 (source_id,headline,url,excerpt,published_at,discovered_at,day,tags)
                 VALUES (?,?,?,?,?,?,?,?)""", (source_id, item["headline"], item["url"], item["excerpt"],
-                item["published_at"], utcnow(), day, json.dumps([item["category"]]))).rowcount)
+                item["published_at"], utcnow(), day, json.dumps(tags))).rowcount)
 
     @staticmethod
     def story(row):
@@ -300,14 +312,43 @@ class Store:
             db.execute("UPDATE settings SET value=? WHERE key='interests'", (json.dumps(interests),))
             return True
 
-    def topic_categories(self):
+    def topics(self):
         with self.connect() as db:
-            return [r[0] for r in db.execute("SELECT DISTINCT category COLLATE NOCASE FROM sources ORDER BY category COLLATE NOCASE")] or ['General']
+            return json.loads(db.execute("SELECT value FROM settings WHERE key='topics'").fetchone()[0])
+
+    def change_topic(self, action, name, replacement=None):
+        if action not in ('add', 'rename', 'delete'):
+            raise ValueError('Choose add, rename, or delete')
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            names = json.loads(db.execute("SELECT value FROM settings WHERE key='topics'").fetchone()[0])
+            if action != 'add' and name not in names:
+                raise ValueError('Topic not found; reload the topic list')
+            if action != 'delete':
+                target = replacement if action == 'rename' else name
+                if any(value.casefold() == target.casefold() for value in names if action == 'add' or value != name):
+                    raise ValueError('A topic with that name already exists')
+                names = [target if value == name and action == 'rename' else value for value in names]
+                if action == 'add':
+                    names.append(target)
+            else:
+                target = None
+                names.remove(name)
+            updated = 0
+            if action != 'add':
+                rows = db.execute("SELECT id,tags FROM stories WHERE EXISTS (SELECT 1 FROM json_each(stories.tags) WHERE value=?)", (name,)).fetchall()
+                for row in rows:
+                    tags = [target if value == name else value for value in json.loads(row['tags']) if value != name or target is not None]
+                    db.execute('UPDATE stories SET tags=? WHERE id=?', (json.dumps(list(dict.fromkeys(tags))), row['id']))
+                updated = len(rows)
+            names.sort(key=str.casefold)
+            db.execute("UPDATE settings SET value=? WHERE key='topics'", (json.dumps(names),))
+            return {'topics': names, 'updated_stories': updated}
 
     def overview(self):
         with self.connect() as db:
             dates = [r[0] for r in db.execute("SELECT DISTINCT day FROM stories ORDER BY day DESC")]
-            tags = [r[0] for r in db.execute("SELECT DISTINCT value FROM stories,json_each(stories.tags) ORDER BY value COLLATE NOCASE")]
+            tags = json.loads(db.execute("SELECT value FROM settings WHERE key='topics'").fetchone()[0])
             counts = dict(db.execute("SELECT status,COUNT(*) FROM stories GROUP BY status"))
             runs = [dict(r) for r in db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT 8")]
             for run in runs:

@@ -14,7 +14,7 @@ import zipfile
 from . import __version__
 from .defaults import SETTINGS, SOURCE_UPDATES
 from .network import valid_url
-from .store import SCHEMA_VERSION
+from .store import SCHEMA_VERSION, initialize_topics
 from . import validation
 
 MAX_UPLOAD = 256 * 1024 * 1024
@@ -90,9 +90,11 @@ def _check_text(value, limit, name, *, nullable=False):
 
 def _validate_rows(database):
     settings = {r['key']: json.loads(r['value']) for r in database.execute('SELECT * FROM settings')}
-    if set(settings) - {*SETTINGS, 'sources_seeded', 'history_cleared_at', 'data_revision', *SOURCE_UPDATES} or not set(SETTINGS) <= set(settings):
+    if set(settings) - {*SETTINGS, 'topics', 'sources_seeded', 'history_cleared_at', 'data_revision', *SOURCE_UPDATES} or not set(SETTINGS) <= set(settings):
         raise ValueError('Backup settings are incomplete or unsupported')
     validation.settings({key: settings[key] for key in SETTINGS}, SETTINGS)
+    if 'topics' in settings:
+        validation.topic_names(settings['topics'])
     if any(marker in settings and settings[marker] is not True for marker in SOURCE_UPDATES):
         raise ValueError('Backup has an invalid source-addition marker')
     if settings.get('sources_seeded') is not True:
@@ -213,6 +215,7 @@ def restore_archive(store, upload):
                 selected = ','.join('"' + column + '"' if column in imported_columns else 'NULL AS "read_at"' for column in columns)
                 live.executemany(f'INSERT INTO {table}({names}) VALUES ({placeholders})',
                                  (tuple(row) for row in imported.execute(f'SELECT {selected} FROM {table}')))
+            initialize_topics(live)
             live.execute("INSERT INTO settings(key,value) VALUES ('data_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(secrets.token_hex(16)),))
             live.execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", (datetime.now(timezone.utc).isoformat(),))
             if live.execute('PRAGMA foreign_key_check').fetchone():

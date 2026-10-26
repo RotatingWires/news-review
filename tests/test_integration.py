@@ -92,6 +92,8 @@ class FixtureHandler(BaseHTTPRequestHandler):
             return
         schema = payload.get('format') or json.loads(payload.get('messages', [{}, {}])[1].get('content', '{}')).get('schema', {})
         allowed_tags = schema.get('properties', {}).get('tags', {}).get('items', {}).get('enum', ['HTTP', 'Standards'])
+        if schema.get('properties', {}).get('tags', {}).get('maxItems') == 0:
+            allowed_tags = []
         if payload.get('model') in ('truncated', 'empty-thinking', 'fenced'):
             model = payload['model']
             content = '{"summary":' if model == 'truncated' else '' if model == 'empty-thinking' else '```json\n' + json.dumps(review(tags=allowed_tags[:1])) + '\n```'
@@ -234,6 +236,56 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/api/maintenance/duplicates')[1]['count'], 0)
         self.assertEqual(self.request(path, 'POST', data)[1]['deleted'], 0)
         self.assertEqual(self.request(path, 'POST', data, {'Cookie': ''})[0], 401)
+
+    def test_topics_api_preserves_existing_topics_and_guards_edits(self):
+        self.start_api()
+        existing = self.request('/api/topics')[1]
+        self.assertEqual(existing, self.store.topics())
+        add = {'action': 'add', 'name': 'Custom topic'}
+        self.assertEqual(self.request('/api/topics', 'POST', add, {'Cookie': ''})[0], 401)
+        self.collector.lock.acquire()
+        try:
+            self.assertEqual(self.request('/api/topics', 'POST', add)[0], 409)
+        finally:
+            self.collector.lock.release()
+        status, result, _ = self.request('/api/topics', 'POST', add)
+        self.assertEqual(status, 201)
+        self.assertTrue(set(existing) <= set(result['topics']))
+        self.assertEqual(self.request('/api/topics', 'POST', {'action': 'add', 'name': 'custom TOPIC'})[0], 400)
+        self.assertEqual(self.request('/api/topics', 'POST', {'action': 'add', 'name': ''})[0], 400)
+        source = next(item for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source['id'], {'headline': 'A useful protocol update', 'url': self.root + '/article',
+                                             'excerpt': 'Source details.', 'published_at': None, 'category': 'Standards'}, '2026-10-25')
+        story = self.store.stories()['items'][0]
+        self.store.review_result(story['id'], review(tags=['Custom topic'], status='reviewed'),
+                                self.model_config(), self.store.settings()['interests'], 'Article text.', 'article')
+        self.store.bookmark(story['id'], True)
+        rename = {'action': 'rename', 'name': 'Custom topic', 'new_name': "SDR / scanner's projects"}
+        status, result, _ = self.request('/api/topics', 'POST', rename)
+        self.assertEqual((status, result['updated_stories']), (200, 1))
+        self.assertEqual(self.store.stories(bookmarks=True)['items'][0]['tags'], [rename['new_name']])
+        delete = {'action': 'delete', 'name': rename['new_name']}
+        self.assertEqual(self.request('/api/topics', 'POST', delete)[0], 400)
+        delete['confirmation'] = 'DELETE TOPIC'
+        self.assertEqual(self.request('/api/topics', 'POST', delete)[0], 200)
+        self.assertEqual(self.store.stories(bookmarks=True)['items'][0]['tags'], [])
+        self.assertEqual(self.store.stories()['total'], 1)
+        self.assertTrue(set(existing) <= set(self.store.topics()))
+
+    def test_empty_and_custom_owned_topic_lists_work_with_model_review(self):
+        for name in self.store.topics():
+            self.store.change_topic('delete', name)
+        for provider in ('ollama', 'compatible'):
+            with self.subTest(provider=provider):
+                result = self.reviewer.test(self.model_config(provider), topics=[])
+                self.assertEqual(result['tags'], [])
+        self.store.change_topic('add', 'Only my custom label')
+        self.store.save_settings({'ai': self.model_config()})
+        self.collect()
+        self.assertEqual(self.store.topics(), ['Only my custom label'])
+        self.assertTrue(all(story['tags'] == ['Only my custom label'] for story in self.store.stories()['items']))
+        requests = [payload for path, payload in self.fixture.requests if path == '/api/chat' and payload.get('model') == 'fixture']
+        self.assertEqual(requests[-1]['format']['properties']['tags']['items']['enum'], ['Only my custom label'])
 
     def test_model_tags_are_constrained_in_both_transports(self):
         for provider in ('ollama', 'compatible'):

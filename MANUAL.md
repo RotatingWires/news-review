@@ -123,7 +123,15 @@ Collection/review messages and their blinking activity light appear only in the 
 
 The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
 
-Topic names come from the categories configured on your sources, including archived source categories. AI reviews receive those names as the only permitted tag values, and response validation rejects invented topics. Edit a source's Default category to manage the vocabulary. Interest descriptions guide relevance scoring; they do not create new filter topics.
+Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation rejects invented topics. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
+
+On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with the bundled source-category names. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
+
+Adding a topic makes it available to future reviews; existing articles are not automatically reassessed. Renaming updates that label on saved articles in one transaction and preserves other labels, summaries, scores, bookmarks, dates, read markers, and feedback. Deleting requires confirmation and removes only that label from saved articles; articles with no remaining labels are still kept. Topic editing waits until collection/review or restore finishes. To reclassify old articles after adding topics, use Reassess history.
+
+Sources retain their independent Default category. Newly collected stories receive it as an initial label only if it matches a managed topic; otherwise they start without a topic until reviewed. Editing a source cannot grow the topic list or restore deleted topics. If the list is empty, AI review still summarizes and scores stories with an empty tags array. History resets keep the managed list; the existing Fresh start Interest topics option applies only to relevance interests.
+
+The owned topic list is stored in SQLite and included in ZIP backups. Restoring a current backup restores its list, including an empty list. Restoring an older backup without a topic list imports all its existing labels and source categories during the same restore transaction, preserving its current topics. Topic changes do not rewrite historical feedback snapshots or your interests/source settings.
 
 ### When the browser refreshes
 
@@ -288,7 +296,7 @@ Clearing history or runs restarts the automatic collection interval from the res
 4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured local model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
-7. Validate exact output fields, types, tag limits and membership in the configured source-category vocabulary, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them.
+7. Validate exact output fields, types, tag limits and membership in the managed Topics list, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them. An empty topic list allows an empty tags array.
 
 The model receives article content as untrusted data, has no tools, and is instructed to ignore embedded commands. The app renders publisher/model text using DOM text nodes, never as executable HTML. Model output validation catches structural problems, not every factual or editorial error.
 
@@ -529,6 +537,8 @@ The optional browser check `python3 -m tests.browser_feedback` verifies article 
 
 The optional browser check `python3 -m tests.browser_read` verifies headline activation, read-label placement, reload/Bookmarks persistence, and unchanged unopened stories.
 
+The optional browser check `python3 -m tests.browser_topics` verifies preservation of existing topics, add/rename/delete and cancellation, duplicate-name handling, active filter selection, retained bookmarks/read markers, reload persistence, and mobile dialogs.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
@@ -538,6 +548,13 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.10.0
+
+- Add a separate Topics settings tab with add, rename, and confirmed delete controls. Preserve every existing topic on upgrade and keep the list independent of interests and source categories.
+- Update saved article labels atomically on rename/delete while preserving articles and reading data. Show new topics in feed filters immediately and retain active selection through renames.
+- Use only managed topic names for AI and initial source labels; support an intentionally empty list without reintroducing source categories.
+- Include topics in ZIP backup validation/restore while importing all labels from older backups without the new list. Verify preservation, model vocabulary, API guards, and desktop/mobile editing.
 
 ### v0.9.8
 

@@ -33,6 +33,9 @@ def run():
         ]
         today = date.today().isoformat()
         for index, (headline, category, summary, why) in enumerate(samples):
+            for name in [category] + [f'Topic {index}-{n}' for n in range(5)]:
+                if name not in store.topics():
+                    store.change_topic('add', name)
             store.insert_story(source, {'headline': headline, 'url': f'https://example.com/{index}', 'excerpt': summary,
                                        'published_at': None, 'category': category}, today)
             with store.connect() as db:

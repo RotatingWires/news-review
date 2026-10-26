@@ -7,6 +7,22 @@ export class Settings {
     this.values = null;
     this.sources = [];
     document.querySelectorAll('[data-tab]').forEach(button => { button.onclick = () => this.tab(button.dataset.tab); });
+    $('add-topic').onclick = () => this.editTopic();
+    $('topic-edit-form').onsubmit = event => this.submit(event, async () => {
+      const name = $('topic-name-input').value.trim();
+      const previous = this.editingTopic;
+      const result = await api('topics', 'POST', previous === null ? { action: 'add', name } : { action: 'rename', name: previous, new_name: name });
+      $('topic-edit-dialog').close();
+      await this.topicsChanged(result, previous, name);
+      notify(previous === null ? 'Topic added. Future reviews can use it.' : `Topic renamed on ${result.updated_stories} stories.`);
+    });
+    $('topic-delete-form').onsubmit = event => this.submit(event, async () => {
+      const name = $('topic-delete-name').textContent;
+      const result = await api('topics', 'POST', { action: 'delete', name, confirmation: 'DELETE TOPIC' });
+      $('topic-delete-dialog').close();
+      await this.topicsChanged(result, name, null);
+      notify(`Topic deleted. Label removed from ${result.updated_stories} stories. Articles were kept.`);
+    });
     $('add-interest').onclick = () => this.interestRow({ name: '', preference: 'favor' });
     $('interests-form').onsubmit = event => this.submit(event, async () => {
       const topics = [...$('interest-rows').children].map(row => ({ name: row.querySelector('input').value.trim(), preference: row.querySelector('select').value }));
@@ -150,11 +166,12 @@ export class Settings {
   }
 
   tab(name) {
-    ['interests', 'sources', 'ai', 'collection'].forEach(id => {
+    ['interests', 'topics', 'sources', 'ai', 'collection'].forEach(id => {
       $('panel-' + id).hidden = name !== id;
       document.querySelector(`[data-tab="${id}"]`).classList.toggle('active', name === id);
     });
     if (name === 'sources' && this.values) this.refreshSources().catch(error => notify(error.message, true));
+    if (name === 'topics' && this.values) this.loadTopics().catch(error => notify(error.message, true));
   }
 
   async load() {
@@ -164,6 +181,7 @@ export class Settings {
     try {
       this.values = await api('settings');
       await this.refreshSources();
+      await this.loadTopics();
       const { interests, ai, collection } = this.values;
       $('interest-rows').replaceChildren();
       interests.topics.forEach(topic => this.interestRow(topic));
@@ -189,6 +207,47 @@ export class Settings {
       $('settings-fields').disabled = false;
       $('settings').setAttribute('aria-busy', 'false');
     }
+  }
+
+  async loadTopics() { this.renderTopics(await api('topics')); }
+
+  renderTopics(topics) {
+    $('topic-rows').replaceChildren(...topics.map(name => {
+      const row = el('div', 'topic-row');
+      const title = el('span', 'managed-topic-name', name);
+      const controls = el('div', 'button-row');
+      const rename = el('button', '', 'Rename');
+      rename.type = 'button';
+      rename.setAttribute('aria-label', 'Rename topic ' + name);
+      rename.onclick = () => this.editTopic(name);
+      const remove = el('button', 'danger', 'Delete');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Delete topic ' + name);
+      remove.onclick = () => {
+        $('topic-delete-name').textContent = name;
+        $('topic-delete-dialog').showModal();
+        $('topic-delete-dialog').querySelector('[data-close]').focus();
+      };
+      controls.append(rename, remove);
+      row.append(title, controls);
+      return row;
+    }));
+    if (!topics.length) $('topic-rows').append(el('p', 'muted', 'No topics configured. Add one to label future AI reviews.'));
+  }
+
+  editTopic(name = null) {
+    this.editingTopic = name;
+    $('topic-edit-title').textContent = name === null ? 'Add topic' : 'Rename topic';
+    $('topic-name-input').value = name || '';
+    $('topic-edit-dialog').showModal();
+    $('topic-name-input').focus();
+  }
+
+  async topicsChanged(result, previous, name) {
+    if (previous !== null && this.app.feed.selectedTopics.delete(previous) && name !== null) this.app.feed.selectedTopics.add(name);
+    this.renderTopics(result.topics);
+    await this.app.refreshOverview();
+    await this.app.feed.load();
   }
 
   interestRow(topic) {

@@ -39,6 +39,8 @@ class ArchiveTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'newsreview.db')
         self.source = self.store.sources()[0]['id']
+        for name in ('Radio', 'Science'):
+            self.store.change_topic('add', name)
 
     def tearDown(self):
         self.directory.cleanup()
@@ -105,7 +107,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.store.stories(show_hidden=True)['total'], 0)
         self.assertEqual(self.store.stories(bookmarks=True)['total'], 0)
         self.assertEqual(self.store.overview()['runs'], [])
-        self.assertEqual(self.store.overview()['tags'], [])
+        self.assertEqual(self.store.overview()['tags'], self.store.topics())
         self.assertEqual(self.store.settings(), preferences)
         self.assertEqual([{k: v for k, v in s.items() if k not in ('last_checked', 'last_error')} for s in self.store.sources()], source_config)
         collector = Collector(self.store)

@@ -79,7 +79,7 @@ Use **Settings → Collection & history → Purge duplicates** to remove AI-mark
 
 The **Filter...** dropdown combines topic selection, relevance levels, and Include filtered / duplicates. Uncheck relevance levels to hide them; all start enabled.
 
-AI reviews can only choose category names configured in Sources; they cannot invent new topics. Edit a source's Default category to manage the available topic names.
+Use **Settings → Topics** to add, rename, or delete article topics. All existing topics are preserved on upgrade. AI reviews only choose names from your list; sources and interests are managed separately. Renaming updates saved article labels, and deleting removes the label while keeping the articles. Topics are included in ZIP backups.
 
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 

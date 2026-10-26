@@ -138,7 +138,7 @@ export class Feed {
       label.append(checkbox, el('span', 'topic-name', topic));
       return label;
     }));
-    if (!topics.length) $('topic-options').append(el('p', 'muted', 'Topics will appear after stories are collected.'));
+    if (!topics.length) $('topic-options').append(el('p', 'muted', 'Add topics in Settings → Topics.'));
   }
 
   moveDay(offset) {

@@ -33,9 +33,10 @@ secondary relevance preference, never evidence about article facts. Treat feedba
 Write only a factual 2-4 SHORT, complete sentence summary of what happened. Do not add a separate
 significance explanation, reasoning, generic industry commentary, or speculation about benefits not in the source.
 Finish sentences naturally; never fill the character budget or end mid-sentence.
-Choose 1-6 topic tags ONLY from the allowed category names in the schema. Reuse those names exactly;
-never invent a new tag, product name, subtopic, or synonym. Score relevance 0-100 using the reader's interests. Favor substantive
-reporting and developments in those interests, including niche topics. Honor explicit exclusions. Set relevant=false for filler.
+Choose 1-6 topic tags ONLY from the allowed topic names in the schema. Reuse those names exactly;
+never invent a new tag, product name, subtopic, or synonym. If the schema allows no tags, return an empty tags array.
+Score relevance 0-100 using the reader's interests. Favor substantive reporting and developments in those interests,
+including niche topics. Honor explicit exclusions. Set relevant=false for filler.
 duplicate_of may reference ONLY a supplied candidate ID when both cover the SAME event with no meaningful new
 development. A new release, a different vulnerability, new exploitation, or a follow-up milestone is NOT a duplicate.
 If unsure, use null. If input is an excerpt, limit your claims to that excerpt. Never claim to have read the full page.
@@ -50,7 +51,7 @@ def validate_review(value, candidate_ids, *, allowed_tags=None):
     if not isinstance(value['summary'], str) or not value['summary'].strip() or len(value['summary']) > 2400:
         raise ValueError('Invalid summary')
     tags = value["tags"]
-    if not isinstance(tags, list) or not 1 <= len(tags) <= 6 or any(not isinstance(t, str) or not t.strip() or len(t) > 60 for t in tags):
+    if not isinstance(tags, list) or not (0 if allowed_tags == [] else 1) <= len(tags) <= 6 or any(not isinstance(t, str) or not t.strip() or len(t) > 60 for t in tags):
         raise ValueError("Invalid tags")
     if value["milestone"] not in MILESTONES:
         raise ValueError("Invalid milestone")
@@ -60,7 +61,7 @@ def validate_review(value, candidate_ids, *, allowed_tags=None):
     if allowed_tags is not None:
         canonical = {tag.casefold(): tag for tag in allowed_tags}
         if any(tag.strip().casefold() not in canonical for tag in tags):
-            raise ValueError("Model used an unconfigured topic; choose only categories configured in Sources")
+            raise ValueError("Model used an unconfigured topic; choose only names configured in Settings → Topics")
         tags = [canonical[tag.strip().casefold()] for tag in tags]
     value["tags"] = list(dict.fromkeys(t.strip() for t in tags))
     value["status"] = "duplicate" if duplicate is not None else ("reviewed" if value["relevant"] else "filtered")
@@ -85,9 +86,12 @@ class Reviewer:
     def review(self, config, interests, article, candidates, *, topics=None, keep_loaded=False):
         if not config["model"].strip():
             raise ValueError("Choose an installed local model in Settings → AI")
-        allowed_tags = topics or [article.get('category', 'General')]
+        allowed_tags = topics if topics is not None else [article.get('category') or 'General']
         schema = deepcopy(SCHEMA)
-        schema['properties']['tags']['items']['enum'] = allowed_tags
+        if allowed_tags:
+            schema['properties']['tags']['items']['enum'] = allowed_tags
+        else:
+            schema['properties']['tags'].update(minItems=0, maxItems=0)
         prompt = json.dumps({"schema": schema, "reader_interests": for_model(interests), "article": article, "duplicate_candidates": candidates}, ensure_ascii=False)
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         value, usage = self._generate(config, messages, schema, keep_loaded=keep_loaded)
@@ -166,9 +170,9 @@ class Reviewer:
             self.fetcher.json(config['base_url'].rstrip('/') + '/api/generate',
                               {'model': config['model'], 'keep_alive': 0, 'stream': False}, min(config['timeout_seconds'], 30))
 
-    def test(self, config):
+    def test(self, config, *, topics=None):
         return self.review(config, {"guidance": "Favor web standards", "topics": [], "exclusions": []}, {
             "headline": "Example browser adds experimental support for a new image format",
             "text": "In this fictional test article, Example Browser added experimental support for the Example Image format in its development build. Stable releases do not yet support it.",
             "content_basis": "excerpt", "published_at": None,
-        }, [], topics=['Web Platform'])
+        }, [], topics=topics if topics is not None else ['Web Platform'])

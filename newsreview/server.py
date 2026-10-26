@@ -312,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {key: item for key, item in value.items() if key != 'ratings'} | {'count': len(value['ratings'])})
         elif path == "/api/settings":
             self.send(200, store.settings())
+        elif path == '/api/topics':
+            self.send(200, store.topics())
         elif path == "/api/sources":
             self.send(200, store.sources())
         elif path.startswith("/api/related/"):
@@ -321,7 +323,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self, path, data):
         store = self.server.store
-        if path == '/api/maintenance/duplicates/purge' and self.command == 'POST':
+        if path == '/api/topics' and self.command == 'POST':
+            action = data.get('action')
+            if action not in ('add', 'rename', 'delete'):
+                raise ValueError('Choose add, rename, or delete')
+            name = validation.text(data.get('name'), 'Topic', 60)
+            replacement = validation.text(data.get('new_name'), 'Topic', 60) if action == 'rename' else None
+            if action == 'delete' and data.get('confirmation') != 'DELETE TOPIC':
+                raise ValueError('Confirm deleting the topic before continuing')
+            if not self.server.collector.lock.acquire(blocking=False):
+                self.send(409, {'error': 'Wait for collection/review or restore to finish before editing topics'})
+                return
+            try:
+                self.send(201 if action == 'add' else 200, store.change_topic(action, name, replacement))
+            finally:
+                self.server.collector.lock.release()
+        elif path == '/api/maintenance/duplicates/purge' and self.command == 'POST':
             if data.get('confirmation') != 'PURGE DUPLICATES':
                 raise ValueError('Confirm duplicate purging before continuing')
             if not self.server.collector.lock.acquire(blocking=False):
@@ -407,7 +424,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(409, {'error': 'Wait for collection/review or maintenance to finish before testing a model'})
                 return
             try:
-                self.send(200, self.server.collector.reviewer.test(config))
+                self.send(200, self.server.collector.reviewer.test(config, topics=store.topics()))
             finally:
                 self.server.collector.lock.release()
         elif path == '/api/jobs/stop-review' and self.command == 'POST':

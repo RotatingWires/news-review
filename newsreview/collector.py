@@ -120,7 +120,7 @@ class Collector:
                         logger.warning('Feedback profile update failed: %s', exc)
                         details['errors'].append('Feedback profile update failed; existing preferences kept: ' + str(exc)[:200])
                 editorial_interests = for_model(self.store.settings()['interests'])
-                topics = self.store.topic_categories()
+                topics = self.store.topics()
                 for number, story in enumerate(pending, 1):
                     if self.stop_event.is_set() or self.review_stop_event.is_set():
                         break
@@ -138,7 +138,7 @@ class Collector:
                         if not text.strip():
                             raise ValueError("No readable article or source excerpt; showing headline and link only")
                         if NOISE.search(story["headline"]):
-                            result = {"summary": "Excluded by the headline filter.", "tags": [story["category"]], "status": "filtered", "score": 0, "milestone": "not applicable"}
+                            result = {"summary": "Excluded by the headline filter.", "tags": [topic for topic in topics if topic.casefold() == (story['category'] or '').casefold()][:1], "status": "filtered", "score": 0, "milestone": "not applicable"}
                         else:
                             candidates = candidates_for(story["headline"], recent)
                             model_used = True
