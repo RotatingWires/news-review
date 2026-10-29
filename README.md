@@ -31,7 +31,7 @@ Data lives in `./data`; runtime logs use `./logs/console.log`, matching TaskList
 
 ## Security and privacy
 
-The local quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, session cookies, or reading data in transit. Use HTTPS for remote access as described below.
+The local quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, API keys, session cookies, or reading data in transit. Use HTTPS for remote access as described below.
 
 On first startup, enter the console setup token in the browser and create a password (at least 8 characters). This applies to loopback and LAN access.
 
@@ -61,7 +61,9 @@ API writes require JSON and reject cross-origin browser requests. Static serving
 
 This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `NEWSREVIEW_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
 
-`.env` files are not loaded automatically. Keep environment/service credentials private and outside the repository; secrets are not stored in SQLite or returned by the settings API. `NEWSREVIEW_MODEL_API_KEY` is an optional bearer token sent by the backend to a compatible model server, never to the browser.
+Save model API keys in **Settings → AI → API key**. They are stored separately in `data/model-credentials.json` (or your chosen data directory), never in SQLite or application ZIP exports. Saved values are not returned to the browser; only configured status is shown. The file contains plaintext secrets, created owner-only on POSIX; restrict data-folder access on Windows. Keep it private if moving or backing up the installation separately.
+
+`.env` files are not loaded automatically. `NEWSREVIEW_MODEL_API_KEY` remains an optional fallback for compatible servers/OpenRouter without a saved key. A saved provider/server key takes priority. Removing a saved key reveals that fallback if present; changing an environment variable still requires restarting the process.
 
 Database exports and recovery ZIPs contain private reading history/preferences and are unencrypted. Restoring a ZIP replaces the dataset; the app first saves a recovery ZIP. Do not delete the data directory while the app runs or copy only a live SQLite main file; use the [backup and restore instructions](MANUAL.md#backup-restore-and-updates).
 
@@ -81,7 +83,7 @@ The **Filter...** dropdown combines topic selection, relevance levels, and Inclu
 
 Use **Settings → Topics** to add, rename, or delete article topics. All existing topics are preserved on upgrade. AI reviews only choose names from your list; sources and interests are managed separately. Renaming updates saved article labels, and deleting removes the label while keeping the articles. Topics are included in ZIP backups.
 
-For OpenRouter, select **OpenRouter** in **Settings → AI → Server type**, use `https://openrouter.ai/api/v1`, and enter a model ID such as `anthropic/claude-haiku-5.5`. Set `NEWSREVIEW_MODEL_API_KEY` in the NewsReview server environment and restart the app. Thinking is explicitly disabled for article reviews, sample tests, and feedback-profile updates. OpenRouter sends review data to the cloud and charges API usage; see the [setup instructions](MANUAL.md#openrouter).
+For OpenRouter, select **OpenRouter** in **Settings → AI → Server type**, use `https://openrouter.ai/api/v1`, and enter a model ID such as `anthropic/claude-haiku-5.5`. Enter your API key below and click **Save key**, then test the model and save the AI settings. **Replace key** and **Remove key...** apply immediately without restarting. Saved keys are scoped to the provider and server URL. Thinking is explicitly disabled for article reviews, sample tests, and feedback-profile updates. OpenRouter sends review data to the cloud and charges API usage; see the [setup instructions](MANUAL.md#openrouter) and [API-key details](MANUAL.md#api-keys).
 
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 

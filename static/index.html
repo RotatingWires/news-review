@@ -124,7 +124,16 @@
           <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a sample article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
         </form>
-        <p class="muted settings-subnotes">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues. Optional server authentication uses NEWSREVIEW_MODEL_API_KEY on the app server.</p>
+        <p class="muted settings-subnotes">Switching models preserves all saved summaries and bookmarks. A blank model name pauses AI review while collection continues.</p>
+        <section id="model-key-panel" class="maintenance" hidden>
+          <h3>API key</h3>
+          <p id="model-key-status" class="muted" role="status">No key configured.</p>
+          <form id="model-key-form" autocomplete="off">
+            <label>New API key<input id="model-api-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="4096" required></label>
+            <div class="button-row"><button id="model-key-save" class="primary" type="submit">Save key</button><button id="model-key-remove" class="danger" type="button" disabled>Remove key...</button></div>
+          </form>
+          <p class="muted settings-subnotes">Save a key here before testing the model. Saving replaces the key for this provider and server URL without restarting. Saved keys are never shown again and are excluded from database exports.</p>
+        </section>
       </section>
 
       <section id="panel-collection" class="settings-panel" hidden>
@@ -170,6 +179,11 @@
       <p id="source-error" class="error" role="alert"></p>
     </div>
     <div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="model-key-remove-dialog"><form id="model-key-remove-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Remove API key</h2><button type="button" data-close="model-key-remove-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Remove the saved key for <strong id="model-key-remove-target"></strong>?</p><p>Current model requests finish using the key they already received. Future requests use the updated key configuration.</p><p id="model-key-environment-fallback" hidden>An environment key is also configured. It will be used after the saved key is removed.</p></div>
+    <div class="dialog-actions"><button type="button" data-close="model-key-remove-dialog">Cancel</button><button class="danger" type="submit">Remove</button></div>
   </form></dialog>
   <dialog id="topic-edit-dialog"><form id="topic-edit-form" class="dialog-layout">
     <div class="dialog-heading"><h2 id="topic-edit-title">Add topic</h2><button type="button" data-close="topic-edit-dialog" aria-label="Close">×</button></div>

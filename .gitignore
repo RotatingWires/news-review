@@ -11,3 +11,5 @@ __pycache__/
 .DS_Store
 auth.json
 .auth-*
+model-credentials.json
+.model-credentials-*

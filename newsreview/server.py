@@ -323,7 +323,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self, path, data):
         store = self.server.store
-        if path == '/api/topics' and self.command == 'POST':
+        if path == '/api/model-key/status' and self.command == 'POST':
+            self.send(200, self.server.collector.model_keys.status(data))
+        elif path == '/api/model-key' and self.command == 'PUT':
+            self.send(200, self.server.collector.model_keys.save(data, data.get('key')))
+        elif path == '/api/model-key/remove' and self.command == 'POST':
+            if data.get('confirmation') != 'REMOVE MODEL KEY':
+                raise ValueError('Confirm removing the saved API key before continuing')
+            self.send(200, self.server.collector.model_keys.remove(data))
+        elif path == '/api/topics' and self.command == 'POST':
             action = data.get('action')
             if action not in ('add', 'rename', 'delete'):
                 raise ValueError('Choose add, rename, or delete')
@@ -395,7 +403,8 @@ class Handler(BaseHTTPRequestHandler):
                 value = store.feedback_state()
                 if not value['ratings']:
                     raise ValueError('Rate at least one article before updating learned preferences')
-                profile = self.server.collector.reviewer.learn_preferences(store.settings()['ai'], value)
+                ai = store.settings()['ai']
+                profile = self.server.collector.reviewer.learn_preferences(ai, value, api_key=self.server.collector.model_keys.get(ai))
                 saved = store.save_feedback_profile(profile, revision=value['revision'])
                 self.send(200 if saved else 409, {'ok': saved, 'error': None if saved else 'Feedback changed during profile generation. Please update again.'})
             finally:
@@ -424,7 +433,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(409, {'error': 'Wait for collection/review or maintenance to finish before testing a model'})
                 return
             try:
-                self.send(200, self.server.collector.reviewer.test(config, topics=store.topics()))
+                self.send(200, self.server.collector.reviewer.test(config, topics=store.topics(), api_key=self.server.collector.model_keys.get(config)))
             finally:
                 self.server.collector.lock.release()
         elif path == '/api/jobs/stop-review' and self.command == 'POST':

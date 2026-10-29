@@ -90,25 +90,11 @@ Load a model and start the inference server. Set:
 
 The adapter appends `/chat/completions`, requests JSON output, and validates the returned object. The API prefix belongs in the base URL; the final endpoint does not. See [LM Studio's chat API](https://lmstudio.ai/docs/developer/openai-compat/chat-completions).
 
-If your compatible server requires authentication, set `NEWSREVIEW_MODEL_API_KEY` in the application's environment. It is sent as a bearer token to that server and never returned to the browser. Native Ollama does not use this optional token.
+If your compatible server requires authentication, save its key in **Settings → AI → API key**. `NEWSREVIEW_MODEL_API_KEY` remains an optional fallback. The backend sends the key as a bearer token; native Ollama does not use it. See [API keys](#api-keys).
 
 ### OpenRouter
 
-Set `NEWSREVIEW_MODEL_API_KEY` in the environment that starts NewsReview, then restart the application. For a shell launch:
-
-```sh
-export NEWSREVIEW_MODEL_API_KEY='your-openrouter-key'
-python3 -m newsreview
-```
-
-PowerShell:
-
-```powershell
-$env:NEWSREVIEW_MODEL_API_KEY = 'your-openrouter-key'
-py -3 -m newsreview
-```
-
-For a service, configure its environment instead. `.env` files are not loaded automatically. In **Settings → AI**, set:
+In **Settings → AI**, set:
 
 | Field | Value |
 | --- | --- |
@@ -116,9 +102,25 @@ For a service, configure its environment instead. `.env` files are not loaded au
 | Server base URL | `https://openrouter.ai/api/v1` |
 | Model name | `anthropic/claude-haiku-5.5` or another supported model ID |
 
-Use Test with a sample article, then Save. The OpenRouter server type sends `reasoning: {"enabled": false}` for article reviews, sample tests, and learned-preference updates. It disables thinking instead of merely hiding reasoning text; see [OpenRouter reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). It omits temperature for compatibility with [Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview). Choose a model that supports disabling thinking. Local compatible-server requests retain their existing format, and native Ollama still sends `think: false`.
+Enter the API key in the API key section and click Save key. Then use Test with a sample article and Save the AI settings. Key updates apply immediately; no environment variable or restart is needed for UI-saved keys. See [API keys](#api-keys) for replacement/removal and the optional environment fallback.
+
+The OpenRouter server type sends `reasoning: {"enabled": false}` for article reviews, sample tests, and learned-preference updates. It disables thinking instead of merely hiding reasoning text; see [OpenRouter reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). It omits temperature for compatibility with [Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview). Choose a model that supports disabling thinking. Local compatible-server requests retain their existing format, and native Ollama still sends `think: false`.
 
 OpenRouter is a paid cloud service. Requests send article text, interests/guidance, topic names, cached preferences, and candidate coverage to OpenRouter and its selected provider; preference generation sends the bounded recent rating examples. The API key remains on the app server and is not included in ZIP backups. Changing providers preserves saved summaries and does not automatically reassess history.
+
+### API keys
+
+For OpenRouter or an authenticated compatible server, **Settings → AI → API key** provides a masked, write-only entry field. Enter the key and use **Save key**; an existing saved key changes that button to **Replace key**. Saving AI settings separately with an empty key field does not remove a saved key. **Remove key...** opens a Cancel/Remove confirmation. The browser receives only configured/source status, never the stored value. The section is hidden for native Ollama.
+
+Saved keys belong to the selected provider and normalized server base URL, including its scheme, host, port, and path. A trailing slash or explicit default port does not create a different scope. Changing models on the same provider/server reuses its saved key; changing the provider or server does not. Use a base URL without embedded credentials, query parameters, or fragments. Provider/URL changes clear an unsaved key entry and refresh its configured status.
+
+Keys live in `model-credentials.json` beside the reading database, separate from SQLite and `auth.json`. The file contains plaintext secrets; POSIX files are created with owner-only permissions, while Windows access follows the data folder's ACLs. Writes flush a temporary file in the same directory and replace the destination atomically, without hard links. Failed writes retain the previous saved key. Invalid credential-file formats stop startup without discarding the file; restore a valid file or move it aside and re-enter keys. Protect this file and any independent filesystem backups of it.
+
+Save, replace, and remove apply to the next model request, including requests in an active review batch. An in-flight request keeps the key it already received. This applies to article reviews, sample tests, and learned-preference generation. Keys are sent only as Authorization headers, never as model prompt fields or reading settings. Authenticated requests cannot redirect to a different origin, and model error messages redact the Authorization secret before entering logs/history. The authenticated key API returns status only; static file serving does not expose the credentials file.
+
+Application ZIP exports, recovery ZIPs, database backups, restores, and Fresh start exclude or preserve the separate credential file. Copy it privately when moving an installation, or re-enter keys on the new host. It is Git-ignored. The key is sent from your browser to NewsReview when saved; use HTTPS for remote access, since a password field does not encrypt HTTP traffic.
+
+`NEWSREVIEW_MODEL_API_KEY` remains a process-environment fallback for non-Ollama servers without a saved key. Saved keys take priority. The UI reports an environment-provided key and disables removal when no saved key exists. If both are present, the removal dialog explains that the environment key will be used afterward. The UI cannot remove an environment variable; remove it from the shell/service configuration and restart if you want to disable the fallback. Existing deployments can instead save a replacement through the UI immediately. `.env` files are not loaded automatically.
 
 ### Move the model to another computer
 
@@ -374,6 +376,8 @@ data/
   newsreview.db         stories, sources, settings, bookmarks, run history
   newsreview.db-wal     SQLite's live write-ahead log, when present
   newsreview.db-shm     SQLite's shared-memory file, when present
+  auth.json             saved login password hash, excluded from exports
+  model-credentials.json  saved model API keys, excluded from exports
 logs/
   console.log          application/HTTP logs, one file up to 10 MiB
 ```
@@ -389,7 +393,7 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | `NEWSREVIEW_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
 | `NEWSREVIEW_PASSWORD` | Optional one-time password bootstrap (8–1024 characters), only when auth.json does not exist |
 | `NEWSREVIEW_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
-| `NEWSREVIEW_MODEL_API_KEY` | Bearer token for OpenRouter or a compatible model server |
+| `NEWSREVIEW_MODEL_API_KEY` | Optional fallback bearer token when the provider/server has no UI-saved key |
 
 `.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
 
@@ -532,6 +536,7 @@ newsreview/
   health.py         observed source health and inactivity warnings
   feedback.py       bounded ratings, profile validation, and compact model context
   reviewer.py       model adapters, editorial prompt, output validation
+  model_keys.py     provider/server credentials and separate atomic key-file persistence
   collector.py      collection/review worker and interval scheduler
   validation.py     source/settings input validation
   auth.py           persistent password hashes and first-run setup tokens
@@ -567,15 +572,24 @@ The optional browser check `python3 -m tests.browser_read` verifies headline act
 
 The optional browser check `python3 -m tests.browser_topics` verifies preservation of existing topics, add/rename/delete and cancellation, duplicate-name handling, active filter selection, retained bookmarks/read markers, reload persistence, and mobile dialogs.
 
+The optional browser check `python3 -m tests.browser_model_keys` verifies saved/hidden values, immediate replacement, server/provider scopes, reload persistence, remove/cancel, environment fallback, and mobile key dialogs using temporary credentials and local model fixtures.
+
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
 
 The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. Persistence owns the current schema version and archive validation imports it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
 
-For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
+For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and the relevant browser suites listed above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.11.0
+
+- Add masked API-key entry, Save/Replace, configured status, and confirmed Remove controls to AI settings. Apply changes to the next request without restarting, including during active review batches.
+- Save keys per provider/server in a separate credentials file with atomic writes, restrictive POSIX permissions, and no hard-link dependency. Keep keys out of SQLite, API responses, application backups, source control, and logs.
+- Preserve the legacy environment variable as a visible fallback behind saved keys. Protect authenticated model requests against cross-origin redirects and redact Authorization values from model errors.
+- Cover persistence/failure behavior, concurrent updates, authenticated APIs, all generation paths, active-batch replacement, backup/reset isolation, and desktop/mobile workflows.
 
 ### v0.10.1
 

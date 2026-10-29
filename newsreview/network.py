@@ -46,11 +46,29 @@ def check_public(url):
         raise ValueError("News sources must use public internet addresses")
 
 
+def _origin(url):
+    parts = urlsplit(url)
+    port = parts.port if parts.port is not None else (443 if parts.scheme == 'https' else 80)
+    return parts.scheme.lower(), parts.hostname, port
+
+
+def _redact_authorization(message, headers):
+    for name, value in headers.items():
+        if name.lower() == 'authorization' and value:
+            message = message.replace(value, '[redacted]')
+            token = value.partition(' ')[2]
+            if token:
+                message = message.replace(token, '[redacted]')
+    return message
+
+
 class CheckedRedirect(HTTPRedirectHandler):
     def __init__(self, public):
         self.public = public
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if req.get_header('Authorization') and _origin(req.full_url) != _origin(newurl):
+            raise ValueError('Authenticated model requests cannot redirect to a different server')
         if self.public:
             check_public(newurl)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -91,6 +109,7 @@ class Fetcher:
                         detail = detail.get('message')
                     if isinstance(detail, str):
                         detail = ' '.join(''.join(c for c in detail if c.isprintable() or c.isspace()).split())
+                        detail = _redact_authorization(detail, request_headers)
                         if detail:
                             message += ': ' + detail[:240]
             except (ValueError, OSError):
@@ -101,7 +120,8 @@ class Fetcher:
                 logger.warning('Model server request failed: %s', message)
             raise ValueError(message) from exc
         except (URLError, TimeoutError, OSError) as exc:
-            raise ValueError(f"Cannot reach {urlsplit(url).hostname}: {exc.reason if isinstance(exc, URLError) else type(exc).__name__}") from exc
+            message = f"Cannot reach {urlsplit(url).hostname}: {exc.reason if isinstance(exc, URLError) else type(exc).__name__}"
+            raise ValueError(_redact_authorization(message, request_headers)) from None
 
     def json(self, url, payload, timeout=180, headers=None):
         text, _, _ = self.request(url, payload=payload, timeout=timeout, limit=1_000_000, headers=headers)

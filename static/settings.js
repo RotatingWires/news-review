@@ -6,6 +6,7 @@ export class Settings {
     this.app = app;
     this.values = null;
     this.sources = [];
+    this.keyStatusSequence = 0;
     document.querySelectorAll('[data-tab]').forEach(button => { button.onclick = () => this.tab(button.dataset.tab); });
     $('add-topic').onclick = () => this.editTopic();
     $('topic-edit-form').onsubmit = event => this.submit(event, async () => {
@@ -41,7 +42,31 @@ export class Settings {
       const defaults = { ollama: 'http://127.0.0.1:11434', compatible: 'http://127.0.0.1:1234/v1', openrouter: 'https://openrouter.ai/api/v1' };
       if (Object.values(defaults).includes($('ai-url').value)) $('ai-url').value = defaults[$('ai-provider').value];
       this.aiHelp();
+      this.refreshKeyStatus(true);
     };
+    $('ai-url').onchange = () => this.refreshKeyStatus(true);
+    $('model-key-form').onsubmit = async event => {
+      event.preventDefault();
+      await busy(event.submitter, async () => {
+        await api('model-key', 'PUT', { ...this.keyConfig(), key: $('model-api-key').value });
+        $('model-api-key').value = '';
+        notify('API key saved. Future model requests use it immediately.');
+      }, 'Saving API key...');
+      await this.refreshKeyStatus();
+    };
+    $('model-key-remove').onclick = () => {
+      this.removingKeyConfig = this.keyConfig();
+      $('model-key-remove-target').textContent = `${this.removingKeyConfig.provider === 'openrouter' ? 'OpenRouter' : 'Compatible server'} · ${this.removingKeyConfig.base_url}`;
+      $('model-key-environment-fallback').hidden = !this.keyStatus?.environment;
+      $('model-key-remove-dialog').showModal();
+      $('model-key-remove-dialog').querySelector('[data-close]').focus();
+    };
+    $('model-key-remove-form').onsubmit = event => this.submit(event, async () => {
+      await api('model-key/remove', 'POST', { ...this.removingKeyConfig, confirmation: 'REMOVE MODEL KEY' });
+      $('model-key-remove-dialog').close();
+      await this.refreshKeyStatus();
+      notify('Saved API key removed. Future requests use the updated key configuration.');
+    });
     $('test-model').onclick = () => busy($('test-model'), async () => {
       $('model-test-result').hidden = false;
       $('model-test-result').textContent = 'Asking your server to review a fictional sample article…';
@@ -196,6 +221,7 @@ export class Settings {
       $('ai-output').value = ai.max_output_tokens ?? 2400;
       $('ai-unload').checked = ai.unload_after_use ?? true;
       this.aiHelp();
+      await this.refreshKeyStatus(true);
       $('schedule-enabled').checked = collection.enabled;
       $('schedule-interval').value = collection.interval_hours ?? 24;
       $('items-per-source').value = collection.items_per_source;
@@ -281,6 +307,34 @@ export class Settings {
     $('feedback-profile-status').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profile_revision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
   }
 
+  keyConfig() { return { provider: $('ai-provider').value, base_url: $('ai-url').value }; }
+
+  async refreshKeyStatus(clearInput = false) {
+    const sequence = ++this.keyStatusSequence;
+    if (clearInput) $('model-api-key').value = '';
+    const config = this.keyConfig();
+    $('model-key-panel').hidden = config.provider === 'ollama';
+    this.keyStatus = null;
+    $('model-key-remove').disabled = true;
+    if (config.provider === 'ollama') return;
+    $('model-key-status').textContent = 'Checking key configuration...';
+    $('model-key-save').disabled = true;
+    try {
+      const status = await api('model-key/status', 'POST', config);
+      if (sequence !== this.keyStatusSequence) return;
+      this.keyStatus = status;
+      $('model-key-status').textContent = status.source === 'saved' ? 'Key configured.' : status.source === 'environment' ? 'Key configured from the server environment.' : 'No key configured.';
+      $('model-key-save').textContent = status.saved ? 'Replace key' : 'Save key';
+      $('model-key-remove').disabled = !status.saved;
+    } catch (error) {
+      if (sequence !== this.keyStatusSequence) return;
+      $('model-key-status').textContent = 'Key status unavailable.';
+      if (!error.connection) notify(error.message, true);
+    } finally {
+      if (sequence === this.keyStatusSequence) $('model-key-save').disabled = false;
+    }
+  }
+
   aiValues() {
     return { provider: $('ai-provider').value, base_url: $('ai-url').value,
       model: $('ai-model').value.trim(), timeout_seconds: Number($('ai-timeout').value), max_input_chars: Number($('ai-input').value), max_output_tokens: Number($('ai-output').value), unload_after_use: $('ai-unload').checked };
@@ -293,7 +347,7 @@ export class Settings {
     const help = {
       ollama: 'Ollama: use the server root, such as http://127.0.0.1:11434. Enter the exact installed model name. The app uses /api/chat with a JSON schema and thinking disabled.',
       compatible: 'Compatible server: include the API prefix, such as http://127.0.0.1:1234/v1 for LM Studio. The app uses /chat/completions and JSON output. Your model must follow the requested schema.',
-      openrouter: 'OpenRouter: use https://openrouter.ai/api/v1 and a model ID such as anthropic/claude-haiku-5.5. Set NEWSREVIEW_MODEL_API_KEY in the app server environment. Thinking is disabled for reviews, sample tests, and preference updates. Article text and review preferences are sent to OpenRouter and its selected provider.',
+      openrouter: 'OpenRouter: use https://openrouter.ai/api/v1 and a model ID such as anthropic/claude-haiku-5.5. Save your API key below. Thinking is disabled for reviews, sample tests, and preference updates. Article text and review preferences are sent to OpenRouter and its selected provider.',
     };
     $('ai-help').textContent = help[provider];
     if (provider !== 'openrouter') $('ai-help').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend must be able to reach it.'));

@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 from newsreview.collector import Collector
 from newsreview.feeds import discover
 from newsreview.network import Fetcher
+from newsreview.model_keys import ModelKeys
 from newsreview.reviewer import Reviewer
 from newsreview.server import AppServer
 from newsreview.store import Store
@@ -64,10 +65,15 @@ class FixtureHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.server.requests.append((self.path, payload))
+        if hasattr(self.server, 'authorizations'):
+            self.server.authorizations.append(self.headers.get('Authorization', ''))
+        if payload.get('model') == 'key-error':
+            self.respond(json.dumps({'error': 'Rejected ' + self.headers.get('Authorization', '')}), 'application/json', status=400)
+            return
         if payload.get('model') == 'openrouter-fixture' and (payload.get('reasoning') != {'enabled': False} or 'temperature' in payload):
             self.respond('{"error":"OpenRouter fixture requires thinking disabled and temperature omitted"}', 'application/json', status=400)
             return
-        if payload.get('model') == 'blocking-review' and self.path == '/api/chat':
+        if payload.get('model') == 'blocking-review' and self.path in ('/api/chat', '/v1/chat/completions'):
             self.server.review_entered.set()
             self.server.review_release.wait(8)
         if self.path == '/api/generate' and payload.get('keep_alive') == 0:
@@ -126,6 +132,7 @@ class IntegrationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.fixture = ThreadingHTTPServer(('127.0.0.1', 0), FixtureHandler)
         cls.fixture.requests = []
+        cls.fixture.authorizations = []
         cls.fixture_thread = threading.Thread(target=cls.fixture.serve_forever, daemon=True)
         cls.fixture_thread.start()
         cls.root = f'http://127.0.0.1:{cls.fixture.server_port}'
@@ -141,7 +148,8 @@ class IntegrationTests(unittest.TestCase):
         self.store = Store(Path(self.directory.name) / 'news.db')
         self.fetcher = Fetcher(public=False)  # Explicit fixture dependency, never the production source policy.
         self.reviewer = Reviewer(self.fetcher)
-        self.collector = Collector(self.store, self.fetcher, self.reviewer)
+        self.collector = Collector(self.store, self.fetcher, self.reviewer,
+                                   model_keys=ModelKeys(self.store.path.parent / 'model-credentials.json', environment={}))
         self.server = None
         for source in self.store.sources():
             self.store.save_source({**source, 'enabled': False}, source['id'])
@@ -591,10 +599,116 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(Store(self.store.path).stories()['items'][0]['read_at'], result['read_at'])
         self.assertEqual(self.request('/api/read/99999999', 'POST', {})[0], 400)
 
+    def test_model_key_api_scopes_authentication_and_immediate_replacement(self):
+        self.start_api()
+        config = self.model_config('openrouter')
+        scope = {key: config[key] for key in ('provider', 'base_url')}
+        data = {**scope, 'key': 'fake-first-private-key'}
+        self.assertFalse(self.request('/api/model-key/status', 'POST', scope)[1]['configured'])
+        self.assertEqual(self.request('/api/model-key', 'PUT', data, {'Cookie': ''})[0], 401)
+        self.assertEqual(self.request('/api/model-key', 'PUT', data, {'Origin': 'https://other.example'})[0], 403)
+        self.collector.lock.acquire()
+        try:
+            status, saved, _ = self.request('/api/model-key', 'PUT', data)
+            self.assertEqual(status, 200, 'Credential updates must work while a job holds the collector lock')
+        finally:
+            self.collector.lock.release()
+        self.assertTrue(saved['saved'])
+        self.assertNotIn(data['key'], json.dumps(saved))
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], 'Bearer ' + data['key'])
+        data['key'] = 'fake-replacement-private-key'
+        self.assertEqual(self.request('/api/model-key', 'PUT', data)[0], 200)
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], 'Bearer ' + data['key'])
+        other = {**scope, 'provider': 'compatible'}
+        self.assertFalse(self.request('/api/model-key/status', 'POST', other)[1]['configured'])
+        self.assertFalse(self.request('/api/model-key/status', 'POST', {**scope, 'base_url': self.root + '/other'})[1]['configured'])
+        self.assertEqual(self.request('/api/test-model', 'POST', {**config, 'provider': 'compatible'})[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], '')
+        self.assertEqual(self.request('/api/model-key/remove', 'POST', scope)[0], 400)
+        removed = self.request('/api/model-key/remove', 'POST', {**scope, 'confirmation': 'REMOVE MODEL KEY'})
+        self.assertFalse(removed[1]['configured'])
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], '')
+        self.assertEqual(self.request('/model-credentials.json')[0], 404)
+        self.assertEqual(self.request('/api/model-key')[0], 404)
+
+    def test_model_key_environment_fallback_is_visible_and_saved_key_wins(self):
+        self.start_api()
+        config = self.model_config('compatible')
+        self.collector.model_keys.environment['NEWSREVIEW_MODEL_API_KEY'] = 'fake-environment-key'
+        status = self.request('/api/model-key/status', 'POST', config)[1]
+        self.assertEqual(status['source'], 'environment')
+        self.assertFalse(status['saved'])
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], 'Bearer fake-environment-key')
+        self.request('/api/model-key', 'PUT', {**config, 'key': 'fake-saved-key'})
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], 'Bearer fake-saved-key')
+        result = self.request('/api/model-key/remove', 'POST', {**config, 'confirmation': 'REMOVE MODEL KEY'})[1]
+        self.assertEqual(result['source'], 'environment')
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        self.assertEqual(self.fixture.authorizations[-1], 'Bearer fake-environment-key')
+
+    def test_model_keys_stay_out_of_database_logs_backups_and_survive_restore(self):
+        from newsreview.transfer import create_archive, restore_archive
+        import zipfile
+        self.start_api()
+        config = self.model_config('openrouter', model='key-error')
+        secret = 'fake-private-key-that-must-stay-out-of-reading-data'
+        with self.assertLogs('newsreview', level='INFO') as logs:
+            self.assertEqual(self.request('/api/model-key', 'PUT', {**config, 'key': secret})[0], 200)
+            self.assertEqual(self.request('/api/settings', 'PUT', {'ai': config})[0], 200)
+            self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 400)
+            source = next(item['id'] for item in self.store.sources() if item['enabled'])
+            self.store.insert_story(source, {'headline': 'A useful update', 'url': self.root + '/article',
+                                            'excerpt': 'Source details.', 'published_at': None, 'category': 'Standards'}, '2026-10-28')
+            self.collect('review')
+        self.assertNotIn(secret, '\n'.join(logs.output))
+        self.assertNotIn(secret, json.dumps(self.store.overview()))
+        self.assertIn('[redacted]', self.store.overview()['runs'][0]['details']['errors'][0])
+        archive = Path(self.directory.name) / 'keys-excluded.zip'
+        create_archive(self.store, archive)
+        with zipfile.ZipFile(archive) as exported:
+            self.assertEqual(set(exported.namelist()), {'newsreview.db', 'manifest.json'})
+            self.assertNotIn(secret.encode(), exported.read('newsreview.db'))
+        credential_file = self.collector.model_keys.path.read_bytes()
+        self.store.reset({'history': True})
+        restore_archive(self.store, archive)
+        self.assertEqual(self.collector.model_keys.path.read_bytes(), credential_file)
+        self.assertEqual(self.collector.model_keys.get(config), secret)
+        self.assertEqual(ModelKeys(self.collector.model_keys.path, environment={}).get(config), secret)
+
+    def test_key_replacement_during_review_applies_to_the_next_article(self):
+        self.start_api()
+        self.fixture.review_entered = threading.Event()
+        self.fixture.review_release = threading.Event()
+        config = self.model_config('openrouter', model='blocking-review')
+        self.store.save_settings({'ai': config})
+        self.request('/api/model-key', 'PUT', {**config, 'key': 'fake-key-before-replacement'})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(2):
+            self.store.insert_story(source, {'headline': f'Technical development {number}', 'url': self.root + f'/excerpt?key={number}',
+                                            'excerpt': 'A substantial development is available.', 'published_at': None, 'category': 'Standards'}, '2026-10-28')
+        start = len(self.fixture.authorizations)
+        self.assertTrue(self.collector.start('review'))
+        try:
+            self.assertTrue(self.fixture.review_entered.wait(5))
+            self.assertEqual(self.request('/api/model-key', 'PUT', {**config, 'key': 'fake-key-after-replacement'})[0], 200)
+        finally:
+            self.fixture.review_release.set()
+            self.collector.worker.join(10)
+        self.assertFalse(self.collector.status()['running'])
+        self.assertEqual(self.fixture.authorizations[start:], ['Bearer fake-key-before-replacement', 'Bearer fake-key-after-replacement'])
+        self.assertTrue(all(story['status'] == 'reviewed' for story in self.store.stories()['items']))
+
     def test_openrouter_disables_thinking_for_samples_profiles_and_article_reviews(self):
         self.start_api()
         config = self.model_config('openrouter', model='openrouter-fixture')
         self.assertEqual(self.request('/api/settings', 'PUT', {'ai': config})[0], 200)
+        self.assertEqual(self.request('/api/model-key', 'PUT', {**config, 'key': 'fake-openrouter-generation-key'})[0], 200)
+        authorization_start = len(self.fixture.authorizations)
         self.assertEqual(self.store.settings()['ai']['provider'], 'openrouter')
         self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
         source = next(item['id'] for item in self.store.sources() if item['enabled'])
@@ -609,6 +723,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(all(path == '/v1/chat/completions' for path, _ in requests))
         self.assertTrue(all(payload.get('reasoning') == {'enabled': False} and 'temperature' not in payload for _, payload in requests))
         self.assertTrue(any(payload['messages'][0]['content'].startswith('Summarize article ratings') for _, payload in requests))
+        self.assertEqual(self.fixture.authorizations[authorization_start:], ['Bearer fake-openrouter-generation-key'] * 3)
         story = self.store.stories()['items'][0]
         self.assertEqual(story['provider'], 'openrouter')
         self.assertEqual(story['status'], 'reviewed')

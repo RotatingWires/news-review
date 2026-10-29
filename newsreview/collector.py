@@ -11,6 +11,7 @@ from .feeds import extract_article
 from .sources import read_source
 from .store import StorageUnavailable
 from .network import Fetcher
+from .model_keys import ModelKeys
 from .reviewer import Reviewer, candidates_for
 
 logger = logging.getLogger(__name__)
@@ -18,10 +19,11 @@ NOISE = re.compile(r"\b(sponsored|coupon|promo code|best deals|daily deals)\b", 
 
 
 class Collector:
-    def __init__(self, store, fetcher=None, reviewer=None):
+    def __init__(self, store, fetcher=None, reviewer=None, model_keys=None):
         self.store = store
         self.fetcher = fetcher or Fetcher()
         self.reviewer = reviewer or Reviewer()
+        self.model_keys = model_keys or ModelKeys(store.path.parent / 'model-credentials.json')
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.review_stop_event = threading.Event()
@@ -114,7 +116,7 @@ class Collector:
                     self.update(message='Updating learned preferences from recent feedback')
                     model_used = True
                     try:
-                        profile = self.reviewer.learn_preferences(ai, feedback, keep_loaded=True)
+                        profile = self.reviewer.learn_preferences(ai, feedback, keep_loaded=True, api_key=self.model_keys.get(ai))
                         self.store.save_feedback_profile(profile, revision=feedback['revision'])
                     except Exception as exc:
                         logger.warning('Feedback profile update failed: %s', exc)
@@ -145,7 +147,7 @@ class Collector:
                             result = self.reviewer.review(ai, editorial_interests, {
                                 "headline": story["headline"], "text": text[:ai["max_input_chars"]],
                                 "content_basis": basis, "published_at": story["published_at"], "category": story['category'],
-                            }, candidates, topics=topics, keep_loaded=True)
+                            }, candidates, topics=topics, keep_loaded=True, api_key=self.model_keys.get(ai))
                         self.store.review_result(story["id"], result, ai, editorial_interests, text[:100000], basis)
                         details[{"reviewed": "reviewed", "duplicate": "duplicates", "filtered": "filtered"}[result["status"]]] += 1
                         if result["status"] == "reviewed":
