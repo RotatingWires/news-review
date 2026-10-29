@@ -64,6 +64,9 @@ class FixtureHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.server.requests.append((self.path, payload))
+        if payload.get('model') == 'openrouter-fixture' and (payload.get('reasoning') != {'enabled': False} or 'temperature' in payload):
+            self.respond('{"error":"OpenRouter fixture requires thinking disabled and temperature omitted"}', 'application/json', status=400)
+            return
         if payload.get('model') == 'blocking-review' and self.path == '/api/chat':
             self.server.review_entered.set()
             self.server.review_release.wait(8)
@@ -156,7 +159,7 @@ class IntegrationTests(unittest.TestCase):
 
     def model_config(self, provider='ollama', model='fixture'):
         return {**self.store.settings()['ai'], 'provider': provider,
-                'base_url': self.root + ('/v1' if provider == 'compatible' else ''), 'model': model}
+                'base_url': self.root + ('' if provider == 'ollama' else '/v1'), 'model': model}
 
     def collect(self, kind='collect'):
         self.assertTrue(self.collector.start(kind))
@@ -275,7 +278,7 @@ class IntegrationTests(unittest.TestCase):
     def test_empty_and_custom_owned_topic_lists_work_with_model_review(self):
         for name in self.store.topics():
             self.store.change_topic('delete', name)
-        for provider in ('ollama', 'compatible'):
+        for provider in ('ollama', 'compatible', 'openrouter'):
             with self.subTest(provider=provider):
                 result = self.reviewer.test(self.model_config(provider), topics=[])
                 self.assertEqual(result['tags'], [])
@@ -287,8 +290,8 @@ class IntegrationTests(unittest.TestCase):
         requests = [payload for path, payload in self.fixture.requests if path == '/api/chat' and payload.get('model') == 'fixture']
         self.assertEqual(requests[-1]['format']['properties']['tags']['items']['enum'], ['Only my custom label'])
 
-    def test_model_tags_are_constrained_in_both_transports(self):
-        for provider in ('ollama', 'compatible'):
+    def test_model_tags_are_constrained_in_all_transports(self):
+        for provider in ('ollama', 'compatible', 'openrouter'):
             with self.subTest(provider=provider):
                 result = self.reviewer.test(self.model_config(provider))
                 self.assertEqual(result['tags'], ['Web Platform'])
@@ -408,7 +411,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(requests[-1][1]['model'], model)
 
     def test_model_http_errors_preserve_bounded_json_details(self):
-        for provider in ('ollama', 'compatible'):
+        for provider in ('ollama', 'compatible', 'openrouter'):
             with self.subTest(provider=provider), self.assertLogs('newsreview.network', level='WARNING') as logs:
                 with self.assertRaisesRegex(ValueError, 'HTTP 400 from 127.0.0.1: Input exceeds the model context window'):
                     self.reviewer.test(self.model_config(provider, model='http-error'))
@@ -435,7 +438,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(run['status'], 'partial')
         self.assertEqual(len(run['details']['errors']), 3)
         self.assertTrue(all('Input exceeds the model context window' in error for error in run['details']['errors']))
-        self.assertIn('Check the run errors and Local AI settings', run['details']['note'])
+        self.assertIn('Check the run errors and AI settings', run['details']['note'])
         stories = self.store.stories()['items']
         self.assertEqual(len(stories), 4)
         self.assertTrue(all(story['status'] == 'pending' for story in stories))
@@ -588,8 +591,31 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(Store(self.store.path).stories()['items'][0]['read_at'], result['read_at'])
         self.assertEqual(self.request('/api/read/99999999', 'POST', {})[0], 400)
 
+    def test_openrouter_disables_thinking_for_samples_profiles_and_article_reviews(self):
+        self.start_api()
+        config = self.model_config('openrouter', model='openrouter-fixture')
+        self.assertEqual(self.request('/api/settings', 'PUT', {'ai': config})[0], 200)
+        self.assertEqual(self.store.settings()['ai']['provider'], 'openrouter')
+        self.assertEqual(self.request('/api/test-model', 'POST', config)[0], 200)
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        self.store.insert_story(source, {'headline': 'A useful technical update', 'url': self.root + '/article',
+                                        'excerpt': 'A practical protocol development.', 'published_at': None, 'category': 'Standards'}, '2026-10-28')
+        identifier = self.store.stories()['items'][0]['id']
+        self.store.rate_story(identifier, 1, 'More practical developments')
+        self.assertEqual(self.request('/api/feedback/rebuild', 'POST', {})[0], 200)
+        self.collect('review')
+        requests = [(path, payload) for path, payload in self.fixture.requests if payload.get('model') == 'openrouter-fixture']
+        self.assertEqual(len(requests), 3)
+        self.assertTrue(all(path == '/v1/chat/completions' for path, _ in requests))
+        self.assertTrue(all(payload.get('reasoning') == {'enabled': False} and 'temperature' not in payload for _, payload in requests))
+        self.assertTrue(any(payload['messages'][0]['content'].startswith('Summarize article ratings') for _, payload in requests))
+        story = self.store.stories()['items'][0]
+        self.assertEqual(story['provider'], 'openrouter')
+        self.assertEqual(story['status'], 'reviewed')
+        self.assertEqual(story['output_tokens'], 25)
+
     def test_model_test_uses_real_adapter_contract(self):
-        for provider in ('ollama', 'compatible'):
+        for provider in ('ollama', 'compatible', 'openrouter'):
             with self.subTest(provider=provider):
                 result = self.reviewer.test(self.model_config(provider))
                 self.assertEqual(result['status'], 'reviewed')
@@ -607,6 +633,12 @@ class IntegrationTests(unittest.TestCase):
                     self.assertEqual(path, '/v1/chat/completions')
                     self.assertNotIn('think', payload)
                     self.assertEqual(payload['response_format'], {'type': 'json_object'})
+                    if provider == 'openrouter':
+                        self.assertEqual(payload['reasoning'], {'enabled': False})
+                        self.assertNotIn('temperature', payload)
+                    else:
+                        self.assertNotIn('reasoning', payload)
+                        self.assertEqual(payload['temperature'], 0)
 
     def test_api_search_bookmarks_settings_sources_and_validation(self):
         self.collect()

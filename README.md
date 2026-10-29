@@ -3,7 +3,7 @@
 
 # NewsReview
 
-A self-hosted news reader that collects your chosen sources and uses your own local model to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
+A self-hosted news reader that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 
 **[Full manual](MANUAL.md)** — complete setup, model configuration, sources, reading/search, scheduling, backup/restore, troubleshooting, and release notes, preserved from the original README.
 
@@ -19,8 +19,8 @@ python3 -m newsreview
 
 On Windows, use `py -3 -m newsreview`. Open **http://127.0.0.1:8714**.
 
-1. Run your preferred local model server separately; NewsReview does not install or start a model.
-2. In **Settings → Local AI**, enter the server URL and exact installed model name, then **Test with a sample article** and **Save**. See [Ollama](MANUAL.md#ollama) or [LM Studio](MANUAL.md#lm-studio-or-another-compatible-local-server) for examples.
+1. Run your preferred local model server separately, or configure an OpenRouter API key; NewsReview does not install or start a model.
+2. In **Settings → AI**, choose the server type, URL, and model name, then **Test with a sample article** and **Save**. See [Ollama](MANUAL.md#ollama), [LM Studio](MANUAL.md#lm-studio-or-another-compatible-local-server), or [OpenRouter](MANUAL.md#openrouter) for examples.
 3. Click **Check sources** and adjust **Settings → Interests** and **Collection & history** as desired.
 
 You can collect without a model: stories show source excerpts marked **awaiting AI review**. Configure a model later and click **Review pending**. No paid API or cloud model is required.
@@ -81,7 +81,9 @@ The **Filter...** dropdown combines topic selection, relevance levels, and Inclu
 
 Use **Settings → Topics** to add, rename, or delete article topics. All existing topics are preserved on upgrade. AI reviews only choose names from your list; sources and interests are managed separately. Renaming updates saved article labels, and deleting removes the label while keeping the articles. Topics are included in ZIP backups.
 
-Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in Local AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
+For OpenRouter, select **OpenRouter** in **Settings → AI → Server type**, use `https://openrouter.ai/api/v1`, and enter a model ID such as `anthropic/claude-haiku-5.5`. Set `NEWSREVIEW_MODEL_API_KEY` in the NewsReview server environment and restart the app. Thinking is explicitly disabled for article reviews, sample tests, and feedback-profile updates. OpenRouter sends review data to the cloud and charges API usage; see the [setup instructions](MANUAL.md#openrouter).
+
+Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 
 Model HTTP failures include the server's JSON error message, when available, in Recent runs, sample-test errors, and `logs/console.log`. An HTTP 400 means the server rejected a request; check its explanation before changing settings. Three consecutive review failures stop the batch and keep remaining stories queued.
 

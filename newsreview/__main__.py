@@ -15,7 +15,7 @@ from .runtime_logging import configure_logging
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NewsReview: self-hosted news reader with local AI")
+    parser = argparse.ArgumentParser(description="NewsReview: self-hosted news reader with AI reviews")
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8714)

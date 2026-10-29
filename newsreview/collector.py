@@ -157,7 +157,7 @@ class Collector:
                         details["errors"].append(f"Review #{story['id']}: {str(exc)[:300]}")
                         consecutive_failures += 1
                         if consecutive_failures >= 3:
-                            details["note"] = "Stopped review after three consecutive failures. Check the run errors and Local AI settings; remaining stories are queued."
+                            details["note"] = "Stopped review after three consecutive failures. Check the run errors and AI settings; remaining stories are queued."
                             break
             self.update(reviewing=False)
             if self.review_stop_event.is_set():

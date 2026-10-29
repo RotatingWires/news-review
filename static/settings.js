@@ -35,11 +35,11 @@ export class Settings {
       const ai = this.aiValues();
       await api('settings', 'PUT', { ai });
       this.values.ai = ai;
-      notify(ai.model ? 'Local AI settings saved.' : 'AI review paused. Collection remains available.');
+      notify(ai.model ? 'AI settings saved.' : 'AI review paused. Collection remains available.');
     });
     $('ai-provider').onchange = () => {
-      const compatible = $('ai-provider').value === 'compatible';
-      if (['http://127.0.0.1:11434', 'http://127.0.0.1:1234/v1'].includes($('ai-url').value)) $('ai-url').value = compatible ? 'http://127.0.0.1:1234/v1' : 'http://127.0.0.1:11434';
+      const defaults = { ollama: 'http://127.0.0.1:11434', compatible: 'http://127.0.0.1:1234/v1', openrouter: 'https://openrouter.ai/api/v1' };
+      if (Object.values(defaults).includes($('ai-url').value)) $('ai-url').value = defaults[$('ai-provider').value];
       this.aiHelp();
     };
     $('test-model').onclick = () => busy($('test-model'), async () => {
@@ -287,11 +287,16 @@ export class Settings {
   }
 
   aiHelp() {
-    $('ai-unload-row').hidden = $('ai-provider').value !== 'ollama';
-    $('ai-help').textContent = $('ai-provider').value === 'ollama'
-      ? 'Ollama: use the server root, such as http://127.0.0.1:11434. Enter the exact installed model name. The app uses /api/chat with a JSON schema.'
-      : 'Compatible server: include the API prefix, such as http://127.0.0.1:1234/v1 for LM Studio. The app uses /chat/completions and JSON output. Your model must follow the requested schema.';
-    $('ai-help').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend—not your browser—must be able to reach it.'));
+    const provider = $('ai-provider').value;
+    $('ai-unload-row').hidden = provider !== 'ollama';
+    $('ai-model').placeholder = provider === 'openrouter' ? 'anthropic/claude-haiku-5.5' : 'Exact model name or server model ID';
+    const help = {
+      ollama: 'Ollama: use the server root, such as http://127.0.0.1:11434. Enter the exact installed model name. The app uses /api/chat with a JSON schema and thinking disabled.',
+      compatible: 'Compatible server: include the API prefix, such as http://127.0.0.1:1234/v1 for LM Studio. The app uses /chat/completions and JSON output. Your model must follow the requested schema.',
+      openrouter: 'OpenRouter: use https://openrouter.ai/api/v1 and a model ID such as anthropic/claude-haiku-5.5. Set NEWSREVIEW_MODEL_API_KEY in the app server environment. Thinking is disabled for reviews, sample tests, and preference updates. Article text and review preferences are sent to OpenRouter and its selected provider.',
+    };
+    $('ai-help').textContent = help[provider];
+    if (provider !== 'openrouter') $('ai-help').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend must be able to reach it.'));
   }
 
   syncNewSources() {

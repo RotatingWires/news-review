@@ -28,6 +28,15 @@ class TransferTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_openrouter_settings_roundtrip(self):
+        config = {**self.store.settings()['ai'], 'provider': 'openrouter',
+                  'base_url': 'https://openrouter.ai/api/v1', 'model': 'anthropic/claude-haiku-5.5'}
+        self.store.save_settings({'ai': config})
+        create_archive(self.store, self.archive)
+        self.store.save_settings({'ai': {**config, 'model': ''}})
+        restore_archive(self.store, self.archive)
+        self.assertEqual(self.store.settings()['ai'], config)
+
     def test_roundtrip_and_recovery_snapshot(self):
         preferences = self.store.settings()
         self.store.reset({'history': True, 'bookmarks': True, 'guidance': True})

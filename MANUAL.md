@@ -3,9 +3,9 @@
 
 # NewsReview
 
-A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let your own local model review the stories. The initial source list and interests are tuned to technology, security, homelabbing/self-hosting, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
+A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. The initial source list and interests are tuned to technology, security, homelabbing/self-hosting, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
 
-Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Your own local model reviews and summarizes articles; no paid API, ChatGPT subscription, or cloud model is required.
+Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Local model review needs no paid API, ChatGPT subscription, or cloud model; OpenRouter is an optional paid API provider.
 
 ## Stack and project conventions
 
@@ -33,7 +33,7 @@ py -3 -m newsreview
 
 Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Publication-date browsing and time-range search need a timezone database; Linux usually provides one. On hosts without system timezone data, install `tzdata` with `python3 -m pip install tzdata` (Windows: `py -3 -m pip install tzdata`).
 
-1. Open **Settings → Local AI** and enter the model server URL and exact installed model name.
+1. Open **Settings → AI**, choose your server type, and enter the server URL and model name.
 2. Use **Test with a sample article**, then **Save**.
 3. Click **Check sources**. The collector runs in the background; the page reports progress.
 4. Adjust **Settings → Interests** and **Collection & history** as desired.
@@ -50,13 +50,13 @@ This flag disables the scheduler for that process only. The UI's schedule settin
 
 ## Connect your own model
 
-The application does not install, download, choose, or start a model for you. Run your preferred inference server separately. Switching computers or models requires changing the AI settings, not the collector or UI code.
+The application does not install, download, choose, or start a model for you. Run your preferred inference server separately, or configure OpenRouter. Switching computers or models requires changing the AI settings, not the collector or UI code.
 
 ### Ollama
 
 Install [Ollama](https://docs.ollama.com/), start it, and download a model that fits your hardware. Use `ollama list` to find its exact installed name.
 
-In **Settings → Local AI**:
+In **Settings → AI**:
 
 | Field | Value |
 | --- | --- |
@@ -84,13 +84,41 @@ Load a model and start the inference server. Set:
 
 | Field | Example |
 | --- | --- |
-| Server type | Compatible local chat server |
+| Server type | Compatible chat server |
 | Server base URL | `http://127.0.0.1:1234/v1` |
 | Model name | The model identifier exposed by your server |
 
 The adapter appends `/chat/completions`, requests JSON output, and validates the returned object. The API prefix belongs in the base URL; the final endpoint does not. See [LM Studio's chat API](https://lmstudio.ai/docs/developer/openai-compat/chat-completions).
 
 If your compatible server requires authentication, set `NEWSREVIEW_MODEL_API_KEY` in the application's environment. It is sent as a bearer token to that server and never returned to the browser. Native Ollama does not use this optional token.
+
+### OpenRouter
+
+Set `NEWSREVIEW_MODEL_API_KEY` in the environment that starts NewsReview, then restart the application. For a shell launch:
+
+```sh
+export NEWSREVIEW_MODEL_API_KEY='your-openrouter-key'
+python3 -m newsreview
+```
+
+PowerShell:
+
+```powershell
+$env:NEWSREVIEW_MODEL_API_KEY = 'your-openrouter-key'
+py -3 -m newsreview
+```
+
+For a service, configure its environment instead. `.env` files are not loaded automatically. In **Settings → AI**, set:
+
+| Field | Value |
+| --- | --- |
+| Server type | OpenRouter |
+| Server base URL | `https://openrouter.ai/api/v1` |
+| Model name | `anthropic/claude-haiku-5.5` or another supported model ID |
+
+Use Test with a sample article, then Save. The OpenRouter server type sends `reasoning: {"enabled": false}` for article reviews, sample tests, and learned-preference updates. It disables thinking instead of merely hiding reasoning text; see [OpenRouter reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). It omits temperature for compatibility with [Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview). Choose a model that supports disabling thinking. Local compatible-server requests retain their existing format, and native Ollama still sends `think: false`.
+
+OpenRouter is a paid cloud service. Requests send article text, interests/guidance, topic names, cached preferences, and candidate coverage to OpenRouter and its selected provider; preference generation sends the bounded recent rating examples. The API key remains on the app server and is not included in ZIP backups. Changing providers preserves saved summaries and does not automatically reassess history.
 
 ### Move the model to another computer
 
@@ -219,7 +247,7 @@ Edit a source to change its feed, default category, or enabled state. Disabling 
 
 ### RadioReference and other forum feeds
 
-Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. The local model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
+Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. Your configured model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
 
 A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific scanner/SDR/manufacturer/category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
 
@@ -294,7 +322,7 @@ Clearing history or runs restarts the automatic collection interval from the res
 2. Read each enabled source using its saved Automatic/feed/page method. Sort by publication date when available; undated website entries retain page order. Initial limits are eight entries per source from the last three days; undated entries remain eligible. Limits select the newest available candidates, not eight guaranteed new entries per run.
 3. Normalize URLs by removing fragments and known tracking parameters. A unique URL constraint prevents repeated insertion. Preserve original headlines, excerpts, and publication dates separately from discovery/edition dates.
 4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
-5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured local model and interest snapshot.
+5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured review model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
 7. Validate exact output fields, types, tag limits and membership in the managed Topics list, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them. An empty topic list allows an empty tags array.
 
@@ -325,9 +353,9 @@ Each Daily Feed and Bookmarks tile has thumbs-up/down buttons, separate from boo
 
 Ratings, optional reasons, and short article snapshots are saved by URL inside the SQLite interests preferences. Repeatedly saving the same vote/reason is a no-op. Recollected URLs recover their rating; deleting/purging story history does not erase feedback. Up to 10000 ratings are retained, with reasons limited to 320 characters. There is no new runtime dependency or model retraining.
 
-Under **Settings → Interests → Learned preferences**, view/edit the compact profile, enable/disable its use, or control automatic updates. When ratings change, the next batch with pending reviews makes at most one extra local model call to rebuild the profile from the **10 most recent ratings** (bounded headline, source, tags, excerpt/summary, and reason). Older ratings stay stored but are not included in that bounded refresh. Unchanged feedback reuses the cached profile. Each normal article review receives only the profile (at most 2400 characters), never the full rating/reason archive. Explicit written interests, guidance, and exclusions take priority; feedback guides relevance rather than supplying article facts.
+Under **Settings → Interests → Learned preferences**, view/edit the compact profile, enable/disable its use, or control automatic updates. When ratings change, the next batch with pending reviews makes at most one extra model call to rebuild the profile from the **10 most recent ratings** (bounded headline, source, tags, excerpt/summary, and reason). Older ratings stay stored but are not included in that bounded refresh. Unchanged feedback reuses the cached profile. Each normal article review receives only the profile (at most 2400 characters), never the full rating/reason archive. Explicit written interests, guidance, and exclusions take priority; feedback guides relevance rather than supplying article facts.
 
-**Update from feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing Local AI controls, with warm reuse within a review batch.
+**Update from feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing AI controls, with warm reuse within a review batch.
 
 **Reset feedback...** confirms before clearing all votes, reasons, and the profile. Fresh start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, the read-marker schema update preserves import support for version-2 ZIP table layouts.
 
@@ -361,7 +389,7 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | `NEWSREVIEW_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
 | `NEWSREVIEW_PASSWORD` | Optional one-time password bootstrap (8–1024 characters), only when auth.json does not exist |
 | `NEWSREVIEW_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
-| `NEWSREVIEW_MODEL_API_KEY` | Optional bearer token for a compatible model server |
+| `NEWSREVIEW_MODEL_API_KEY` | Bearer token for OpenRouter or a compatible model server |
 
 `.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
 
@@ -503,7 +531,7 @@ newsreview/
   sources.py        Automatic/feed/page collection strategy
   health.py         observed source health and inactivity warnings
   feedback.py       bounded ratings, profile validation, and compact model context
-  reviewer.py       local model adapters, editorial prompt, output validation
+  reviewer.py       model adapters, editorial prompt, output validation
   collector.py      collection/review worker and interval scheduler
   validation.py     source/settings input validation
   auth.py           persistent password hashes and first-run setup tokens
@@ -519,7 +547,7 @@ static/
   app.js            startup, navigation and collection status
   shared.js         API, DOM, notification and formatting helpers
   feed.js           tiles, search, dates, pagination and bookmarks
-  settings.js       interests, sources, local AI and scheduling controls
+  settings.js       interests, topics, sources, AI and scheduling controls
   transfer.js       browser ZIP download/upload and restore confirmation
   dropdowns.js      shared Win95 single-select and editable category menus
   icon.svg          application icon
@@ -548,6 +576,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and all three browser suites (including `python3 -m tests.browser_auth`). Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.10.1
+
+- Rename the Local AI tab to AI and update current UI/help/setup wording for local or cloud review.
+- Add an explicit OpenRouter server type that disables thinking for article reviews, model tests, and feedback-profile generation. Omit unsupported temperature controls while preserving other server request formats.
+- Document server-side API-key setup, data flow, and model selection; verify provider settings, request contracts, and the browser workflow using local fixtures.
 
 ### v0.10.0
 

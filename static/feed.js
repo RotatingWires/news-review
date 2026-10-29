@@ -186,7 +186,7 @@ export class Feed {
       $('story-count').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('empty').hidden = result.total > 0;
       $('empty-title').textContent = bookmarked ? 'No bookmarks yet.' : searching ? 'Nothing matched this search.' : 'No stories in this edition.';
-      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Your local model can be connected whenever you’re ready.';
+      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Configure a review model whenever you’re ready.';
       $('empty-action').hidden = bookmarked || searching;
       $('empty-action').onclick = () => this.app.collect('collect', $('empty-action'));
       $('page-prev').hidden = this.page <= 1;

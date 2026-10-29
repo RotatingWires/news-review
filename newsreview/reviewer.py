@@ -85,7 +85,7 @@ class Reviewer:
 
     def review(self, config, interests, article, candidates, *, topics=None, keep_loaded=False):
         if not config["model"].strip():
-            raise ValueError("Choose an installed local model in Settings → AI")
+            raise ValueError("Choose a review model in Settings → AI")
         allowed_tags = topics if topics is not None else [article.get('category') or 'General']
         schema = deepcopy(SCHEMA)
         if allowed_tags:
@@ -115,7 +115,7 @@ class Reviewer:
 
     def _generate(self, config, messages, schema, *, keep_loaded=False):
         if not config['model'].strip():
-            raise ValueError('Choose an installed model before updating learned preferences')
+            raise ValueError('Choose a review model in Settings → AI')
         base = config["base_url"].rstrip("/")
         limit = config.get("max_output_tokens", 2400)
         if config["provider"] == "ollama":
@@ -132,8 +132,12 @@ class Reviewer:
             headers = {}
             if os.environ.get("NEWSREVIEW_MODEL_API_KEY"):
                 headers["Authorization"] = "Bearer " + os.environ["NEWSREVIEW_MODEL_API_KEY"]
-            payload = {"model": config["model"], "messages": messages, "stream": False, "temperature": 0,
+            payload = {"model": config["model"], "messages": messages, "stream": False,
                        "max_tokens": limit, "response_format": {"type": "json_object"}}
+            if config['provider'] == 'openrouter':
+                payload['reasoning'] = {'enabled': False}
+            else:
+                payload['temperature'] = 0
             response = self.fetcher.json(base + "/chat/completions", payload, config["timeout_seconds"], headers)
             try:
                 content = response["choices"][0]["message"]["content"]
@@ -147,10 +151,10 @@ class Reviewer:
         metadata = f"provider={config['provider']} model={config['model']} finish={reason} answer_chars={len(content)} thinking_chars={len(thinking) if isinstance(thinking, str) else 0} output_limit={limit}"
         if reason in ('length', 'max_tokens'):
             logger.warning('Model output truncated: %s', metadata)
-            raise ValueError(f"Model response was cut off at its output limit ({limit} tokens). Increase Maximum response tokens in Local AI settings and retry.")
+            raise ValueError(f"Model response was cut off at its output limit ({limit} tokens). Increase Maximum response tokens in AI settings and retry.")
         if not content.strip():
             logger.warning('Empty model answer: %s', metadata)
-            raise ValueError("Model returned an empty answer" + (" with thinking output but no final response" if thinking else "") + ". Check the model and Ollama version; details are in logs/console.log.")
+            raise ValueError("Model returned an empty answer" + (" with thinking output but no final response" if thinking else "") + ". Check the model and server configuration; details are in logs/console.log.")
         # Accept a single fenced JSON document while retaining strict schema validation.
         fenced = re.fullmatch(r"\s*```(?:json)?\s*\n(.*?)\n```\s*", content, re.S | re.I)
         if fenced:

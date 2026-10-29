@@ -53,8 +53,8 @@ def settings(value, current):
     result = deepcopy(current)
     if "ai" in value:
         ai = value["ai"]
-        if not isinstance(ai, dict) or ai.get("provider") not in ("ollama", "compatible"):
-            raise ValueError("Choose Ollama or a compatible local server")
+        if not isinstance(ai, dict) or ai.get("provider") not in ("ollama", "compatible", "openrouter"):
+            raise ValueError("Choose Ollama, a compatible server, or OpenRouter")
         result["ai"] = {
             "provider": ai["provider"], "base_url": valid_url(ai.get("base_url")).rstrip("/"),
             "model": text(ai.get("model"), "Model", 200, empty=True),

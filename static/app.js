@@ -107,7 +107,7 @@ class App {
     $('collect').disabled = state.running;
     $('review-pending').textContent = state.reviewing ? state.review_stop_requested ? 'Stopping review...' : 'Stop review' : 'Review pending';
     $('review-pending').classList.toggle('danger', Boolean(state.reviewing));
-    $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your local model';
+    $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
     $('review-pending').disabled = state.reviewing ? Boolean(state.review_stop_requested) : state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
