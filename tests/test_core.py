@@ -4,6 +4,9 @@ from copy import deepcopy
 from datetime import datetime, timezone, timedelta
 import json
 from pathlib import Path
+import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -12,7 +15,7 @@ from newsreview.collector import Collector
 from newsreview.feeds import extract_article, parse_date, parse_feed, plain
 from newsreview.network import canonical_url, check_public, valid_url
 from newsreview.reviewer import candidates_for, validate_review
-from newsreview.store import Store
+from newsreview.store import Store, StorageUnavailable
 from newsreview.validation import settings, source
 
 
@@ -73,7 +76,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(validate_review(review(duplicate_of=8), {8})["status"], "duplicate")
 
     def test_invalid_model_outputs_are_not_persisted(self):
-        invalid = [review(score=True), review(score=101), review(relevant="yes"), review(tags=[]),
+        invalid = [review(score=True), review(score=101), review(relevant="yes"),
                    review(summary=""), review(milestone="released probably"), review(duplicate_of=99),
                    review(extra="unexpected"), review(tags=[42])]
         for value in invalid:
@@ -189,6 +192,36 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.pending(10), [])
         self.assertEqual(self.store.requeue(True), 1)
         self.assertEqual(len(self.store.pending(10)), 1)
+
+    def test_cannot_open_wal_is_actionable_during_connection_setup_and_startup(self):
+        # A real filesystem obstruction makes sqlite3.connect succeed, then
+        # synchronous=NORMAL fail while opening WAL. No replacement SQLite API.
+        self.insert()
+        wal = Path(str(self.store.path) + '-wal')
+        wal.mkdir()
+        try:
+            with self.assertRaises(StorageUnavailable) as error:
+                self.store.settings()
+            self.assertEqual(error.exception.__cause__.sqlite_errorcode & 0xff, sqlite3.SQLITE_CANTOPEN)
+            self.assertIn('--data-dir', str(error.exception))
+            self.assertIn(str(self.store.path), str(error.exception))
+            script = '''import sys
+from newsreview.store import Store
+from newsreview.__main__ import main
+from pathlib import Path
+directory = Path(sys.argv[1]) / 'startup'
+store = Store(directory / 'newsreview.db')
+Path(str(store.path) + '-wal').mkdir()
+sys.argv = ['newsreview', '--data-dir', str(directory), '--no-scheduler']
+main()
+'''
+            result = subprocess.run([sys.executable, '-c', script, self.directory.name], capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('SQLite can create/open its -wal and -shm', result.stderr)
+            self.assertNotIn('Traceback', result.stderr)
+        finally:
+            wal.rmdir()
+        self.assertEqual(self.store.stories()['total'], 1)
 
     def test_three_hour_interval_respects_elapsed_time_and_restart(self):
         config = {**self.store.settings()['collection'], 'interval_hours': 3}

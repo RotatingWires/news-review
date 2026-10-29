@@ -87,7 +87,9 @@ For OpenRouter, select **OpenRouter** in **Settings → AI → Server type**, us
 
 Ollama unloads its model after sample tests and review batches by default; toggle **Unload Ollama model after a test or review batch** in AI settings. This releases the model while leaving Ollama running. **Maximum response tokens** defaults to 2400; truncated or empty answers now report a specific error, with diagnostic metadata in `logs/console.log`.
 
-Model HTTP failures include the server's JSON error message, when available, in Recent runs, sample-test errors, and `logs/console.log`. An HTTP 400 means the server rejected a request; check its explanation before changing settings. Three consecutive review failures stop the batch and keep remaining stories queued.
+Model HTTP failures include the server's JSON error message, when available, in Recent runs, sample-test errors, and `logs/console.log`. An HTTP 400 means the server rejected a request; check its explanation before changing settings. Three consecutive model-review failures stop the batch and keep remaining stories queued. Articles without readable text or an excerpt are skipped individually without calling the model or stopping other reviews; use **Reset failed reviews** to retry after they reach three attempts. Unknown model topic names are discarded while valid summaries and configured labels are kept; reviews can have no topics.
+
+If startup reports **cannot open its database**, check access to the data directory and its SQLite `-wal`/`-shm` files. For a pooled drive such as DrivePool, test a copy of the complete data folder on a regular local disk using `--data-dir`; the app itself can remain on the pool. See [storage troubleshooting](MANUAL.md#database-startup-errors-and-pooled-drives). No automatic database relocation or journal-mode change is performed.
 
 While AI reviews run, **Review pending** becomes **Stop review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Tiles show the article summary without a separate Why it matters section.
 

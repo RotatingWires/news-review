@@ -9,7 +9,7 @@ import threading
 from . import __version__
 from .collector import Collector
 from .server import AppServer
-from .store import Store
+from .store import Store, StorageUnavailable
 from .migration import database_path
 from .runtime_logging import configure_logging
 
@@ -28,7 +28,11 @@ def main():
     directory = Path(args.data_dir).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     configure_logging()
-    store = Store(database_path(directory))
+    try:
+        store = Store(database_path(directory))
+    except StorageUnavailable as exc:
+        logging.error('%s', exc)
+        parser.exit(1)
     collector = Collector(store)
     server = AppServer((args.host, args.port), store, collector, password)
     if server.auth.setup_token:

@@ -138,7 +138,10 @@ class Collector:
                         text = text or story["excerpt"]
                     try:
                         if not text.strip():
-                            raise ValueError("No readable article or source excerpt; showing headline and link only")
+                            error = "No readable article or source excerpt; showing headline and link only"
+                            self.store.review_failed(story["id"], error, text[:100000], basis)
+                            details["errors"].append(f"Review #{story['id']}: {error}")
+                            continue
                         if NOISE.search(story["headline"]):
                             result = {"summary": "Excluded by the headline filter.", "tags": [topic for topic in topics if topic.casefold() == (story['category'] or '').casefold()][:1], "status": "filtered", "score": 0, "milestone": "not applicable"}
                         else:
@@ -159,7 +162,7 @@ class Collector:
                         details["errors"].append(f"Review #{story['id']}: {str(exc)[:300]}")
                         consecutive_failures += 1
                         if consecutive_failures >= 3:
-                            details["note"] = "Stopped review after three consecutive failures. Check the run errors and AI settings; remaining stories are queued."
+                            details["note"] = "Stopped review after three consecutive model-review failures. Check the run errors and AI settings; remaining stories are queued."
                             break
             self.update(reviewing=False)
             if self.review_stop_event.is_set():

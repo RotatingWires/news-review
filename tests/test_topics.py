@@ -86,17 +86,22 @@ class TopicTests(unittest.TestCase):
         self.assertEqual(Store(self.store.path).topics(), [])
         self.assertEqual(self.store.overview()['tags'], [])
         self.assertEqual(validate_review(review(tags=[]), set(), allowed_tags=[])['tags'], [])
-        with self.assertRaisesRegex(ValueError, 'unconfigured topic'):
-            validate_review(review(tags=['Invented']), set(), allowed_tags=[])
+        self.assertEqual(validate_review(review(tags=['Invented']), set(), allowed_tags=[])['tags'], [])
 
-    def test_vocabulary_validation_rejects_invented_model_tags(self):
+    def test_vocabulary_validation_discards_unknown_names_keeps_valid_tags_and_summary(self):
         self.store.change_topic('add', 'My topic')
         self.assertIn('My topic', self.store.overview()['tags'])
         self.assertNotIn('One-off product', self.store.topics())
-        result = validate_review(review(tags=[' security ', 'Security']), set(), allowed_tags=['Security'])
+        result = validate_review(review(tags=[' security ', 'Invented product', 'Security']), set(), allowed_tags=['Security'])
         self.assertEqual(result['tags'], ['Security'])
-        with self.assertRaisesRegex(ValueError, 'unconfigured topic'):
-            validate_review(review(tags=['Invented product tag']), set(), allowed_tags=self.store.topics())
+        result = validate_review(review(tags=['Invented product tag']), set(), allowed_tags=self.store.topics())
+        self.assertEqual(result['tags'], [])
+        self.assertEqual(result['summary'], review()['summary'])
+        self.assertEqual(result['status'], 'reviewed')
+        self.assertEqual(validate_review(review(tags=[]), set(), allowed_tags=['Security'])['tags'], [])
+        for tags in ([''], [123], 'Security', ['x' * 61], ['Security'] * 7):
+            with self.subTest(tags=tags), self.assertRaisesRegex(ValueError, 'Invalid tags'):
+                validate_review(review(tags=tags), set(), allowed_tags=['Security'])
         for value in ('wrong type', [''], ['x' * 61], ['same', 'same'], [123]):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 topic_names(value)

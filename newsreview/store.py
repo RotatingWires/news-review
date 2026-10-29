@@ -108,19 +108,27 @@ class Store:
         if self.initialized and not self.path.is_file():
             raise StorageUnavailable('The NewsReview database or data folder was removed while the server was running. Stop and restart NewsReview to initialize a fresh database, or restore your backup. Use Fresh start in Settings to clear history without removing preferences.')
         uri = self.path.resolve().as_uri() + ('?mode=rw' if self.initialized else '?mode=rwc')
+        db = None
         try:
             db = sqlite3.connect(uri, uri=True, timeout=10)
-        except sqlite3.OperationalError as exc:
-            raise StorageUnavailable('NewsReview cannot open its database. Check that the data folder exists and is writable, then restart the server.') from exc
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=10000")
-        db.execute("PRAGMA synchronous=NORMAL")
-        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("PRAGMA busy_timeout=10000")
+            db.execute("PRAGMA synchronous=NORMAL")
             with db:
                 yield db
+        except sqlite3.OperationalError as exc:
+            if getattr(exc, 'sqlite_errorcode', 0) & 0xff == sqlite3.SQLITE_CANTOPEN:
+                raise StorageUnavailable(
+                    f'NewsReview cannot open its database at {self.path}. Check that the data folder is writable '
+                    'and SQLite can create/open its -wal and -shm files there. Stop other NewsReview processes. '
+                    'If using a pooled or network drive, test a copy of the data folder on a regular local disk '
+                    'with --data-dir. Keep the original database and companion files together; do not delete them.'
+                ) from exc
+            raise
         finally:
-            db.close()
+            if db is not None:
+                db.close()
 
     def settings(self):
         with self.connect() as db:

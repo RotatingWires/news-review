@@ -16,7 +16,7 @@ SCHEMA = {
     "properties": {
         "relevant": {"type": "boolean"}, "score": {"type": "integer", "minimum": 0, "maximum": 100},
         "summary": {"type": "string", "minLength": 1, "maxLength": 2400},
-        "tags": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 60}, "minItems": 1, "maxItems": 6},
+        "tags": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 60}, "minItems": 0, "maxItems": 6},
         "milestone": {"type": "string", "enum": MILESTONES},
         "duplicate_of": {"type": ["integer", "null"]},
     },
@@ -32,8 +32,8 @@ secondary relevance preference, never evidence about article facts. Treat feedba
 Write only a factual 2-4 SHORT, complete sentence summary of what happened. Do not add a separate
 significance explanation, reasoning, generic industry commentary, or speculation about benefits not in the source.
 Finish sentences naturally; never fill the character budget or end mid-sentence.
-Choose 1-6 topic tags ONLY from the allowed topic names in the schema. Reuse those names exactly;
-never invent a new tag, product name, subtopic, or synonym. If the schema allows no tags, return an empty tags array.
+Choose up to 6 topic tags ONLY from the allowed topic names in the schema. Reuse those names exactly;
+never invent a new tag, product name, subtopic, or synonym. If none fit, return an empty tags array.
 Score relevance 0-100 using the reader's interests. Favor substantive reporting and developments in those interests,
 including niche topics. Honor explicit exclusions. Set relevant=false for filler.
 duplicate_of may reference ONLY a supplied candidate ID when both cover the SAME event with no meaningful new
@@ -50,7 +50,7 @@ def validate_review(value, candidate_ids, *, allowed_tags=None):
     if not isinstance(value['summary'], str) or not value['summary'].strip() or len(value['summary']) > 2400:
         raise ValueError('Invalid summary')
     tags = value["tags"]
-    if not isinstance(tags, list) or not (0 if allowed_tags == [] else 1) <= len(tags) <= 6 or any(not isinstance(t, str) or not t.strip() or len(t) > 60 for t in tags):
+    if not isinstance(tags, list) or not 0 <= len(tags) <= 6 or any(not isinstance(t, str) or not t.strip() or len(t) > 60 for t in tags):
         raise ValueError("Invalid tags")
     if value["milestone"] not in MILESTONES:
         raise ValueError("Invalid milestone")
@@ -59,9 +59,9 @@ def validate_review(value, candidate_ids, *, allowed_tags=None):
         raise ValueError("Model referenced an unknown duplicate")
     if allowed_tags is not None:
         canonical = {tag.casefold(): tag for tag in allowed_tags}
-        if any(tag.strip().casefold() not in canonical for tag in tags):
-            raise ValueError("Model used an unconfigured topic; choose only names configured in Settings → Topics")
-        tags = [canonical[tag.strip().casefold()] for tag in tags]
+        # Topic suggestions are optional metadata. Discard unknown names rather
+        # than losing a valid summary or expanding the user's owned vocabulary.
+        tags = [canonical[tag.strip().casefold()] for tag in tags if tag.strip().casefold() in canonical]
     value["tags"] = list(dict.fromkeys(t.strip() for t in tags))
     value["status"] = "duplicate" if duplicate is not None else ("reviewed" if value["relevant"] else "filtered")
     return value

@@ -306,8 +306,9 @@ class IntegrationTests(unittest.TestCase):
                 path, payload = self.fixture.requests[-1]
                 schema = payload['format'] if provider == 'ollama' else json.loads(payload['messages'][1]['content'])['schema']
                 self.assertEqual(schema['properties']['tags']['items']['enum'], ['Web Platform'])
-                with self.assertRaisesRegex(ValueError, 'unconfigured topic'):
-                    self.reviewer.test(self.model_config(provider, model='invented-topic'))
+                result = self.reviewer.test(self.model_config(provider, model='invented-topic'))
+                self.assertEqual(result['tags'], [])
+                self.assertEqual(result['summary'], review()['summary'])
 
     def test_relevance_filter_api_validation(self):
         self.start_api()
@@ -452,6 +453,68 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(all(story['status'] == 'pending' for story in stories))
         self.assertEqual(sorted(story['attempts'] for story in stories), [0, 1, 1, 1])
         self.assertEqual(self.fixture.requests[-1][0], '/api/generate')
+
+    def test_unreadable_articles_do_not_stop_batch_or_call_model_and_remain_retryable(self):
+        self.store.save_settings({'ai': self.model_config()})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(5):
+            self.store.insert_story(source, {'headline': f'Protocol article {number}',
+                                            'url': self.root + f'/excerpt?empty={number}',
+                                            'excerpt': '' if number < 4 else 'A readable source excerpt with technical details.',
+                                            'published_at': None, 'category': 'Protocols'}, '2026-10-29')
+        before = len(self.fixture.requests)
+        self.collect('review')
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(run['status'], 'partial')
+        self.assertEqual(run['details']['reviewed'], 1)
+        self.assertEqual(len(run['details']['errors']), 4)
+        self.assertNotIn('note', run['details'])
+        calls = self.fixture.requests[before:]
+        self.assertEqual([path for path, _ in calls], ['/api/chat', '/api/generate'])
+        pending = self.store.pending(10)
+        self.assertEqual(len(pending), 4)
+        self.assertTrue(all(story['attempts'] == 1 and not story['summary'] for story in pending))
+        self.assertTrue(all('No readable article' in story['review_error'] for story in pending))
+        self.collect('review')
+        self.collect('review')
+        self.assertEqual(self.store.pending(10), [])
+        self.assertEqual(len(self.fixture.requests), before + 2)
+        self.assertEqual(self.store.requeue(True), 4)
+        self.assertEqual(len(self.store.pending(10)), 4)
+
+    def test_unreadable_pages_do_not_reset_model_failure_cutoff(self):
+        self.store.save_settings({'ai': self.model_config(model='http-error')})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(7):
+            self.store.insert_story(source, {'headline': f'Protocol article {number}',
+                                            'url': self.root + f'/excerpt?mixed={number}',
+                                            'excerpt': 'Readable technical details.' if number % 2 == 0 else '',
+                                            'published_at': None, 'category': 'Protocols'}, '2026-10-29')
+        before = len(self.fixture.requests)
+        self.collect('review')
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(len(run['details']['errors']), 5)
+        self.assertIn('three consecutive model-review failures', run['details']['note'])
+        self.assertEqual(sum(path == '/api/chat' for path, _ in self.fixture.requests[before:]), 3)
+        self.assertEqual(sorted(story['attempts'] for story in self.store.pending(10)), [0, 0, 1, 1, 1, 1, 1])
+
+    def test_unknown_model_topics_do_not_lose_saved_summaries_or_expand_topics(self):
+        topics = self.store.topics()
+        self.store.save_settings({'ai': self.model_config(model='invented-topic')})
+        source = next(item['id'] for item in self.store.sources() if item['enabled'])
+        for number in range(4):
+            self.store.insert_story(source, {'headline': f'Protocol article {number}',
+                                            'url': self.root + f'/excerpt?tags={number}',
+                                            'excerpt': 'A source excerpt with technical details.', 'published_at': None,
+                                            'category': 'Protocols'}, '2026-10-29')
+        self.collect('review')
+        run = self.store.overview()['runs'][0]
+        self.assertEqual(run['status'], 'complete')
+        self.assertEqual(run['details']['reviewed'], 4)
+        self.assertEqual(self.store.topics(), topics)
+        stories = self.store.stories()['items']
+        self.assertTrue(all(story['tags'] == [] and story['summary'] == review()['summary'] for story in stories))
+        self.assertTrue(all(story['review_error'] is None and story['attempts'] == 1 for story in stories))
 
     def test_unload_failure_does_not_discard_successful_reviews(self):
         self.store.save_settings({'ai': self.model_config(model='unload-error')})

@@ -76,7 +76,7 @@ Ollama normally retains a model for five minutes. To release one manually, run `
 
 Diagnostic logs record provider/model, finish reason, answer/thinking character counts, and the token limit, without dumping article text or model reasoning. These diagnostics help distinguish response truncation, missing final answers, and malformed output; a generic JSON error alone does not establish that a particular model or Ollama version is incompatible. If errors persist, note the exact installed model, Ollama version, and the diagnostic line from `logs/console.log`. An unload request failure is logged and shown in job status without discarding successful summaries. If a process exits abruptly or a request remains active after a network timeout, immediate unloading cannot be guaranteed; batch requests retain the bounded five-minute fallback.
 
-If the model server rejects a request with an HTTP error, NewsReview includes its JSON `error` or `message` explanation in sample-test errors, Recent runs, and `logs/console.log`. Explanations are normalized to one line and limited to 240 characters, with at most 8 KiB read from the error body. HTML, invalid JSON, and unrecognized error objects retain the HTTP status without exposing the body. Publisher error handling is unchanged. HTTP 400 indicates a rejected request, not necessarily a connection problem; use the returned explanation and the model server's own logs to identify the cause. After three consecutive review failures the batch stops, preserving stories and queued work. Fix the reported problem, test the model, and run Review pending again; stories that have reached three attempts need the existing retry/reassessment controls.
+If the model server rejects a request with an HTTP error, NewsReview includes its JSON `error` or `message` explanation in sample-test errors, Recent runs, and `logs/console.log`. Explanations are normalized to one line and limited to 240 characters, with at most 8 KiB read from the error body. HTML, invalid JSON, and unrecognized error objects retain the HTTP status without exposing the body. Publisher error handling is unchanged. HTTP 400 indicates a rejected request, not necessarily a connection problem; use the returned explanation and the model server's own logs to identify the cause. After three consecutive model-review failures the batch stops, preserving stories and queued work. Fix the reported problem, test the model, and run Review pending again; stories that have reached three attempts need the existing retry/reassessment controls.
 
 ### LM Studio or another compatible local server
 
@@ -159,7 +159,7 @@ On upgrade, the app imports every existing story tag and source category into th
 
 Adding a topic makes it available to future reviews; existing articles are not automatically reassessed. Renaming updates that label on saved articles in one transaction and preserves other labels, summaries, scores, bookmarks, dates, read markers, and feedback. Deleting requires confirmation and removes only that label from saved articles; articles with no remaining labels are still kept. Topic editing waits until collection/review or restore finishes. To reclassify old articles after adding topics, use Reassess history.
 
-Sources retain their independent Default category. Newly collected stories receive it as an initial label only if it matches a managed topic; otherwise they start without a topic until reviewed. Editing a source cannot grow the topic list or restore deleted topics. If the list is empty, AI review still summarizes and scores stories with an empty tags array. History resets keep the managed list; the existing Fresh start Interest topics option applies only to relevance interests.
+Sources retain their independent Default category. Newly collected stories receive it as an initial label only if it matches a managed topic; otherwise they start without a topic until reviewed. Editing a source cannot grow the topic list or restore deleted topics. Reviews may have no topic when none fit. Unknown model-suggested names are discarded, while configured names are matched without case sensitivity, deduplicated, and saved using their exact configured spelling. This keeps otherwise valid summaries and scores without creating topics or spending another model request. Invalid field types and other malformed output still fail validation. If the list is empty, AI review still summarizes and scores stories with an empty tags array. History resets keep the managed list; the existing Fresh start Interest topics option applies only to relevance interests.
 
 The owned topic list is stored in SQLite and included in ZIP backups. Restoring a current backup restores its list, including an empty list. Restoring an older backup without a topic list imports all its existing labels and source categories during the same restore transaction, preserving its current topics. Topic changes do not rewrite historical feedback snapshots or your interests/source settings.
 
@@ -326,7 +326,7 @@ Clearing history or runs restarts the automatic collection interval from the res
 4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured review model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
-7. Validate exact output fields, types, tag limits and membership in the managed Topics list, score range, milestone, and duplicate ID. Save only a valid review, together with provider/model, input basis, current interests, review time, and token counts when the server reports them. An empty topic list allows an empty tags array.
+7. Validate exact output fields, types, tag limits, score range, milestone, and duplicate ID. Keep only tags from the managed Topics list; unknown names are discarded without invalidating the summary. Save the valid review together with provider/model, input basis, current interests, review time, and token counts when the server reports them. Reviews can have an empty tags array even when configured topics exist.
 
 The model receives article content as untrusted data, has no tools, and is instructed to ignore embedded commands. The app renders publisher/model text using DOM text nodes, never as executable HTML. Model output validation catches structural problems, not every factual or editorial error.
 
@@ -340,7 +340,7 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - **Review pending** skips feed collection and processes the existing queue. While reviews are running, the button becomes **Stop review** (also during the AI phase of a full collection). Stop finishes the article already being fetched/reviewed, then stops the batch and leaves unprocessed stories queued. The button shows **Stopping review...** until the in-flight article finishes. Network/model timeouts still apply; this does not forcibly terminate an Ollama process or interrupt its active request.
 - Completed reviews remain saved, the configured model-unload cleanup runs, and the review stop is recorded in run details as a partial run. Click Review pending again to resume. The collection scheduler stays enabled, so a later scheduled/full run can process pending stories. Review stopping never cancels source collection or disables future automatic work.
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
-- Each failed review increments an attempt count. After three attempts, use **Reset failed reviews** once the underlying issue is fixed.
+- Each failed review increments an attempt count. Unreadable articles with no usable excerpt are recorded individually and skipped without a model call; they do not increase or reset the consecutive model-failure counter. Later articles continue. After three actual model-review failures without a successful review, the batch stops. After an article reaches three attempts, use **Reset failed reviews** once the underlying issue is fixed. Previously saved topic-validation errors also need Reset failed reviews to retry; old run records are retained.
 - Fresh/unattempted entries are processed first, newest first; older pending entries can wait on busy days. Increase the per-run limit or run additional review batches to catch up.
 - Collection is due when the configured hours have elapsed since the most recent full collection started. Manual full collections restart the interval; review-only and new-source-only jobs do not. With no previous full collection it runs on the next scheduler tick. Existing daily settings become a 24-hour interval; their old hour/minute fields are retained for archive compatibility but no longer control scheduling.
 - There is no wake-from-sleep mechanism. If the service was offline, it checks current feeds when it resumes; it cannot reconstruct stories that have already disappeared from those feeds.
@@ -497,6 +497,26 @@ If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the
 | A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess history to queue the archive explicitly. |
 | Connection or storage error in the footer | Check the app process, address, logs, and data directory. A deleted running database requires stopping and restarting or restoring a backup; write actions are not replayed automatically. |
 
+### Database startup errors and pooled drives
+
+A database connection can open initially and then fail during SQLite setup when it accesses its journal/shared-memory files. NewsReview now handles `SQLITE_CANTOPEN` throughout connection setup and use, closes the connection, and reports the database path and recovery checks. Startup exits with that explanation instead of an unhandled traceback. Other SQLite errors retain their original meaning; the app does not recreate the database, delete sidecar files, change journal mode, or silently relocate data.
+
+For **unable to open database file**, confirm the data directory and existing database are accessible, the account running NewsReview can write there and create/open `newsreview.db-wal` and `newsreview.db-shm`, and another NewsReview process is not running against the same folder. The error alone does not prove corruption or identify a specific DrivePool fault.
+
+DrivePool is a local pooled filesystem when accessed directly on its host; it is not inherently an SMB share. If the failure occurs on a pooled drive, isolate that path by testing the complete data folder on a regular local disk on the same machine:
+
+1. Stop every NewsReview process and retain a backup of the original folder.
+2. Copy the entire `data` folder to an unused local location, for example `C:\NewsReviewData`, including the database, any `-wal`/`-shm` files, `auth.json`, and `model-credentials.json`. Keep the original intact. Do not copy only a database main file from an active application or delete its sidecars.
+3. Run from the existing application directory:
+
+   ```powershell
+   py -3 -m newsreview --host 192.168.1.12 --port 8714 --data-dir "C:\NewsReviewData" --no-scheduler
+   ```
+
+4. Verify the existing history/settings load. If this works, it isolates the original storage path/filesystem/access conditions; it does not prove which DrivePool setting caused the failure. Keep using the same `--data-dir` (or set `NEWSREVIEW_DATA_DIR`) for later launches, and omit `--no-scheduler` to resume automatic collection. Do not start another instance against the original folder.
+
+The code may remain on the pooled drive. Moving the data folder also moves login credentials and saved model keys; ZIP exports exclude those files. There is no automatic copy or change to your storage. For an actual SMB/NFS share, SQLite WAL requires local storage; see [SQLite's WAL requirements](https://sqlite.org/wal.html).
+
 ## Tests and verification
 
 The automated suite needs only Python:
@@ -583,6 +603,13 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and the relevant browser suites listed above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.11.1
+
+- Skip individual articles without readable text without calling the model or tripping the consecutive model-failure cutoff. Preserve per-article errors, bounded attempts, and explicit retry controls.
+- Discard unknown model topic suggestions while keeping configured labels and valid summaries. Allow untagged reviews without growing the owned topic list or repeating paid requests; retain strict validation for other fields.
+- Catch database-open failures during SQLite setup as well as initial connection, always close connections, and show actionable startup diagnostics. Document safe data-folder testing outside pooled drives without changing storage or journal mode automatically.
+- Verify queue continuation, failure-cutoff behavior, all model transports, topic-list preservation, retry limits, and real SQLite WAL-open failures.
 
 ### v0.11.0
 
