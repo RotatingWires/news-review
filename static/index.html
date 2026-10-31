@@ -246,6 +246,7 @@
     <div class="dialog-body help-content">
       <h3>What AI reviews do</h3>
       <p>Your configured model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, selects tags from Settings → Topics, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage. Add, rename, or delete topics there; AI cannot invent new ones.</p>
+      <p>NewsReview tries to summarize the extracted article text. If the article page cannot be read reliably, it falls back to the source's RSS/Atom excerpt and marks that tile <strong>AI summary · based on source excerpt</strong>. Full-article summaries are left unlabeled to keep the feed uncluttered.</p>
       <p>Filtered stories remain in the database but are hidden in the normal feed. Open Filter... and select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
       <h3>Article feedback</h3><p>Use thumbs up/down on a tile and optionally explain why. Ratings and reasons stay saved; a compact preference profile is refreshed once before a review batch when needed. Edit, disable, update, or reset it in Settings, Interests. Written interests and guidance take priority. All stories show a summary without a separate Why it matters section.</p>
       <h3>Adding sources</h3>
