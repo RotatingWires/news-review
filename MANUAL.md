@@ -617,6 +617,10 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ## Release notes
 
+### v0.12.1
+
+- Place Sort immediately after Filter, followed by Date/time range, on Daily Feed and Bookmarks. Keep the same control order when the toolbar wraps on mobile.
+
 ### v0.12.0
 
 - Use indexed UTC publication bounds for day/date-range browsing, preserving original dates, microsecond precision, browser timezones, daylight-saving behavior, and undated-story fallback.
