@@ -204,6 +204,25 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26')[1]['total'], 2)
         self.assertEqual(self.request(base + '&period=10/15/26%20-%2010/16/26,%202pm%20-%204pm')[1]['total'], 2)
 
+    def test_story_sort_api_uses_publication_times_and_validates_order(self):
+        self.start_api()
+        source = next(source['id'] for source in self.store.sources() if source['enabled'])
+        for name, time, score in [('older-high', '08:00:00', 95), ('newer-low', '17:00:00', 20)]:
+            self.store.insert_story(source, {'headline': name, 'url': 'https://example.com/' + name,
+                                            'excerpt': 'Details', 'published_at': '2026-10-31T' + time + '+00:00',
+                                            'category': 'Technology'}, '2026-10-31')
+            with self.store.connect() as db:
+                db.execute('UPDATE stories SET score=?,bookmarked=1 WHERE headline=?', (score, name))
+        for sort, first in [('rank', 'older-high'), ('rank_asc', 'newer-low'),
+                            ('published', 'newer-low'), ('published_asc', 'older-high')]:
+            status, result, _ = self.request('/api/stories?day=2026-10-31&time_zone=UTC&sort=' + sort)
+            self.assertEqual(status, 200)
+            self.assertEqual(result['items'][0]['headline'], first)
+            status, result, _ = self.request('/api/stories?bookmarks=1&sort=' + sort)
+            self.assertEqual((status, result['items'][0]['headline']), (200, first))
+            self.assertFalse({'article_text', 'interests_snapshot', 'why_it_matters', 'sort_timestamp'} & set(result['items'][0]))
+        self.assertEqual(self.request('/api/stories?sort=unknown')[0], 400)
+
     def test_duplicate_purge_confirmation_lock_bookmarks_references_and_compaction(self):
         self.start_api()
         source = next(item['id'] for item in self.store.sources() if item['enabled'])

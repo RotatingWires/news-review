@@ -15,7 +15,7 @@ from newsreview.collector import Collector
 from newsreview.feeds import extract_article, parse_date, parse_feed, plain
 from newsreview.network import canonical_url, check_public, valid_url
 from newsreview.reviewer import candidates_for, validate_review
-from newsreview.store import Store, StorageUnavailable
+from newsreview.store import Store, StorageUnavailable, backfill_story_times
 from newsreview.validation import settings, source
 
 
@@ -116,6 +116,7 @@ class StoreTests(unittest.TestCase):
         self.store.insert_story(self.source, {"headline": "Undated", "url": "https://example.com/undated", "excerpt": "", "published_at": None, "category": "Protocols"}, '2020-01-01')
         with self.store.connect() as db:
             db.execute("UPDATE stories SET discovered_at='2026-10-18T10:00:00+00:00' WHERE published_at IS NULL")
+            backfill_story_times(db)
         result = self.store.stories(day='2026-10-18', time_zone='UTC')
         self.assertEqual([story['headline'] for story in result['items']], ['Undated'])
         self.assertEqual(self.store.stories(time_zone='UTC')['items'][0]['headline'], 'Undated')

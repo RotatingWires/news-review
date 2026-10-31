@@ -23,6 +23,14 @@ export class Feed {
     this.page = 1;
     this.requestId = 0;
     this.selectedTopics = new Set();
+    try {
+      const saved = localStorage.getItem('newsreview-sort');
+      if ([...$('story-sort').options].some(option => option.value === saved)) $('story-sort').value = saved;
+    } catch { /* Sorting still works without browser storage. */ }
+    $('story-sort').onchange = () => {
+      try { localStorage.setItem('newsreview-sort', $('story-sort').value); } catch { /* Optional preference. */ }
+      this.reload();
+    };
     const key = $('relevance-key');
     key.append(el('span', 'relevance-key-heading', 'Relevance:'));
     [...RELEVANCE, UNREVIEWED].forEach(tier => {
@@ -163,7 +171,7 @@ export class Feed {
     ['day', 'previous-day', 'next-day'].forEach(id => { $(id).disabled = history; });
     $('day').title = history ? 'The date range controls which days are searched. Clear it to use this picker.' : 'Publication day';
     const bookmarked = this.app.view === 'bookmarks';
-    const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('story-sort').value });
     if (query) params.set('query', query);
     if (period) {
       params.set('period', period);

@@ -8,7 +8,7 @@ import unittest
 import zipfile
 
 from newsreview.search import date_time_range
-from newsreview.store import Store
+from newsreview.store import Store, SCHEMA_VERSION
 from newsreview.transfer import create_archive, restore_archive
 
 
@@ -62,6 +62,9 @@ class TransferTests(unittest.TestCase):
             legacy = self.root / 'legacy.db'
             legacy.write_bytes(archive.read('newsreview.db'))
         with closing(sqlite3.connect(legacy)) as database:
+            database.execute('DROP INDEX stories_publication')
+            database.execute('DROP INDEX stories_bookmarks')
+            database.execute('ALTER TABLE stories DROP COLUMN sort_timestamp')
             database.execute('ALTER TABLE stories DROP COLUMN read_at')
             database.execute('PRAGMA user_version=2')
             database.commit()
@@ -75,7 +78,7 @@ class TransferTests(unittest.TestCase):
         restore_archive(self.store, upload)
         self.assertIsNone(self.store.stories()['items'][0]['read_at'])
         with self.store.connect() as database:
-            self.assertEqual(database.execute('PRAGMA user_version').fetchone()[0], 3)
+            self.assertEqual(database.execute('PRAGMA user_version').fetchone()[0], SCHEMA_VERSION)
         # The same version-2 file also upgrades normally when starting the app.
         upgraded = Store(legacy)
         self.assertIsNone(upgraded.stories()['items'][0]['read_at'])
@@ -84,7 +87,7 @@ class TransferTests(unittest.TestCase):
         with zipfile.ZipFile(self.archive) as archive:
             original_db = archive.read('newsreview.db')
             original_manifest = json.loads(archive.read('manifest.json'))
-        for mutation in ('checksum', 'extra', 'version', 'view'):
+        for mutation in ('checksum', 'extra', 'version', 'view', 'sort_timestamp'):
             with self.subTest(mutation=mutation):
                 manifest = dict(original_manifest)
                 database = original_db
@@ -92,12 +95,13 @@ class TransferTests(unittest.TestCase):
                     manifest['sha256'] = '0' * 64
                 if mutation == 'version':
                     manifest['application_version'] = '99.0.0'
-                if mutation == 'view':
+                if mutation in ('view', 'sort_timestamp'):
                     import sqlite3
                     path = self.root / 'mutant.db'
                     path.write_bytes(database)
                     with closing(sqlite3.connect(path)) as db:
-                        db.execute('CREATE VIEW unwanted AS SELECT * FROM stories')
+                        db.execute('CREATE VIEW unwanted AS SELECT * FROM stories' if mutation == 'view' else
+                                   'UPDATE stories SET sort_timestamp=sort_timestamp+1')
                         db.commit()
                     database = path.read_bytes()
                     manifest['sha256'] = hashlib.sha256(database).hexdigest()

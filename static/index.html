@@ -63,6 +63,12 @@
           </div>
         </div>
         <label>Date/time range<input type="text" id="period" form="search" placeholder="9/1/26 - 10/1/26, 10am - 3pm" autocomplete="off" spellcheck="false" maxlength="200"></label>
+        <label class="sort-control">Sort<select id="story-sort" aria-label="Sort stories">
+          <option value="rank">Rank: highest first</option>
+          <option value="rank_asc">Rank: lowest first</option>
+          <option value="published">Published: newest first</option>
+          <option value="published_asc">Published: oldest first</option>
+        </select></label>
         <button id="clear-search" class="text-button" hidden>Clear search</button>
       </div>
       <div class="results-heading"><h2 id="results-heading">Today’s Edition</h2><span id="story-count"></span><div id="relevance-key" aria-label="Relevance color key"></div></div>
@@ -258,6 +264,7 @@
       <p>Feeds/listings find the links. During AI review, NewsReview downloads each article or thread page to extract readable text. A headline-only feed can work if that page is readable. If it is blocked, only the available excerpt is used and labeled. JavaScript-only, restricted, or unusual pages may need a custom adapter.</p>
       <h3>Search and source health</h3>
       <p>Combine dates and times with a comma: 9/1/26 - 10/1/26, 10am - 3pm. A date range or time range alone also works. Times match the displayed publication time in your browser timezone, or collection time for undated stories; overnight ranges are supported. Topics match any checked selection.</p>
+      <p>Sort orders Daily Feed and Bookmarks by publication time (newest or oldest first) or relevance rank (highest or lowest first). Rank uses the saved AI score. The choice applies before pagination and is remembered in this browser; changing it does not run AI again.</p>
       <p>Check new sources collects only enabled sources that have never been checked, including newly added sources. Refresh sources checks all enabled sources, including failed ones. The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
       <h3>Backups and fresh starts</h3>
       <p>Open Settings, Collection &amp; history, then Import/Export to download a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>

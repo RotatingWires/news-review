@@ -8,7 +8,7 @@ import unittest
 from newsreview.collector import Collector
 from newsreview.migration import database_path
 from newsreview.search import date_range, time_range
-from newsreview.store import Store
+from newsreview.store import Store, backfill_story_times
 from tests.test_core import review
 from newsreview.reviewer import validate_review
 
@@ -51,6 +51,7 @@ class ArchiveTests(unittest.TestCase):
         local = datetime(2026, 10, 15, hour, 30).astimezone().astimezone(timezone.utc)
         with self.store.connect() as db:
             db.execute('UPDATE stories SET discovered_at=? WHERE url=?', (local.isoformat(), f'https://example.com/{number}'))
+            backfill_story_times(db)
 
     def test_multiple_topics_match_any_and_combine_with_clock_range(self):
         self.insert(1, 'Radio', 10)
@@ -70,6 +71,7 @@ class ArchiveTests(unittest.TestCase):
             for number, published in enumerate(publications, 1):
                 db.execute('UPDATE stories SET published_at=? WHERE url=?', (published, f'https://example.com/{number}'))
             db.execute("UPDATE stories SET discovered_at='2026-10-15T15:00:00+00:00' WHERE url='https://example.com/5'")
+            backfill_story_times(db)
         start, end = time_range('10am - 12pm')
         result = self.store.stories(time_start=start, time_end=end, time_zone='America/New_York')
         self.assertEqual({item['headline'] for item in result['items']}, {'Story 1', 'Story 2', 'Story 4', 'Story 5'})

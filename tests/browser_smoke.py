@@ -16,7 +16,7 @@ from newsreview.collector import Collector
 from newsreview.network import Fetcher
 from newsreview.reviewer import Reviewer, validate_review
 from newsreview.server import AppServer
-from newsreview.store import Store
+from newsreview.store import Store, backfill_story_times
 from tests.test_core import review
 from tests.test_integration import FixtureHandler
 
@@ -69,6 +69,34 @@ def run():
                 expect(page.locator('.relevance-indicator.relevance-medium')).to_have_count(1)
                 expect(page.locator('.relevance-indicator.relevance-low')).to_have_count(1)
                 expect(page.locator('#relevance-key .relevance-key-item')).to_have_count(4)
+                def choose_sort(label):
+                    page.get_by_role('button', name='Sort stories', exact=True).click()
+                    page.get_by_role('option', name=label, exact=True).click()
+                choose_sort('Rank: lowest first')
+                expect(page.locator('.story h3').first).to_contain_text('FreePBX')
+                choose_sort('Published: newest first')
+                expect(page.locator('.story h3').first).to_contain_text('Image compression')
+                choose_sort('Published: oldest first')
+                expect(page.locator('.story h3').first).to_contain_text('Experimental HTTP')
+                choose_sort('Rank: lowest first')
+                page.reload()
+                expect(page.get_by_role('button', name='Sort stories', exact=True)).to_contain_text('Rank: lowest first')
+                expect(page.locator('.story h3').first).to_contain_text('FreePBX')
+                with store.connect() as db:
+                    identifiers = dict(db.execute('SELECT headline,id FROM stories'))
+                for name in (samples[0][0], samples[2][0]):
+                    store.bookmark(identifiers[name], True)
+                page.get_by_role('button', name='Bookmarks', exact=True).click()
+                expect(page.locator('.story')).to_have_count(2)
+                expect(page.locator('.story h3').first).to_contain_text('FreePBX')
+                choose_sort('Published: oldest first')
+                expect(page.locator('.story h3').first).to_contain_text('Experimental HTTP')
+                for name in (samples[0][0], samples[2][0]):
+                    store.bookmark(identifiers[name], False)
+                page.get_by_role('button', name='Daily Feed', exact=True).click()
+                choose_sort('Rank: highest first')
+                expect(page.locator('.story')).to_have_count(4)
+                expect(page.locator('.story h3').first).to_contain_text('Experimental HTTP')
                 page.locator('#topic-button').click()
                 expect(page.locator('#topic-label')).to_have_text('Filter...')
                 low_row = page.locator('input[name="relevance"][value="low"]').locator('..')
@@ -209,6 +237,7 @@ def run():
                 with store.connect() as db:
                     db.execute("UPDATE stories SET discovered_at='2026-10-16T02:00:00+00:00'")
                     db.execute("UPDATE stories SET published_at='2026-10-15T15:00:00+00:00', discovered_at='2026-10-16T02:00:00+00:00' WHERE url='https://example.com/0'")
+                    backfill_story_times(db)
                 page.emulate_media(reduced_motion='reduce')
                 page.get_by_label('Date/time range', exact=True).fill('10am - 12pm')
                 page.get_by_label('Date/time range', exact=True).press('Enter')
@@ -219,6 +248,7 @@ def run():
                 expect(page.locator('.story h3')).to_contain_text('Experimental HTTP method')
                 with store.connect() as db:
                     db.execute("UPDATE stories SET published_at=NULL, discovered_at=? WHERE url != 'https://example.com/yesterday'", (today + 'T12:00:00+00:00',))
+                    backfill_story_times(db)
                 page.get_by_label('Date/time range', exact=True).fill(date_text)
                 page.get_by_label('Date/time range', exact=True).press('Enter')
                 expect(page.locator('.story')).to_have_count(5)
@@ -350,6 +380,9 @@ def run():
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 page.wait_for_selector('.story')
                 page.set_viewport_size({'width': 390, 'height': 844})
+                choose_sort('Published: newest first')
+                expect(page.get_by_role('button', name='Sort stories', exact=True)).to_contain_text('Published: newest first')
+                choose_sort('Rank: highest first')
                 chrome = page.locator('.window').evaluate('el => [el.querySelector("header").getBoundingClientRect().top, el.querySelector("footer").getBoundingClientRect().bottom]')
                 page.locator('main').evaluate('el => { el.scrollTop = el.scrollHeight; }')
                 assert chrome == page.locator('.window').evaluate('el => [el.querySelector("header").getBoundingClientRect().top, el.querySelector("footer").getBoundingClientRect().bottom]')

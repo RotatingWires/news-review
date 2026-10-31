@@ -14,7 +14,7 @@ import zipfile
 from . import __version__
 from .defaults import SETTINGS, SOURCE_UPDATES
 from .network import valid_url
-from .store import SCHEMA_VERSION, initialize_topics
+from .store import SCHEMA_VERSION, initialize_topics, backfill_story_times, publication_time
 from . import validation
 
 MAX_UPLOAD = 256 * 1024 * 1024
@@ -126,6 +126,9 @@ def _validate_rows(database):
             raise ValueError('Backup contains invalid relevance scores')
         _check_date(value['discovered_at'], required=True)
         _check_date(value['published_at'])
+        if 'sort_timestamp' in value and (type(value['sort_timestamp']) is not int or
+                value['sort_timestamp'] != publication_time(value['published_at'] or value['discovered_at'])):
+            raise ValueError('Backup contains an invalid publication sort timestamp')
         _check_date(value['reviewed_at'])
         _check_date(value.get('read_at'))
         datetime.strptime(value['day'], '%Y-%m-%d')
@@ -152,7 +155,7 @@ def extract_and_validate(store, upload, directory):
                 if member.file_size > limit or member.flag_bits & 1 or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
                     raise ValueError('Backup member is encrypted, unsupported, or exceeds its size limit')
             manifest = json.loads(archive.read('manifest.json'))
-            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') not in (2, SCHEMA_VERSION):
+            if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or manifest.get('format_version') != 1 or manifest.get('schema_version') not in (2, 3, SCHEMA_VERSION):
                 raise ValueError('This is not a supported NewsReview backup format')
             if _version(manifest.get('application_version')) > _version(__version__):
                 raise ValueError('This backup is from a newer NewsReview version. Update the application first.')
@@ -177,8 +180,10 @@ def extract_and_validate(store, upload, directory):
                 raise ValueError('Backup contains invalid source/duplicate relationships')
             for table in TABLES:
                 expected = [tuple(r) for r in live.execute(f'PRAGMA table_info({table})')]
-                if table == 'stories' and manifest['schema_version'] == 2:
-                    expected = [column for column in expected if column[1] != 'read_at']
+                if table == 'stories':
+                    expected = [column for column in expected if not
+                                (column[1] == 'read_at' and manifest['schema_version'] < 3 or
+                                 column[1] == 'sort_timestamp' and manifest['schema_version'] < 4)]
                 actual = [tuple(r) for r in imported.execute(f'PRAGMA table_info({table})')]
                 if expected != actual:
                     raise ValueError(f'Backup table layout does not match: {table}')
@@ -212,9 +217,12 @@ def restore_archive(store, upload):
                 placeholders = ','.join('?' for _ in columns)
                 names = ','.join('"' + column + '"' for column in columns)
                 imported_columns = {row['name'] for row in imported.execute(f'PRAGMA table_info({table})')}
-                selected = ','.join('"' + column + '"' if column in imported_columns else 'NULL AS "read_at"' for column in columns)
+                selected = ','.join('"' + column + '"' if column in imported_columns else
+                                    ('0' if column == 'sort_timestamp' else 'NULL') + ' AS "' + column + '"' for column in columns)
                 live.executemany(f'INSERT INTO {table}({names}) VALUES ({placeholders})',
                                  (tuple(row) for row in imported.execute(f'SELECT {selected} FROM {table}')))
+            if imported.execute('PRAGMA user_version').fetchone()[0] < 4:
+                backfill_story_times(live)
             initialize_topics(live)
             live.execute("INSERT INTO settings(key,value) VALUES ('data_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(secrets.token_hex(16)),))
             live.execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", (datetime.now(timezone.utc).isoformat(),))

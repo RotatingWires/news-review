@@ -1,7 +1,7 @@
 """SQLite persistence. Each operation owns its connection and transaction."""
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -12,7 +12,18 @@ from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
 from .health import source_health
 from . import feedback
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+STORY_SORTS = {
+    'rank': 's.score DESC,s.sort_timestamp DESC,s.id DESC',
+    'rank_asc': 's.score ASC,s.sort_timestamp DESC,s.id DESC',
+    'published': 's.sort_timestamp DESC,s.id DESC',
+    'published_asc': 's.sort_timestamp ASC,s.id ASC',
+}
+FEED_COLUMNS = '''s.id,s.source_id,s.headline,s.url,s.excerpt,s.content_basis,
+    s.published_at,s.discovered_at,s.day,s.summary,s.tags,s.status,s.score,s.bookmarked,
+    s.milestone,s.duplicate_of,s.review_error,s.attempts,s.reviewed_at,s.provider,s.model,
+    s.input_tokens,s.output_tokens,s.read_at'''
 PURGEABLE_DUPLICATES = """s.status='duplicate' AND s.bookmarked=0
     AND NOT EXISTS (SELECT 1 FROM stories child WHERE child.duplicate_of=s.id)"""
 
@@ -23,6 +34,31 @@ class StorageUnavailable(RuntimeError):
 
 def utcnow():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def publication_time(value):
+    """Exact UTC microseconds, retaining original timestamp strings separately."""
+    delta = datetime.fromisoformat(value).astimezone(timezone.utc) - EPOCH
+    return (delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds
+
+
+def backfill_story_times(db):
+    rows = db.execute('SELECT id,COALESCE(published_at,discovered_at) FROM stories ORDER BY id')
+    while batch := rows.fetchmany(500):
+        db.executemany('UPDATE stories SET sort_timestamp=? WHERE id=?',
+                       ((publication_time(timestamp), identifier) for identifier, timestamp in batch))
+
+
+def calendar_boundary(value, zone, *, following=False):
+    day = date.fromisoformat(value)
+    if following:
+        if day == date.max:
+            return 2**63 - 1
+        day += timedelta(days=1)
+    midnight = datetime.combine(day, time.min)
+    if zone is not None:
+        midnight = midnight.replace(tzinfo=zone)
+    return publication_time(midnight.isoformat())
 
 
 def initialize_topics(db):
@@ -70,6 +106,12 @@ class Store:
             """)
             if version < 3 and 'read_at' not in {row['name'] for row in db.execute('PRAGMA table_info(stories)')}:
                 db.execute('ALTER TABLE stories ADD COLUMN read_at TEXT')
+            if 'sort_timestamp' not in {row['name'] for row in db.execute('PRAGMA table_info(stories)')}:
+                db.execute('BEGIN IMMEDIATE')
+                db.execute('ALTER TABLE stories ADD COLUMN sort_timestamp INTEGER NOT NULL DEFAULT 0')
+                backfill_story_times(db)
+            db.execute('CREATE INDEX IF NOT EXISTS stories_publication ON stories(sort_timestamp,id,score,status,bookmarked)')
+            db.execute('CREATE INDEX IF NOT EXISTS stories_bookmarks ON stories(bookmarked,sort_timestamp,id,score,status)')
             columns = {r['name'] for r in db.execute('PRAGMA table_info(sources)')}
             additions = {
                 'mode': "TEXT NOT NULL DEFAULT 'auto'", 'link_pattern': "TEXT NOT NULL DEFAULT ''",
@@ -177,10 +219,11 @@ class Store:
         with self.connect() as db:
             topics = json.loads(db.execute("SELECT value FROM settings WHERE key='topics'").fetchone()[0])
             tags = [name for name in topics if name.casefold() == item['category'].casefold()][:1]
+            discovered = utcnow()
             return bool(db.execute("""INSERT OR IGNORE INTO stories
-                (source_id,headline,url,excerpt,published_at,discovered_at,day,tags)
-                VALUES (?,?,?,?,?,?,?,?)""", (source_id, item["headline"], item["url"], item["excerpt"],
-                item["published_at"], utcnow(), day, json.dumps(tags))).rowcount)
+                (source_id,headline,url,excerpt,published_at,discovered_at,day,tags,sort_timestamp)
+                VALUES (?,?,?,?,?,?,?,?,?)""", (source_id, item["headline"], item["url"], item["excerpt"],
+                item["published_at"], discovered, day, json.dumps(tags), publication_time(item['published_at'] or discovered))).rowcount)
 
     @staticmethod
     def story(row):
@@ -190,7 +233,9 @@ class Store:
         return result
 
     def stories(self, *, day="", query="", start="", end="", tag="", tags=None,
-                time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, excluded_relevance=None, page=1):
+                time_start=None, time_end=None, time_zone="", bookmarks=False, show_hidden=False, excluded_relevance=None, page=1, sort='rank'):
+        if sort not in STORY_SORTS:
+            raise ValueError('Choose a valid story sort order')
         zone = None
         if time_zone:
             if not isinstance(time_zone, str) or len(time_zone) > 100:
@@ -201,20 +246,15 @@ class Store:
                 raise ValueError('Search timezone is unavailable; install system timezone data or the Python tzdata package') from exc
 
         def clock_minutes(timestamp):
-            local = datetime.fromisoformat(timestamp).astimezone(zone)
+            local = (EPOCH + timedelta(microseconds=timestamp)).astimezone(zone)
             return local.hour * 60 + local.minute
-
-        def calendar_day(timestamp):
-            return datetime.fromisoformat(timestamp).astimezone(zone).date().isoformat()
-
-        story_date = "newsreview_date(COALESCE(s.published_at,s.discovered_at))"
         clauses, args = ["1=1"], []
         if not show_hidden:
             clauses.append("(s.status NOT IN ('filtered','duplicate') OR s.bookmarked=1)")
-        for value, clause in [(day, f"{story_date}=?"), (start, f"{story_date}>=?"), (end, f"{story_date}<=?")]:
+        for value, following in [(day, False), (day, True), (start, False), (end, True)]:
             if value:
-                clauses.append(clause)
-                args.append(value)
+                clauses.append('s.sort_timestamp' + ('<?' if following else '>=?'))
+                args.append(calendar_boundary(value, zone, following=following))
         excluded = list(dict.fromkeys(excluded_relevance or []))
         if any(value not in ('high', 'medium', 'low', 'pending') for value in excluded):
             raise ValueError('Invalid relevance filter')
@@ -230,7 +270,7 @@ class Store:
             clauses.append(f"EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value IN ({placeholders}))")
             args.extend(selected_tags)
         if time_start is not None:
-            minutes = "newsreview_clock(COALESCE(s.published_at,s.discovered_at))"
+            minutes = "newsreview_clock(s.sort_timestamp)"
             if time_start <= time_end:
                 clauses.append(f"({minutes}>=? AND {minutes}<=?)")
             else:
@@ -245,12 +285,17 @@ class Store:
         where = " AND ".join(clauses)
         with self.connect() as db:
             db.create_function("newsreview_clock", 1, clock_minutes, deterministic=True)
-            db.create_function("newsreview_date", 1, calendar_day, deterministic=True)
             total = db.execute(f"SELECT COUNT(*) FROM stories s WHERE {where}", args).fetchone()[0]
-            rows = db.execute(f"""SELECT s.*,src.name AS source_name,src.category AS source_category,
+            # Materialize only the page IDs before reading display fields. Article
+            # bodies and review snapshots never enter the feed query or sort.
+            order = STORY_SORTS[sort]
+            rows = db.execute(f"""WITH page AS MATERIALIZED (
+                SELECT s.id FROM stories s WHERE {where}
+                ORDER BY {order} LIMIT 48 OFFSET ?)
+                SELECT {FEED_COLUMNS},src.name AS source_name,src.category AS source_category,
                 (SELECT COUNT(*) FROM stories d WHERE d.duplicate_of=s.id) AS related_count
-                FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE {where}
-                ORDER BY {story_date} DESC,s.score DESC,s.discovered_at DESC,s.id DESC LIMIT 48 OFFSET ?""", (*args, (page - 1) * 48))
+                FROM page JOIN stories s ON s.id=page.id LEFT JOIN sources src ON src.id=s.source_id
+                ORDER BY {order}""", (*args, (page - 1) * 48))
             items = [self.story(row) for row in rows]
             interests = json.loads(db.execute("SELECT value FROM settings WHERE key='interests'").fetchone()[0])
             ratings = interests.get('feedback', {}).get('ratings', {})

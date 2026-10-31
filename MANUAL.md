@@ -153,7 +153,7 @@ Collection/review messages and their blinking activity light appear only in the 
 
 The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
 
-Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation rejects invented topics. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
+Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
 
 On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with the bundled source-category names. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
 
@@ -177,6 +177,7 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 
 ## Reading and searching
 
+- **Sort:** choose Published: newest first / oldest first, or Rank: highest first / lowest first. Rank means the saved AI relevance score (0–100), with highest first as the default. The choice is shared between Daily Feed and Bookmarks and remembered in this browser when storage is available. It applies to the entire matching day, date range, or bookmark set before pagination. Equal ranks use newest publication time first; equal timestamps use a stable story ID order so paging does not reshuffle ties. Undated stories use collection time. Sorting does not call the model or reassess stories, and Clear search / Today keep your chosen sort.
 - **Daily feed:** the selected day shows stories published on that date in your browser timezone. Stories without a publication date use their collection date. This applies to existing history too.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
 - **Search:** a keyword searches the currently selected publication day, unless an explicit date range is entered, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
@@ -188,7 +189,7 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
 - **Relevance:** all four levels start checked in Filter...: highly relevant, somewhat relevant, low relevance, and awaiting review. Uncheck any level to hide it, including bookmarked stories in that level. Levels combine with topics, search, dates, and Include filtered / duplicates on Daily Feed and Bookmarks. Unchecking all levels intentionally shows no stories. Clear search, Today, and previous/next navigation restore all levels.
 - **Include filtered / duplicates** (inside Filter...): reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
-- **Ordering and pagination:** 48 results per page, newest publication day first (collection day for undated stories), then AI relevance score (highest first), collection time, and ID. Across multiple days, an older green story can follow a newer yellow one. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
+- **Ordering and pagination:** 48 results per page using your chosen Sort order. Rank sorting compares scores across the entire selected date range, so an older green story can precede a newer yellow one. Publication sorting compares the actual timestamp, including the time within a day. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
 
 Tiles show the original headline and source, tags, the generated summary when available, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
@@ -384,7 +385,19 @@ logs/
 
 Both directories are Git-ignored. Runtime logs match TaskList: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` relative to the working directory. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database and credentials, not the log directory. File logging failures leave console logging available. Old `data/server.log` and `data/server.log.1` files are no longer written or removed automatically. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (3); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+
+### Feed reads and upgrade work
+
+Schema 4 adds an indexed UTC publication timestamp in exact integer microseconds, falling back to collection time only when publication is unknown. Original publication/collection strings are retained. On first upgrade, existing stories are backfilled in bounded batches and compact publication/bookmark indexes are built. This is a one-time pass over existing history that requires disk activity and a little additional index space; later restarts do not backfill the archive again. Login credentials, model keys, interests, bookmarks, read markers, summaries, and feedback remain intact.
+
+Day and date-range searches translate browser-local calendar boundaries into UTC bounds and look up the matching index range. Adjacent local midnights are converted separately so 23/25-hour daylight-saving days and offset timestamps remain correct. Time-of-day filters then apply within the selected date range. Without an explicit browser timezone, the existing server-local interpretation is retained.
+
+The feed counts matching records, selects at most 48 page IDs, and only then retrieves display fields for those stories. Article bodies, legacy significance text, and review-interest snapshots are not selected for feed reads. Related-source counts use the duplicate index. Overview requests still calculate archive counts and available discovery days from compact indexes and return the eight most recent runs; the app does not keep the entire database in RAM. There is no added idle polling or full-history browser download.
+
+Broad archive keyword searches and ranking across all history can still examine many matching records; those requests intentionally span the archive. Opening SQLite, reading assets/logging requests, and scheduled collection still involve disk access. A sleeping drive can therefore still need to spin up even though a daily feed no longer scans unrelated article records.
+
+Current ZIP backups include the derived timestamp/indexes. Schema-2 and schema-3 backups are accepted, validated against their original table layouts, and backfilled transactionally when restored; schema-2 read markers remain empty. A newer backup is still refused by an older app. Keep an export before upgrading if you need a recovery copy.
 
 The database stores original URLs/headlines, excerpts, bounded extracted text, summaries, tags, milestones, dates, relevance, bookmark status, duplicate relationships, review attempts/errors, model metadata, and the interest snapshot for the latest review. History is retained until explicitly cleared; there is no automatic expiration.
 
@@ -603,6 +616,14 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and the relevant browser suites listed above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.12.0
+
+- Use indexed UTC publication bounds for day/date-range browsing, preserving original dates, microsecond precision, browser timezones, daylight-saving behavior, and undated-story fallback.
+- Materialize only the selected page IDs before loading display fields. Keep full article bodies and review snapshots out of feed queries, and use compact covering indexes for publication/bookmark filtering.
+- Add a custom Win95 Sort dropdown for publication newest/oldest and relevance rank highest/lowest across Daily Feed and Bookmarks. Remember the browser preference, sort before paging, and keep deterministic tie ordering.
+- Upgrade existing databases once to schema 4 without resetting history or preferences. Retain schema-2/3 ZIP restore support and validate derived timestamp integrity.
+- Verify real query plans and bounded SQLite work against a larger archive, migration/backup roundtrips, offset/microsecond/DST boundaries, sorting/filtering/pagination, API validation, and desktop/mobile dropdown behavior.
 
 ### v0.11.1
 

@@ -292,10 +292,8 @@ class Handler(BaseHTTPRequestHandler):
             values.pop("tag")
             page = validation.integer(int(params.get("page", ["1"])[0]), "Page", 1, 100000)
             result = store.stories(**values, tags=tags, time_start=time_start, time_end=time_end, time_zone=params.get("time_zone", [""])[0],
-                                   excluded_relevance=excluded_relevance, bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page)
-            for item in result["items"]:
-                for field in ("article_text", "interests_snapshot", "why_it_matters"):
-                    item.pop(field, None)
+                                   excluded_relevance=excluded_relevance, bookmarks=params.get("bookmarks") == ["1"], show_hidden=params.get("hidden") == ["1"], page=page,
+                                   sort=params.get('sort', ['rank'])[0])
             self.send(200, result)
         elif path == '/api/export':
             with tempfile.TemporaryDirectory(prefix='newsreview-download-') as directory:
