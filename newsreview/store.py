@@ -8,7 +8,7 @@ import sqlite3
 import secrets
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .defaults import SETTINGS, SOURCES, SOURCE_UPDATES
+from .defaults import SETTINGS
 from .health import source_health
 from . import feedback
 
@@ -126,18 +126,8 @@ class Store:
             for key, value in SETTINGS.items():
                 db.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, json.dumps(value)))
             db.execute("INSERT OR IGNORE INTO settings VALUES ('data_revision',?)", (json.dumps(secrets.token_hex(16)),))
-            if not db.execute("SELECT 1 FROM settings WHERE key='sources_seeded'").fetchone():
-                db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", SOURCES)
-                db.execute("INSERT INTO settings VALUES ('sources_seeded', 'true')")
-            for marker, additions in SOURCE_UPDATES.items():
-                if not db.execute("SELECT 1 FROM settings WHERE key=?", (marker,)).fetchone():
-                    db.executemany("INSERT OR IGNORE INTO sources(name,url,feed_url,category) VALUES (?,?,?,?)", additions)
-                    db.execute("INSERT INTO settings VALUES (?, 'true')", (marker,))
             initialize_topics(db)
             if version < 2:
-                # Retain historical source names/relationships, but remove these
-                # requested sources from active configuration on existing installs.
-                db.execute("UPDATE sources SET removed=1,enabled=0 WHERE url IN ('https://daniel.haxx.se/blog/','https://lwn.net/')")
                 db.execute("""UPDATE sources SET first_checked=last_checked,
                     last_success=CASE WHEN last_error IS NULL THEN last_checked ELSE NULL END,
                     consecutive_failures=CASE WHEN last_error IS NULL THEN 0 ELSE 1 END""")

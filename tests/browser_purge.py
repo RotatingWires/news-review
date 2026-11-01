@@ -8,12 +8,13 @@ from playwright.sync_api import sync_playwright, expect
 from newsreview.collector import Collector
 from newsreview.server import AppServer
 from newsreview.store import Store
+from tests.fixtures import add_source
 
 
 def run():
     with tempfile.TemporaryDirectory() as directory:
         store = Store(Path(directory) / 'news.db')
-        source = store.sources()[0]['id']
+        source = add_source(store)['id']
         for name in ('Main', 'Duplicate', 'Saved duplicate'):
             store.insert_story(source, {'headline': name, 'url': 'https://example.com/' + name.replace(' ', '-'),
                                        'excerpt': 'Fixture article.', 'published_at': None, 'category': 'Security'}, '2026-10-21')

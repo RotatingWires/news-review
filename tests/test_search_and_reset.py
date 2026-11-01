@@ -11,6 +11,7 @@ from newsreview.search import date_range, time_range
 from newsreview.store import Store, backfill_story_times
 from tests.test_core import review
 from newsreview.reviewer import validate_review
+from tests.fixtures import add_source
 
 
 class RangeTests(unittest.TestCase):
@@ -38,8 +39,8 @@ class ArchiveTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'newsreview.db')
-        self.source = self.store.sources()[0]['id']
-        for name in ('Radio', 'Science'):
+        self.source = add_source(self.store)['id']
+        for name in ('Radio', 'Science', 'Standards'):
             self.store.change_topic('add', name)
 
     def tearDown(self):
@@ -125,7 +126,7 @@ class ArchiveTests(unittest.TestCase):
             legacy = Store(path / 'tech-news.db')
             interests = {**legacy.settings()['interests'], 'guidance': 'Favor local history.'}
             legacy.save_settings({'interests': interests})
-            legacy.insert_story(legacy.sources()[0]['id'], {'headline': 'Old story', 'url': 'https://example.com/old',
+            legacy.insert_story(add_source(legacy)['id'], {'headline': 'Old story', 'url': 'https://example.com/old',
                                  'excerpt': 'Text', 'published_at': None, 'category': 'History'}, '2026-10-15')
             migrated = Store(database_path(path))
             self.assertEqual(migrated.stories()['total'], 1)

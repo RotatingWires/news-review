@@ -10,6 +10,7 @@ from newsreview.health import source_health
 from newsreview.listings import parse_listing
 from newsreview.store import Store
 from newsreview.validation import source
+from tests.fixtures import add_source
 
 
 class ListingTests(unittest.TestCase):
@@ -44,7 +45,7 @@ class SourceTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'newsreview.db')
-        self.source_id = self.store.sources()[0]['id']
+        self.source_id = add_source(self.store)['id']
 
     def tearDown(self):
         self.directory.cleanup()
@@ -70,87 +71,16 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(config['consecutive_failures'], 0)
         self.assertTrue(any('no story entries' in w for w in config['health']['warnings']))
 
-    def test_removed_defaults_migrate_existing_installs_without_deleting_stories(self):
+    def test_existing_sources_and_legacy_markers_survive_restart_without_reseeding(self):
         with self.store.connect() as db:
-            source_id = db.execute("INSERT INTO sources(name,url,feed_url,category) VALUES ('Daniel Stenberg','https://daniel.haxx.se/blog/','','Protocols')").lastrowid
-            db.execute('PRAGMA user_version=1')
-        self.store.insert_story(source_id, {'headline': 'An archived protocol article', 'url': 'https://example.com/old',
-            'excerpt': 'Text', 'published_at': None, 'category': 'Protocols'}, '2026-10-15')
-        reopened = Store(self.store.path)
-        self.assertEqual(len(reopened.sources()), 39)
-        self.assertEqual(reopened.stories()['items'][0]['source_name'], 'Daniel Stenberg')
-        self.assertEqual(reopened.stories()['total'], 1)
-        restored = reopened.save_source({'name': 'Manually restored', 'url': 'https://daniel.haxx.se/blog/', 'feed_url': '', 'category': 'News', 'enabled': True})
-        self.assertEqual(restored, source_id)
-        self.assertEqual(len(Store(self.store.path).sources()), 40, 'One-time migration must not repeatedly remove a manually restored source')
-
-    def test_approved_sources_upgrade_once_preserving_configuration_and_removals(self):
-        from newsreview.defaults import SOURCE_ADDITIONS_048
-        additions = {item[1] for item in SOURCE_ADDITIONS_048}
-        with self.store.connect() as db:
-            db.execute("DELETE FROM settings WHERE key='source_additions_048'")
-            for url in additions:
-                db.execute('DELETE FROM sources WHERE url=?', (url,))
-        name, url, feed, category = SOURCE_ADDITIONS_048[0]
-        source_id = self.store.save_source({'name': 'My existing self-host source', 'url': url,
-            'feed_url': feed, 'category': 'Custom', 'enabled': False})
+            db.execute("INSERT INTO settings VALUES ('sources_seeded','true'),('source_additions_048','true')")
+            db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (self.source_id,))
+        kept = self.store.save_source({'name': 'Kept source', 'url': 'https://example.org/', 'feed_url': '',
+                                       'category': 'Custom', 'enabled': False})
         preferences = self.store.settings()
-        upgraded = Store(self.store.path)
-        self.assertEqual(len(upgraded.sources()), 39)
-        self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
-        existing = next(item for item in upgraded.sources() if item['id'] == source_id)
-        self.assertEqual(existing['name'], 'My existing self-host source')
-        self.assertEqual(existing['category'], 'Custom')
-        self.assertFalse(existing['enabled'])
-        self.assertEqual(upgraded.settings(), preferences)
-        with upgraded.connect() as db:
-            db.execute('UPDATE sources SET removed=1,enabled=0 WHERE id=?', (source_id,))
-        self.assertEqual(len(Store(self.store.path).sources()), 38)
-        upgraded.reset({'sources': True})
-        self.assertEqual(Store(self.store.path).sources(), [])
-
-    def test_general_hackaday_upgrade_preserves_ham_source_and_user_edits(self):
-        from newsreview.defaults import SOURCE_UPDATES
-        marker = 'source_additions_0411'
-        name, url, feed, category = SOURCE_UPDATES[marker][0]
-        configured = next(item for item in self.store.sources() if item['url'] == url)
-        self.store.save_source({**configured, 'name': 'My Hackaday', 'enabled': False}, configured['id'])
-        with self.store.connect() as db:
-            db.execute('DELETE FROM settings WHERE key=?', (marker,))
-        upgraded = Store(self.store.path)
-        matches = [item for item in upgraded.sources() if item['url'] == url]
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]['name'], 'My Hackaday')
-        self.assertFalse(matches[0]['enabled'])
-        self.assertTrue(any(item['url'] == 'https://hackaday.com/tag/ham-radio/' for item in upgraded.sources()))
-        with upgraded.connect() as db:
-            db.execute('UPDATE sources SET removed=1 WHERE url=?', (url,))
-        self.assertFalse(any(item['url'] == url for item in Store(self.store.path).sources()))
-
-    def test_google_mac_security_additions_upgrade_once(self):
-        from newsreview.defaults import SOURCE_ADDITIONS_056
-        with self.store.connect() as db:
-            db.execute("DELETE FROM settings WHERE key='source_additions_056'")
-            for _, url, _, _ in SOURCE_ADDITIONS_056:
-                db.execute('DELETE FROM sources WHERE url=?', (url,))
-        name, url, feed, category = SOURCE_ADDITIONS_056[0]
-        identifier = self.store.save_source({'name': 'My Google feed', 'url': url, 'feed_url': feed,
-                                             'category': 'Custom', 'enabled': False})
-        upgraded = Store(self.store.path)
-        additions = {item[1] for item in SOURCE_ADDITIONS_056}
-        self.assertTrue(additions <= {item['url'] for item in upgraded.sources()})
-        existing = next(item for item in upgraded.sources() if item['id'] == identifier)
-        self.assertEqual(existing['name'], 'My Google feed')
-        self.assertFalse(existing['enabled'])
-        self.assertEqual(existing['category'], 'Custom')
-        for config in upgraded.sources():
-            if config['url'] in additions:
-                self.assertFalse(config['last_checked'])
-        with upgraded.connect() as db:
-            db.execute('UPDATE sources SET removed=1 WHERE url=?', (url,))
         reopened = Store(self.store.path)
-        self.assertFalse(any(item['url'] == url for item in reopened.sources()))
-        self.assertEqual(reopened.settings(), upgraded.settings())
+        self.assertEqual([(item['id'], item['name'], item['enabled']) for item in reopened.sources()], [(kept, 'Kept source', 0)])
+        self.assertEqual(reopened.settings(), preferences)
 
     def test_source_modes_and_intervals_are_validated(self):
         config = {'name': 'Website', 'url': 'https://example.com/', 'category': 'News', 'mode': 'page', 'stale_days': 30}

@@ -9,12 +9,13 @@ from newsreview.collector import Collector
 from newsreview.server import AppServer
 from newsreview.store import Store
 from tests.test_core import review
+from tests.fixtures import add_source
 
 
 def run():
     with tempfile.TemporaryDirectory() as directory:
         store = Store(Path(directory) / 'news.db')
-        source = store.sources()[0]
+        source = add_source(store)
         category = source['category']
         for number in range(2):
             store.insert_story(source['id'], {

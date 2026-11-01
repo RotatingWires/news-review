@@ -8,13 +8,14 @@ from newsreview.store import Store
 from newsreview.transfer import create_archive, restore_archive
 from newsreview.validation import topic_names
 from tests.test_core import review
+from tests.fixtures import add_source
 
 
 class TopicTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'news.db')
-        self.source = self.store.sources()[0]
+        self.source = add_source(self.store)
         self.store.insert_story(self.source['id'], {
             'headline': 'A useful technical development', 'url': 'https://example.com/topics',
             'excerpt': 'Source details.', 'published_at': None, 'category': self.source['category'],

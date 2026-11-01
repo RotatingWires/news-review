@@ -280,7 +280,7 @@ export class Settings {
     const row = el('div', 'interest-row');
     const input = el('input');
     input.value = topic.name;
-    input.placeholder = 'e.g. science, local news, or radio projects';
+    input.placeholder = 'e.g. science, local news, or open source';
     input.required = true;
     input.maxLength = 120;
     input.setAttribute('aria-label', 'Interest topic');

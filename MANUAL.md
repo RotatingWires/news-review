@@ -3,7 +3,7 @@
 
 # NewsReview
 
-A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. The initial source list and interests are tuned to technology, security, homelabbing/self-hosting, radio, and telephony; they are editable presets, not a restriction on what NewsReview can cover.
+A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
 Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Local model review needs no paid API, ChatGPT subscription, or cloud model; OpenRouter is an optional paid API provider.
 
@@ -35,8 +35,9 @@ Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Pub
 
 1. Open **Settings → AI**, choose your server type, and enter the server URL and model name.
 2. Use **Test with a sample article**, then **Save**.
-3. Click **Check sources**. The collector runs in the background; the page reports progress.
-4. Adjust **Settings → Interests** and **Collection & history** as desired.
+3. Add your sources in **Settings → Sources → Add source**. A fresh install has none; see [Add or edit a source](#add-or-edit-a-source).
+4. Click **Check sources**. The collector runs in the background; the page reports progress.
+5. Describe your interests in **Settings → Interests**, add article labels in **Settings → Topics**, and adjust **Collection & history** as desired.
 
 You can collect before setting up a model. Stories display source excerpts labeled **awaiting AI review**, rather than pretending those excerpts are generated summaries. Later, configure the model and click **Review pending**.
 
@@ -155,7 +156,7 @@ The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as oth
 
 Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
 
-On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with the bundled source-category names. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
+On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with an empty list; add topics if you want reviewed articles labeled. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
 
 Adding a topic makes it available to future reviews; existing articles are not automatically reassessed. Renaming updates that label on saved articles in one transaction and preserves other labels, summaries, scores, bookmarks, dates, read markers, and feedback. Deleting requires confirmation and removes only that label from saved articles; articles with no remaining labels are still kept. Topic editing waits until collection/review or restore finishes. To reclassify old articles after adding topics, use Reassess history.
 
@@ -206,27 +207,7 @@ Each story has a relevance square beside its bookmark: green **75–100**, yello
 
 ## Sources
 
-The following **39 sources** are seeded once on a fresh database:
-
-| Group | Sources |
-| --- | --- |
-| Google and Apple coverage | 9to5Google, 9to5Mac |
-| Original technology sources | BetaNews, Ars Technica, BleepingComputer, TechCrunch, MacRumors, Android Authority, Engadget, MIT Technology Review, PCWorld, The Register, Tom's Hardware, CNET |
-| Standards, engineering, and open source | IETF Blog, W3C News, web.dev, Mozilla Hacks, Cloudflare Blog, Phoronix, general Hackaday |
-| Radio and SDR | RTL-SDR Blog, RadioReference Forums, GNU Radio News, Hackaday's ham radio coverage |
-| Telephony | FreePBX Blog, FreePBX Community announcements, Asterisk Blog |
-| Homelab and self-hosting | selfh.st, ServeTheHome, VirtualizationHowto |
-| Additional cybersecurity | PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, Cybernews, The Hacker News, Zero Day Initiative, HackerNoon Cybersecurity, TechRepublic Security |
-
-Defaults are defined in `newsreview/defaults.py`. Changes to defaults normally do not overwrite an existing installation's sources or settings. The v0.3.0 migration specifically removes Daniel Stenberg and LWN from active source configuration, as requested, while retaining the source records behind archived stories. This migration runs once; a manually restored source is not removed again.
-
-[SOURCES.md](SOURCES.md) links to the 27 current approved additions separately from the original 12 websites.
-
-The v0.4.8 source update adds seven approved sources once on startup to both fresh and existing databases. It uses an internal `source_additions_048` marker, included in ZIP backups; source URLs already present are never overwritten or re-enabled. Later disabling/removing these sources, or clearing source configuration through Fresh start, persists across restarts. Existing interests are preserved. Cybernews currently uses HTML listing extraction in Automatic mode; the other six additions have verified feeds.
-
-The v0.5.6 source update adds 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security once for new and existing installations. All four use verified RSS feeds in Automatic mode; HackerNoon uses its cybersecurity tag feed for the requested category page. Existing source customizations, disabled/removed records, and interests are preserved. Restart after updating, then use **Check new sources** to collect them.
-
-General Hackaday is added once on upgrade to v0.4.11, using `https://hackaday.com/blog/feed/`. The ham-radio source remains separate. Identical article URLs discovered through both are still stored only once. Matching configured URLs and later disable/remove choices are preserved, using the same source-update mechanism as v0.4.8.
+NewsReview does not bundle any sources. A fresh database starts with an empty source list; add each feed or website as described below. Updating the application never adds, removes, or edits an existing installation's sources, and Fresh start does not reseed any.
 
 ### Add or edit a source
 
@@ -246,13 +227,13 @@ The collector supports RSS 2.0, common RDF/RSS feeds, and Atom. Feed discovery f
 
 **Feeds or website listings find stories; article webpages provide review text.** During AI review the collector visits each article URL and attempts to extract readable text, even when the feed has only a headline. This is an HTTP download, not a JavaScript browser session. A site that requires JavaScript, authentication, or a subscription may still be unreadable. In that case the model uses the available source excerpt; if there is no usable article text or excerpt, the app keeps the headline/link and reports the review error. It does not summarize a headline as if it had read the article. Without a model configured, collection still works, but article extraction waits for the review stage.
 
-Edit a source to change its feed, default category, or enabled state. Disabling stops collection and preserves all existing stories. Sources are not deleted through the UI, keeping historical source references stable. RadioReference starts with its general forum feed; you can replace it with a narrower public forum/category feed to reduce support-thread noise.
+Edit a source to change its feed, default category, or enabled state. Disabling stops collection and preserves all existing stories. Sources are not deleted through the UI, keeping historical source references stable.
 
-### RadioReference and other forum feeds
+### Forum feeds
 
 Forum entries are treated as story candidates, using the entry's title, link, and available excerpt. The app does not monitor every post or assume a discussion is verified reporting. Your configured model applies your interests to the retrieved text; without a model, entries appear as unreviewed excerpts. The same normalized thread URL is inserted only once, so later replies do not automatically create another tile. Publication/activity timestamps depend on what the forum feed exposes.
 
-A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific scanner/SDR/manufacturer/category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
+A broad forum feed can contain troubleshooting, casual discussion, and unrelated topics. Point the source at a specific subforum or category feed for a narrower selection, or disable it if you want publisher-style reporting only. AI relevance filtering reduces noise but cannot guarantee every discussion is interesting or factually correct.
 
 ### Automatic stale-feed checks
 
@@ -285,15 +266,9 @@ Browser-to-app connection failures are separate from publisher/source errors. A 
 
 ### Feed availability
 
-The first-version audit retrieved usable feeds from all retained default sources except Asterisk, whose website/feed returned **HTTP 403** in that environment. It remains configured and enabled, with the error visible after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time. Feed addresses can also change. The v0.3.0 website extractor was additionally checked against public Hackaday and GNU Radio listing pages.
+Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time, and feed addresses can change.
 
-To run a live audit without changing the database:
-
-```bash
-python3 -m tests.check_sources
-```
-
-To preview a website listing without saving data:
+To preview a website listing from the command line without saving data:
 
 ```bash
 python3 -m tests.check_sources --website https://example.com/news/ --contains /news/ --details
@@ -303,7 +278,7 @@ An individual source failure is recorded next to that source and in run history.
 
 ## Interests and editorial behavior
 
-**Settings → Interests** contains editable topic rows with **Favor / Normal / Less / Exclude**, freeform editorial guidance, and explicit exclusions. Initial interests include security/privacy, protocols, formats, web standards, open source, meaningful hardware capabilities, SDR/scanners, ham radio/RF projects, and FreePBX/Asterisk/VoIP.
+**Settings → Interests** contains editable topic rows with **Favor / Normal / Less / Exclude**, freeform editorial guidance, and explicit exclusions. A fresh install starts with no interest topics, short guidance asking for concise factual summaries that favor substantive reporting over rumors and marketing, and exclusions for deals/coupons, sponsored content, and buying guides. Edit all of them to match what you follow.
 
 Saving affects the next job's AI decisions. A currently running job keeps the settings snapshot it started with. A feed's topic dropdown is an immediate view filter and does not call the model.
 
@@ -385,7 +360,7 @@ logs/
 
 Both directories are Git-ignored. Runtime logs match TaskList: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` relative to the working directory. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database and credentials, not the log directory. File logging failures leave console logging available. Old `data/server.log` and `data/server.log.1` files are no longer written or removed automatically. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields and retires the two removed defaults without deleting their archived stories. The app refuses to open a newer schema version. It creates fresh tables and seeds defaults once; future schema changes belong in explicit migrations.
+`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields. The app refuses to open a newer schema version. It creates fresh tables and default settings once; future schema changes belong in explicit migrations.
 
 ### Feed reads and upgrade work
 
@@ -523,7 +498,7 @@ DrivePool is a local pooled filesystem when accessed directly on its host; it is
 3. Run from the existing application directory:
 
    ```powershell
-   py -3 -m newsreview --host 192.168.1.12 --port 8714 --data-dir "C:\NewsReviewData" --no-scheduler
+   py -3 -m newsreview --host 0.0.0.0 --port 8714 --data-dir "C:\NewsReviewData" --no-scheduler
    ```
 
 4. Verify the existing history/settings load. If this works, it isolates the original storage path/filesystem/access conditions; it does not prove which DrivePool setting caused the failure. Keep using the same `--data-dir` (or set `NEWSREVIEW_DATA_DIR`) for later launches, and omit `--no-scheduler` to resume automatic collection. Do not start another instance against the original folder.
@@ -558,7 +533,7 @@ newsreview/
   __init__.py       authoritative application version
   __main__.py       CLI, server startup, logging, interval scheduler startup
   runtime_logging.py single-file logging with in-place 10 MiB truncation
-  defaults.py       initial source list, interests, collection/model defaults
+  defaults.py       first-run interests and collection/model settings
   store.py          SQLite schema, queries, queue and settings persistence
   migration.py      safe import of the first-version database filename
   search.py         TaskList-compatible date/time range parsing
@@ -589,7 +564,7 @@ static/
   transfer.js       browser ZIP download/upload and restore confirmation
   dropdowns.js      shared Win95 single-select and editable category menus
   icon.svg          application icon
-tests/              unit/integration tests and optional browser/live-feed audits
+tests/              unit/integration tests, optional browser checks, and a live website-listing preview
 deploy/             example systemd unit
 ```
 
@@ -609,13 +584,20 @@ The optional browser check `python3 -m tests.browser_model_keys` verifies saved/
 
 ## Maintenance and cleanup
 
-Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, one-time source updates, and legacy API aliases are retained for existing installations.
+Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, acceptance of older source markers in ZIP restores, and legacy API aliases are retained for existing installations.
 
 The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. Persistence owns the current schema version and archive validation imports it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
 
 For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and the relevant browser suites listed above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
 
 ## Release notes
+
+### v0.13.0
+
+- Ship without bundled sources or personal interest presets. Fresh installs start with no sources, no interest or article topics, neutral summary guidance, and the existing deal/sponsored/buying-guide exclusions.
+- Remove first-run source seeding and the one-time source additions. Existing installations keep their sources, interests, topics, and history unchanged.
+- Keep restoring ZIP backups that contain the older source markers; new backups no longer write them.
+- Limit `tests.check_sources` to live website-listing previews.
 
 ### v0.12.1
 
@@ -749,11 +731,11 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ### v0.6.2
 
-- Add Zero Day Initiative’s published vulnerability advisories as a Security source with its RSS feed, once for new and existing installations without overwriting source choices.
+- Add a vulnerability-advisory source to the bundled defaults, once for new and existing installations without overwriting source choices.
 
 ### v0.6.1
 
-- Add The Hacker News using its verified RSS feed, once on startup for both fresh and existing installations without overwriting existing source settings.
+- Add a security news source to the bundled defaults, once on startup for both fresh and existing installations without overwriting existing source settings.
 
 ### v0.6.0
 
@@ -762,7 +744,7 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ### v0.5.6
 
-- Add 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security with verified feeds through the non-overwriting one-time source update.
+- Add four bundled sources with verified feeds through the non-overwriting one-time source update.
 
 ### v0.5.5
 
@@ -824,8 +806,8 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 - Match keyword search against source names as well as headline/summary/excerpt/tag text, including historical source records.
 - Check website listings in Automatic mode when feeds are stale or empty, merge usable results, and retain feed entries with an explicit warning if the website cannot be read.
 - Explain staleness thresholds, strict feed-only behavior, combined preview methods, and JavaScript-only limitations in the UI and README.
-- Add general Hackaday with its verified RSS feed, preserving the separate ham-radio source and existing source settings through a one-time upgrade.
-- Expand regression coverage for stale/fresh/undated/empty feeds, merged URL deduplication, fallback failures, source search, and Hackaday persistence.
+- Add a bundled source with its verified RSS feed, preserving existing source settings through a one-time upgrade.
+- Expand regression coverage for stale/fresh/undated/empty feeds, merged URL deduplication, fallback failures, source search, and source persistence.
 
 ### v0.4.10
 
@@ -843,10 +825,9 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ### v0.4.8
 
-- Add selfh.st, ServeTheHome, VirtualizationHowto, PortSwigger Research, SANS Internet Storm Center, KrebsOnSecurity, and Cybernews.
-- Add these approved sources once to existing installations without overwriting matching source configuration; preserve later removal/disable decisions.
-- Verify six RSS feeds and Cybernews HTML news-listing collection; update approved-source documentation and backup marker validation.
-- Leave existing interests and web-development source configuration unchanged; do not add MDN Blog or WebKit.
+- Add seven bundled sources once to existing installations without overwriting matching source configuration; preserve later removal/disable decisions.
+- Verify their feeds and HTML news-listing collection; update source documentation and backup marker validation.
+- Leave existing interests and source configuration unchanged.
 
 ### v0.4.7
 
@@ -908,7 +889,7 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 
 ### v0.3.0
 
-- Remove Daniel Stenberg and LWN from fresh and existing active source lists, preserving archived stories.
+- Remove two bundled sources from fresh and existing active source lists, preserving archived stories.
 - Add no-RSS website collection, feed-first automatic fallback, article URL filters, and preview before saving.
 - Track source success, failures, activity, publication age, entry counts, and actual collection method; show adjustable stale/inactive/broken warnings.
 - Add Sources-tab refresh progress/results, persistent connection/storage errors, and safe read-only reconnection without replaying writes.
@@ -922,12 +903,12 @@ For verification, run `python3 -m compileall -q newsreview tests`, the unit/inte
 - Replace the editorial UI with a responsive Windows 95 light/dark interface while retaining tiles, bookmarks, collection controls, and settings.
 - Add multi-topic checkbox filtering and TaskList-style date/time range search, including overnight ranges.
 - Add a confirmed fresh-start action that clears archive/run history while retaining sources and preferences, and prevents an immediate scheduled refill.
-- Document RSS discovery versus article webpage fetching, and provide the separately linked approved source additions.
+- Document RSS discovery versus article webpage fetching.
 
 ### v0.1.0
 
 - Initial daily feed, SQLite history, bookmarks, keyword/date/tag search and calendar navigation.
-- Seed the 27 selected sources; support UI-based RSS/Atom discovery and source editing.
+- Seed a bundled source list; support UI-based RSS/Atom discovery and source editing.
 - Add editable interests, exclusions, collection schedule and bounded processing controls.
 - Support local Ollama and compatible model servers with validated summaries, significance, tags and conservative duplicate grouping.
 - Preserve readable source excerpts while AI is unavailable; expose retry/reassessment and run history.

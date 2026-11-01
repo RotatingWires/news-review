@@ -13,6 +13,7 @@ from newsreview.server import AppServer
 from newsreview.store import Store
 from tests.test_core import review
 from tests.test_integration import FixtureHandler
+from tests.fixtures import add_source
 
 
 def run():
@@ -22,7 +23,7 @@ def run():
         threading.Thread(target=fixture.serve_forever, daemon=True).start()
         root = f'http://127.0.0.1:{fixture.server_port}'
         store = Store(Path(directory) / 'news.db')
-        source = store.sources()[0]['id']
+        source = add_source(store)['id']
         ai = {**store.settings()['ai'], 'base_url': root, 'model': 'fixture'}
         store.save_settings({'ai': ai})
         store.insert_story(source, {'headline': 'Practical SDR project', 'url': 'https://example.com/project',

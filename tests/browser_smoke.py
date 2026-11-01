@@ -19,12 +19,13 @@ from newsreview.server import AppServer
 from newsreview.store import Store, backfill_story_times
 from tests.test_core import review
 from tests.test_integration import FixtureHandler
+from tests.fixtures import add_source
 
 
 def run():
     with tempfile.TemporaryDirectory() as directory:
         store = Store(Path(directory) / 'news.db')
-        source = store.sources()[0]['id']
+        source = add_source(store)['id']
         samples = [
             ('Experimental HTTP method reaches a browser development build', 'Protocols', 'A proposed HTTP method is now available for developer testing. Stable browser releases do not yet include it.', 'This moves the proposal into practical interoperability testing.'),
             ('Open-source SDR decoder adds new P25 analysis tools', 'Radio & SDR', 'The project introduces control-channel analysis and improved diagnostic output for compatible receivers.', 'Better diagnostics make it easier to understand reception and decoding issues.'),
@@ -293,7 +294,7 @@ def run():
                 page.locator('#source-feed').fill(f'http://127.0.0.1:{fixture.server_port}/feed')
                 page.locator('#source-url').fill(f'http://127.0.0.1:{fixture.server_port}')
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(40)
+                expect(page.locator('.source-row')).to_have_count(2)
                 page.get_by_role('button', name='+ Add source', exact=True).click()
                 page.get_by_label('Name', exact=True).fill('Website without RSS')
                 page.get_by_label('Website URL', exact=True).fill(f'http://127.0.0.1:{fixture.server_port}/listing')
@@ -303,7 +304,7 @@ def run():
                 expect(page.locator('#source-preview')).to_contain_text('Website page')
                 expect(page.locator('#source-preview a')).to_have_count(2)
                 page.get_by_role('button', name='Save', exact=True).click()
-                expect(page.locator('.source-row')).to_have_count(41)
+                expect(page.locator('.source-row')).to_have_count(3)
                 page.get_by_role('button', name='AI', exact=True).click()
                 page.get_by_role('button', name='Server type', exact=True).click()
                 page.get_by_role('option', name='Compatible chat server (e.g. LM Studio)', exact=True).click()
@@ -418,7 +419,7 @@ def run():
                 assert api_requests.count('sources') == 1, 'Reset fetched source settings more than once'
                 assert store.stories()['total'] == 0
                 assert store.settings() == preferences
-                assert len(store.sources()) == 41
+                assert len(store.sources()) == 3
                 page.get_by_role('button', name='Daily Feed', exact=True).click()
                 expect(page.locator('#empty')).to_be_visible()
                 assert not errors, errors

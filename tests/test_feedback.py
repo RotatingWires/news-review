@@ -11,13 +11,14 @@ from newsreview.store import Store
 from newsreview.transfer import create_archive, restore_archive
 from newsreview.validation import settings
 from tests.test_core import review
+from tests.fixtures import add_source
 
 
 class FeedbackTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'news.db')
-        self.source = self.store.sources()[0]['id']
+        self.source = add_source(self.store)['id']
         self.store.insert_story(self.source, {'headline': 'Practical SDR project', 'url': 'https://example.com/sdr',
                                             'excerpt': 'Useful practical SDR details.', 'published_at': None, 'category': 'Radio'}, '2026-10-25')
         self.story = self.store.stories()['items'][0]['id']

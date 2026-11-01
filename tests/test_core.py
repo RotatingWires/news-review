@@ -17,6 +17,7 @@ from newsreview.network import canonical_url, check_public, valid_url
 from newsreview.reviewer import candidates_for, validate_review
 from newsreview.store import Store, StorageUnavailable, backfill_story_times
 from newsreview.validation import settings, source
+from tests.fixtures import add_source
 
 
 def review(**values):
@@ -99,7 +100,7 @@ class StoreTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.directory.name) / 'news.db')
-        self.source = self.store.sources()[0]["id"]
+        self.source = add_source(self.store)["id"]
 
     def tearDown(self):
         self.directory.cleanup()
@@ -121,8 +122,11 @@ class StoreTests(unittest.TestCase):
         self.assertEqual([story['headline'] for story in result['items']], ['Undated'])
         self.assertEqual(self.store.stories(time_zone='UTC')['items'][0]['headline'], 'Undated')
 
-    def test_exact_source_list_and_persistent_first_run_defaults(self):
-        self.assertEqual(len(self.store.sources()), 39)
+    def test_no_bundled_sources_and_persistent_first_run_defaults(self):
+        fresh = Store(Path(self.directory.name) / 'fresh.db')
+        self.assertEqual(fresh.sources(), [])
+        self.assertEqual(fresh.topics(), [])
+        self.assertEqual(fresh.settings()["interests"]["topics"], [])
         settings = self.store.settings()
         settings["ai"]["model"] = 'local-test'
         self.store.save_settings({"ai": settings["ai"]})
@@ -131,7 +135,7 @@ class StoreTests(unittest.TestCase):
         reopened = Store(self.store.path)
         self.assertEqual(reopened.settings()["ai"]["model"], 'local-test')
         self.assertEqual(reopened.sources()[0]["enabled"], 0)
-        self.assertEqual(len(reopened.sources()), 39)
+        self.assertEqual(len(reopened.sources()), 1)
 
     def test_relevance_filters_match_tiers_and_combine_with_visibility(self):
         for score in (0, 39, 40, 74, 75, 100):

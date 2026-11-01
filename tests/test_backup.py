@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from newsreview.store import Store
+from tests.fixtures import add_source
 
 
 class BackupTests(unittest.TestCase):
@@ -14,7 +15,7 @@ class BackupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             store = Store(path / 'source.db')
-            source_id = store.sources()[0]['id']
+            source_id = add_source(store)['id']
             store.insert_story(source_id, {'headline': 'Radio project', 'url': 'https://example.com/radio',
                                           'excerpt': 'A useful project.', 'published_at': None, 'category': 'Radio'}, '2026-10-15')
             story = store.stories()['items'][0]

@@ -12,7 +12,7 @@ import tempfile
 import zipfile
 
 from . import __version__
-from .defaults import SETTINGS, SOURCE_UPDATES
+from .defaults import SETTINGS
 from .network import valid_url
 from .store import SCHEMA_VERSION, initialize_topics, backfill_story_times, publication_time
 from . import validation
@@ -21,6 +21,10 @@ MAX_UPLOAD = 256 * 1024 * 1024
 MAX_DATABASE = 1024 * 1024 * 1024
 TABLES = ('sources', 'settings', 'stories', 'runs')
 FORMAT = 'newsreview-backup'
+# Markers left by releases that seeded bundled sources. Existing databases and
+# their backups still contain them; they are restored as-is and otherwise unused.
+LEGACY_MARKERS = {'sources_seeded', 'source_additions_0411', 'source_additions_048',
+                  'source_additions_056', 'source_additions_061', 'source_additions_062'}
 
 
 def _readonly(path):
@@ -90,15 +94,13 @@ def _check_text(value, limit, name, *, nullable=False):
 
 def _validate_rows(database):
     settings = {r['key']: json.loads(r['value']) for r in database.execute('SELECT * FROM settings')}
-    if set(settings) - {*SETTINGS, 'topics', 'sources_seeded', 'history_cleared_at', 'data_revision', *SOURCE_UPDATES} or not set(SETTINGS) <= set(settings):
+    if set(settings) - {*SETTINGS, 'topics', 'history_cleared_at', 'data_revision', *LEGACY_MARKERS} or not set(SETTINGS) <= set(settings):
         raise ValueError('Backup settings are incomplete or unsupported')
     validation.settings({key: settings[key] for key in SETTINGS}, SETTINGS)
     if 'topics' in settings:
         validation.topic_names(settings['topics'])
-    if any(marker in settings and settings[marker] is not True for marker in SOURCE_UPDATES):
-        raise ValueError('Backup has an invalid source-addition marker')
-    if settings.get('sources_seeded') is not True:
-        raise ValueError('Backup is missing its source initialization marker')
+    if any(marker in settings and settings[marker] is not True for marker in LEGACY_MARKERS):
+        raise ValueError('Backup has an invalid source marker')
     if 'history_cleared_at' in settings:
         _check_date(settings['history_cleared_at'], required=True)
     for row in database.execute('SELECT * FROM sources'):

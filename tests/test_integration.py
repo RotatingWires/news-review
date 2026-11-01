@@ -151,8 +151,7 @@ class IntegrationTests(unittest.TestCase):
         self.collector = Collector(self.store, self.fetcher, self.reviewer,
                                    model_keys=ModelKeys(self.store.path.parent / 'model-credentials.json', environment={}))
         self.server = None
-        for source in self.store.sources():
-            self.store.save_source({**source, 'enabled': False}, source['id'])
+        self.store.change_topic('add', 'Standards')
         self.store.save_source({'name': 'Fixture', 'url': self.root, 'feed_url': '', 'category': 'Standards', 'enabled': True})
 
     def tearDown(self):
@@ -1028,7 +1027,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('restart', result['error'])
         self.assertFalse(self.store.path.exists(), 'Requests must not create an empty SQLite database behind the app')
         fresh = Store(self.store.path)
-        self.assertEqual(len(fresh.sources()), 39)
+        self.assertEqual(fresh.sources(), [])
 
 
 if __name__ == '__main__':

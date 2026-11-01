@@ -8,6 +8,7 @@ import unittest
 
 from newsreview.store import Store, publication_time
 from newsreview.transfer import create_archive, restore_archive
+from tests.fixtures import add_source
 
 
 class MeasuredStore(Store):
@@ -38,7 +39,7 @@ class FeedQueryTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.root = Path(self.directory.name)
         self.store = MeasuredStore(self.root / 'newsreview.db')
-        self.source = self.store.sources()[0]['id']
+        self.source = add_source(self.store)['id']
 
     def tearDown(self):
         self.directory.cleanup()

@@ -21,7 +21,8 @@ On Windows, use `py -3 -m newsreview`. Open **http://127.0.0.1:8714**.
 
 1. Run your preferred local model server separately, or configure an OpenRouter API key; NewsReview does not install or start a model.
 2. In **Settings → AI**, choose the server type, URL, and model name, then **Test with a sample article** and **Save**. See [Ollama](MANUAL.md#ollama), [LM Studio](MANUAL.md#lm-studio-or-another-compatible-local-server), or [OpenRouter](MANUAL.md#openrouter) for examples.
-3. Click **Check sources** and adjust **Settings → Interests** and **Collection & history** as desired.
+3. NewsReview ships without any sources. Add the feeds or news websites you want in **Settings → Sources → Add source**, then click **Check sources**.
+4. Describe what you care about in **Settings → Interests**, add article labels in **Settings → Topics**, and adjust **Collection & history** as desired.
 
 You can collect without a model: stories show source excerpts marked **awaiting AI review**. Configure a model later and click **Review pending**. No paid API or cloud model is required.
 
@@ -73,7 +74,7 @@ The Daily Feed date picker and archive date ranges use story publication dates i
 
 On mobile, use your browser’s Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
 
-The default [source list](SOURCES.md) includes Zero Day Initiative published advisories, The Hacker News, 9to5Google, 9to5Mac, HackerNoon Cybersecurity, and TechRepublic Security. Approved additions appear once on restart after updating; use **Check new sources** to collect them.
+A fresh install starts with no sources, no interest topics, and no article topics. Updating NewsReview never adds, removes, or edits an existing installation's sources, interests, or topics. **Settings → Sources → Check new sources** collects only sources that have never been checked.
 
 Day/date-range browsing now uses an indexed publication timestamp and reads display fields only for the selected 48-story page. The first startup after upgrading to v0.12.0 builds this index once from existing records; later restarts do not repeat that pass. Original timestamps and all saved history/preferences are kept, and schema-2/3 ZIP backups still restore. This reduces archive reads; opening a database on a sleeping hard drive still has wake-up latency.
 

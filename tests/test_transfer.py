@@ -10,6 +10,7 @@ import zipfile
 from newsreview.search import date_time_range
 from newsreview.store import Store, SCHEMA_VERSION
 from newsreview.transfer import create_archive, restore_archive
+from tests.fixtures import add_source
 
 
 class TransferTests(unittest.TestCase):
@@ -17,7 +18,7 @@ class TransferTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.store = Store(self.root / 'newsreview.db')
-        self.store.insert_story(self.store.sources()[0]['id'], {
+        self.store.insert_story(add_source(self.store)['id'], {
             'headline': 'Protocol update', 'url': 'https://example.com/story',
             'excerpt': 'Details', 'published_at': None, 'category': 'Protocols'}, '2026-10-15')
         self.story = self.store.stories()['items'][0]['id']
@@ -47,6 +48,19 @@ class TransferTests(unittest.TestCase):
         self.assertTrue(recovery.exists())
         restore_archive(self.store, recovery)
         self.assertEqual(self.store.stories(show_hidden=True)['total'], 0)
+
+    def test_backups_from_installs_with_bundled_source_markers_restore(self):
+        with self.store.connect() as db:
+            db.execute("INSERT INTO settings VALUES ('sources_seeded','true'),('source_additions_062','true')")
+        create_archive(self.store, self.archive)
+        self.store.reset({'history': True, 'bookmarks': True})
+        restore_archive(self.store, self.archive)
+        self.assertEqual(self.store.stories(bookmarks=True)['items'][0]['id'], self.story)
+        with self.store.connect() as db:
+            db.execute("UPDATE settings SET value='false' WHERE key='sources_seeded'")
+        create_archive(self.store, self.archive)
+        with self.assertRaisesRegex(ValueError, 'invalid source marker'):
+            restore_archive(self.store, self.archive)
 
     def test_read_markers_roundtrip_and_schema_two_backups_still_restore(self):
         timestamp = self.store.mark_read(self.story)
