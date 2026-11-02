@@ -1,15 +1,18 @@
+# Build output
+bin/
+obj/
+.vs/
+
+# Runtime/private data
 data/
 backups/
 *.db
 *.db-wal
 *.db-shm
 logs/
-__pycache__/
-*.py[cod]
-.venv/
 .env
-.DS_Store
 auth.json
-.auth-*
+auth.json.tmp
 model-credentials.json
 .model-credentials-*
+.DS_Store

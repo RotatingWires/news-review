@@ -9,29 +9,24 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 
 ## Stack and project conventions
 
-- Python 3.11 or newer; developed and tested locally on Python 3.14.
-- Python standard library HTTP server, SQLite, XML/HTML parsing, and HTTP transport.
-- Plain HTML/CSS/JavaScript ES modules. No frontend framework, Node build, npm, or ORM. No runtime Python packages are normally needed; hosts without system timezone data can use optional `tzdata`.
-- Purpose-based modules; changes belong in the module that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
-- `newsreview/__init__.py` contains the authoritative application version. The UI reads it from the server.
+- ASP.NET Core on .NET 10, the same stack as TaskList and TaskList Stats; runs on Windows, Linux, and macOS.
+- SQLite through `Microsoft.Data.Sqlite`, the only package dependency. XML parsing, HTTP, ZIP, and time zones use the .NET runtime.
+- Plain HTML/CSS/JavaScript ES modules in `wwwroot/`. No frontend framework, Node build, npm, or ORM.
+- Purpose-based source files; changes belong in the file that owns the behavior. No monkey patches, runtime wrappers, or release-specific override files.
+- `<Version>` in `NewsReview.csproj` is the authoritative application version. The UI reads it from the server.
 - Commits use the existing project convention: `v0.4.15: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
 ## Quick start
 
-From the repository directory:
+Install the **.NET 10 SDK**, then from the repository directory:
 
 ```bash
-python3 -m newsreview
+dotnet restore
+dotnet run
 ```
 
-On Windows:
-
-```powershell
-py -3 -m newsreview
-```
-
-Open **http://127.0.0.1:8714**. No runtime dependencies are normally needed. Publication-date browsing and time-range search need a timezone database; Linux usually provides one. On hosts without system timezone data, install `tzdata` with `python3 -m pip install tzdata` (Windows: `py -3 -m pip install tzdata`).
+Open **http://127.0.0.1:8714**. NewsReview listens on loopback port 8714 unless `--urls` (or `ASPNETCORE_URLS`) chooses another address; see [LAN access](#lan-access-and-authentication).
 
 1. Open **Settings → AI**, choose your server type, and enter the server URL and model name.
 2. Use **Test with a sample article**, then **Save**.
@@ -44,7 +39,7 @@ You can collect before setting up a model. Stories display source excerpts label
 Automatic collection is enabled initially **every 24 hours**, adjustable under **Settings → Collection & history → Collect every (hours)** (1–8760 whole hours). An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
 
 ```bash
-python3 -m newsreview --no-scheduler
+dotnet run --no-scheduler
 ```
 
 This flag disables the scheduler for that process only. The UI's schedule setting is persistent. Only one application process should use a data directory.
@@ -199,7 +194,7 @@ Tiles show the original headline and source, tags, the generated summary when av
 
 No sample articles are inserted into your real database. The first edition starts empty until collection runs.
 
-Publication-date browsing and time search use standard-library zoneinfo with the browser's IANA timezone. Linux normally supplies system timezone data; on hosts without it (commonly Windows), install the optional `tzdata` Python package. Missing timezone data returns an explicit error rather than silently applying the wrong clock.
+Publication-date browsing and time search use the browser's IANA timezone, resolved by the .NET runtime on both Windows and Linux. An unknown timezone name returns an explicit error rather than silently applying the wrong clock.
 
 ### Relevance colors
 
@@ -266,13 +261,7 @@ Browser-to-app connection failures are separate from publisher/source errors. A 
 
 ### Feed availability
 
-Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time, and feed addresses can change.
-
-To preview a website listing from the command line without saving data:
-
-```bash
-python3 -m tests.check_sources --website https://example.com/news/ --contains /news/ --details
-```
+Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time, and feed addresses can change. Use **Preview stories** in the source editor to check a feed or website listing without saving anything.
 
 An individual source failure is recorded next to that source and in run history. Other sources continue.
 
@@ -345,7 +334,7 @@ The server rechecks eligibility inside a write transaction and refuses purging d
 
 ## Data, configuration, and logging
 
-By default, runtime data is stored in `./data` relative to the working directory:
+By default, runtime data is stored in `data/` under the folder you start NewsReview from (its content root):
 
 ```text
 data/
@@ -354,13 +343,15 @@ data/
   newsreview.db-shm     SQLite's shared-memory file, when present
   auth.json             saved login password hash, excluded from exports
   model-credentials.json  saved model API keys, excluded from exports
+  keys/                 sign-in cookie keys, excluded from exports
+  backups/              recovery ZIPs written before each restore
 logs/
   console.log          application/HTTP logs, one file up to 10 MiB
 ```
 
-Both directories are Git-ignored. Runtime logs match TaskList: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` relative to the working directory. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database and credentials, not the log directory. File logging failures leave console logging available. Old `data/server.log` and `data/server.log.1` files are no longer written or removed automatically. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
+Both directories are Git-ignored. Runtime logs use TaskList's logger: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` under the content root. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database, credentials, and cookie keys, not the log directory. File logging failures leave console logging available. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`SCHEMA_VERSION` in `newsreview/store.py` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields. The app refuses to open a newer schema version. It creates fresh tables and default settings once; future schema changes belong in explicit migrations.
+`Store.SchemaVersion` in `Store.cs` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields. The app refuses to open a newer schema version. It creates fresh tables and default settings once; future schema changes belong in explicit migrations.
 
 ### Feed reads and upgrade work
 
@@ -379,9 +370,16 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | Environment variable | Purpose |
 | --- | --- |
 | `NEWSREVIEW_DATA_DIR` | Default runtime directory, overridden by `--data-dir` |
-| `NEWSREVIEW_PASSWORD` | Optional one-time password bootstrap (8–1024 characters), only when auth.json does not exist |
-| `NEWSREVIEW_SECURE_COOKIE=1` | Add the Secure flag when serving through HTTPS |
+| `ASPNETCORE_URLS` | Listening address, like `--urls`; default `http://127.0.0.1:8714` |
 | `NEWSREVIEW_MODEL_API_KEY` | Optional fallback bearer token when the provider/server has no UI-saved key |
+
+| Command-line option | Purpose |
+| --- | --- |
+| `--urls URL` | Listening address, for example `http://0.0.0.0:8714` for LAN access |
+| `--data-dir PATH` | Runtime data folder |
+| `--no-scheduler` | Disable automatic collection for this process |
+| `--version` | Print the version and exit |
+| `backup --output FILE [--database FILE]` | Consistent SQLite backup; see [Offline SQLite backup](#offline-sqlite-backup-and-restore) |
 
 `.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
 
@@ -390,26 +388,20 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 Loopback access is the default. For LAN access, explicitly change the listening address:
 
 ```bash
-python3 -m newsreview --host 0.0.0.0 --port 8714
-```
-
-PowerShell:
-
-```powershell
-py -3 -m newsreview --host 0.0.0.0 --port 8714
+dotnet run --urls "http://0.0.0.0:8714"
 ```
 
 On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
 
-The salted PBKDF2-SHA256 password hash is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. Existing `NEWSREVIEW_PASSWORD` deployments seed this file once; an existing credentials file takes precedence, so the environment variable can then be removed. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
+The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. A hash saved with fewer iterations still verifies and is re-hashed once, on the next successful login, by writing a temporary file and renaming it. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
-The browser login issues an HttpOnly, SameSite=Strict cookie valid for seven days, signed with an in-memory random secret. Restarting the app invalidates sessions. Login is limited to five attempts per IP per minute. Setup uses the same five-attempt limit.
+The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie are stored in `data/keys/` (protected with DPAPI on Windows), so sessions survive restarts. Delete that folder while NewsReview is stopped to sign every browser out. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
 
-API writes require JSON and reject cross-origin browser requests. Static serving uses an explicit asset allowlist; database, logs, and source files are not served. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
+API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
-This is a single-user/household application using Python's standard-library HTTP server, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Set `NEWSREVIEW_SECURE_COOKIE=1` when using HTTPS. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
+This is a single-user/household application, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
 
 ## Run as a service
 
@@ -420,16 +412,16 @@ The app must stay running for its scheduler to run. It can also be launched at l
 `deploy/newsreview.service` is a template, not an installer:
 
 1. Create a dedicated service account and a private writable data directory.
-2. Place the checkout at the desired application path and create its `logs/` directory, writable by the service account.
-3. Edit `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match those paths. `ProtectHome=true` means this template expects code outside `/home`, such as `/opt/newsreview`.
+2. Build the app into the desired application path with `dotnet publish -c Release -o /opt/newsreview`, and create its `logs/` directory, writable by the service account.
+3. Edit `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match those paths. `ProtectHome=true` means this template expects the app outside `/home`, such as `/opt/newsreview`.
 4. If needed, put variables in `/etc/newsreview.env`, readable only by the service administrator. The template loads it as an optional environment file.
 5. Install the unit using your normal system administration process, then enable/start it.
 
-The template listens on loopback. Edit the bind address for direct LAN access; find the first-run setup token in the service console/journal. The scheduler uses elapsed hours, independent of timezone or daylight-saving changes. The app does not install or alter system services automatically.
+The template listens on loopback. Change its `--urls` value for direct LAN access; find the first-run setup token in the service console/journal. The scheduler uses elapsed hours, independent of timezone or daylight-saving changes. The app does not install or alter system services automatically.
 
 ### Windows / Task Scheduler
 
-Create a task that starts your Python executable with `-m newsreview`, and set **Start in** to the checkout directory. Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the interval schedule.
+Build once with `dotnet build` (or `dotnet publish -c Release -o C:\path\to\newsreview`), then create a task that starts `NewsReview.exe` directly with arguments such as `--urls "http://0.0.0.0:8714"`, and set **Start in** to the folder containing `wwwroot` (the checkout, or the publish folder). Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the interval schedule.
 
 ## Backup, restore, and updates
 
@@ -446,32 +438,37 @@ Restore and reset change a dataset revision: other tabs refresh before making fu
 To create a consistent online backup, including while the app runs:
 
 ```bash
-python3 -m newsreview.backup --output backups/newsreview-2026-10-15.db
+dotnet run -- backup --output backups/newsreview-2026-10-15.db
 ```
 
-For a custom runtime directory:
+For a custom runtime directory, or with a built/published app:
 
 ```bash
-python3 -m newsreview.backup --database /path/to/data/newsreview.db --output /path/to/backups/news.db
+dotnet NewsReview.dll backup --database /path/to/data/newsreview.db --output /path/to/backups/news.db
 ```
 
 The command refuses to overwrite an existing file and checks the new database's integrity. Store backups privately: they contain your reading history and preferences. No credentials are in the database, but environment/service configuration must be backed up separately if needed.
 
 To restore: stop the app, move the entire existing data directory aside as a recovery copy, create a fresh data directory, and place the backup there as `newsreview.db`. Restart using that directory. Do not leave old `-wal`/`-shm` files beside a restored database. Do not copy only the main SQLite file while the app is writing; use the backup command or stop the process first.
 
-Before an update, make a backup, pull the code, and restart. Runtime data is ignored by Git, and saved defaults are not reset. There is no browser service worker caching old application files.
+Before an update, make a backup, pull the code, rebuild (or run `dotnet run`, which builds), and restart. Runtime data is ignored by Git, and saved defaults are not reset. There is no browser service worker caching old application files.
 
 **Do not delete the data folder while the app is running.** This removes its database and preferences outside the application's lifecycle. If this happened, stop and restart NewsReview to create a fresh database, or restore a backup before restarting. The running server now returns an actionable HTTP 503 instead of silently recreating an empty SQLite file or reporting a generic internal error. Use **Fresh start** in Settings when you only want to clear reading history and retain configuration.
 
-### Upgrade from the first version
+### Upgrade from the Python release (0.x)
 
-Stop the old process before updating. The Python package and launch command are now `newsreview`; environment variables use `NEWSREVIEW_` (update the previous `TECHNEWS_` names in your shell/service configuration). The default port is now **8714**, so update reverse-proxy targets or bookmarks that used **8713**. Services use the `newsreview.service` template and new checkout path. Browser sessions and theme preferences start fresh under the new name/port.
+NewsReview 1.0 replaces the Python implementation with ASP.NET Core and keeps your data. Point it at the same data folder:
 
-Point `--data-dir` at your existing data directory. If `newsreview.db` does not exist but `tech-news.db` does, startup makes a consistent SQLite backup into the new filename and preserves your sources, interests, settings, bookmarks, and archive. The original is left untouched as a recovery copy. Once the new database exists, the old file is never imported again, including after a history reset. Keep a separate backup and remove the old recovery file yourself when no longer needed. Do not run old and new versions against that directory simultaneously.
+1. Download an export ZIP from the old version (**Settings → Collection & history → Import/Export...**) and keep it as a recovery copy. The Python release cannot restore ZIPs exported by 1.0, so this is your way back.
+2. Stop the old `python3 -m newsreview` process (or its service/scheduled task).
+3. Install the .NET 10 SDK, pull this release, and start it with your old data folder and listening address, for example `dotnet run --urls "http://0.0.0.0:8714" --data-dir C:\path\to\data`. `--host`/`--port` became `--urls`.
+4. Sign in with your existing password. Everyone is signed out once, because the session cookie changed.
+
+Your stories, sources, settings, topics, feedback, bookmarks, read markers, `auth.json`, and saved model API keys are used as they are; nothing is migrated or rewritten. Older ZIP backups, including schema-2/3 exports, still restore. `NEWSREVIEW_PASSWORD` and `NEWSREVIEW_SECURE_COOKIE` are no longer read, and the unused `/api/collect`, `/api/login`, `/api/session`, `/api/logout`, and `/api/history/clear` aliases were removed.
 
 ## Browser-blocked requests
 
-If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the browser side, commonly by a content blocker or a browser request-blocking rule. In the reported case, GET requests to overview/sources worked but POST `/api/collect` was blocked immediately. NewsReview now starts jobs through `/api/jobs/start`; `/api/collect` remains available for older API clients. If blocking persists, allow the NewsReview origin in the responsible extension or remove the matching DevTools blocking rule. A generic fetch failure cannot reliably identify the extension or prove whether a write reached the server, so NewsReview reports it as unconfirmed, checks current status, and never automatically resends the write.
+If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the browser side, commonly by a content blocker or a browser request-blocking rule. In the reported case, GET requests worked but a POST whose path ended in `collect` was blocked immediately; NewsReview starts jobs through `/api/jobs/start` to avoid that pattern. If blocking persists, allow the NewsReview origin in the responsible extension or remove the matching DevTools blocking rule. A generic fetch failure cannot reliably identify the extension or prove whether a write reached the server, so NewsReview reports it as unconfirmed, checks current status, and never automatically resends the write.
 
 ## Troubleshooting
 
@@ -487,7 +484,7 @@ If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the
 
 ### Database startup errors and pooled drives
 
-A database connection can open initially and then fail during SQLite setup when it accesses its journal/shared-memory files. NewsReview now handles `SQLITE_CANTOPEN` throughout connection setup and use, closes the connection, and reports the database path and recovery checks. Startup exits with that explanation instead of an unhandled traceback. Other SQLite errors retain their original meaning; the app does not recreate the database, delete sidecar files, change journal mode, or silently relocate data.
+A database connection can open initially and then fail during SQLite setup when it accesses its journal/shared-memory files. NewsReview now handles `SQLITE_CANTOPEN` throughout connection setup and use, closes the connection, and reports the database path and recovery checks. Startup exits with that explanation instead of an unhandled exception. Other SQLite errors retain their original meaning; the app does not recreate the database, delete sidecar files, change journal mode, or silently relocate data.
 
 For **unable to open database file**, confirm the data directory and existing database are accessible, the account running NewsReview can write there and create/open `newsreview.db-wal` and `newsreview.db-shm`, and another NewsReview process is not running against the same folder. The error alone does not prove corruption or identify a specific DrivePool fault.
 
@@ -498,7 +495,7 @@ DrivePool is a local pooled filesystem when accessed directly on its host; it is
 3. Run from the existing application directory:
 
    ```powershell
-   py -3 -m newsreview --host 0.0.0.0 --port 8714 --data-dir "C:\NewsReviewData" --no-scheduler
+   dotnet run --urls "http://0.0.0.0:8714" --data-dir "C:\NewsReviewData" --no-scheduler
    ```
 
 4. Verify the existing history/settings load. If this works, it isolates the original storage path/filesystem/access conditions; it does not prove which DrivePool setting caused the failure. Keep using the same `--data-dir` (or set `NEWSREVIEW_DATA_DIR`) for later launches, and omit `--no-scheduler` to resume automatic collection. Do not start another instance against the original folder.
@@ -507,51 +504,50 @@ The code may remain on the pooled drive. Moving the data folder also moves login
 
 ## Tests and verification
 
-The automated suite needs only Python:
+The automated suite needs only the .NET SDK:
 
 ```bash
-python3 -m unittest discover -v
+dotnet test tests/NewsReview.Tests
 ```
 
-It uses real temporary SQLite databases and local HTTP fixtures for RSS, article pages, Ollama, and compatible model responses. Tests cover parsing, extraction/excerpt fallback, settings/model validation, duplicate references, queue retries, idempotent/full/new-source collection, isolated review queues, interval scheduling, source failures/upgrades, history/search/timezones, bookmarks, ZIP restore validation and recovery, selective resets, authentication, origin checks, and static-file boundaries. No tests contact the live sources or require a real model. No monkey patches are used.
+It uses real temporary SQLite databases, the real application hosted in memory, and local HTTP fixtures for RSS, article pages, and Ollama/compatible/OpenRouter model responses. Tests cover parsing, extraction/excerpt fallback, settings/model validation, duplicate references, queue retries, idempotent/full/new-source collection, isolated review queues, interval scheduling, source failures, history/search/timezones, sorting and query plans, bookmarks, feedback, topics, model keys, ZIP restore validation and recovery, selective resets, authentication and sessions, origin checks, and static-file boundaries. `PythonCompatibility.json` holds outputs of the earlier Python release for URL canonicalization, URL joining, feed dates, and HTML text, so stored story URLs keep deduplicating. No tests contact live sources or require a real model.
 
-Optional real-browser verification requires Playwright and its Chromium browser in your development environment:
+Optional real-browser checks drive the actual frontend with Chromium through Playwright:
 
 ```bash
-python3 -m tests.browser_smoke
-python3 -m tests.browser_polling
+dotnet build tests/NewsReview.BrowserTests
+pwsh tests/NewsReview.BrowserTests/bin/Debug/net10.0/playwright.ps1 install chromium   # first time only
+dotnet test tests/NewsReview.BrowserTests
 ```
 
-This exercises desktop/mobile reading, bookmarks, day navigation, keyword/date/time search, multi-topic selection, editing interests, feed discovery, website preview, source-health display, new-source counts and refresh completion, offline/reconnect handling, a fixture model connection, ZIP transfer, selective history reset, relevance colors, text-selection scope, custom menus, and both Windows 95 themes. It writes screenshots under `/tmp` on Linux and uses temporary data. Playwright is a development-only tool, not a runtime dependency. The polling suite uses Playwright’s test clock and local fixture job state to verify idle silence, active progress/completion, focus refresh, unsaved settings, and connection recovery. The live source audit is a separate opt-in command described above.
+Browsers already installed by Playwright 1.60 for Python or Node are reused, so the install step can be skipped on such machines. They cover first-run setup and login, desktop/mobile reading, bookmarks, read markers, day navigation, keyword/date/time search, topics and relevance filters, sorting, interests, feed discovery, website preview, source health, new-source refresh, offline/reconnect handling and idle polling (with Playwright's test clock), AI providers, model keys, feedback and learned preferences, Stop review, duplicate purging, ZIP transfer, selective reset, and both Windows 95 themes. They write screenshots to the system temp folder and use temporary data. Playwright is a development-only tool, not a runtime dependency.
 
-GitHub Actions runs the standard-library suite on Python 3.11 and 3.14. Local verification for the initial release uses Python 3.14; a real installed user model still needs its own connection and quality check.
+GitHub Actions builds the app and runs `tests/NewsReview.Tests` on every push. A real installed user model still needs its own connection and quality check.
 
 ## Project layout
 
 ```text
-newsreview/
-  __init__.py       authoritative application version
-  __main__.py       CLI, server startup, logging, interval scheduler startup
-  runtime_logging.py single-file logging with in-place 10 MiB truncation
-  defaults.py       first-run interests and collection/model settings
-  store.py          SQLite schema, queries, queue and settings persistence
-  migration.py      safe import of the first-version database filename
-  search.py         TaskList-compatible date/time range parsing
-  network.py        bounded HTTP transport and news-source URL checks
-  feeds.py          RSS/Atom parsing/discovery and article extraction
-  listings.py       website article-card/headline/structured-list extraction
-  sources.py        Automatic/feed/page collection strategy
-  health.py         observed source health and inactivity warnings
-  feedback.py       bounded ratings, profile validation, and compact model context
-  reviewer.py       model adapters, editorial prompt, output validation
-  model_keys.py     provider/server credentials and separate atomic key-file persistence
-  collector.py      collection/review worker and interval scheduler
-  validation.py     source/settings input validation
-  auth.py           persistent password hashes and first-run setup tokens
-  server.py         same-origin HTTP API, authentication and static assets
-  backup.py         consistent online SQLite backup command
-  transfer.py       validated ZIP snapshots and transactional restoration
-static/
+NewsReview.csproj   project file and authoritative version
+Program.cs          startup, options, authentication, security headers, and API routes
+Store.cs            SQLite schema, queries, queue and settings persistence
+Defaults.cs         first-run interests and collection/model settings
+Collector.cs        collection/review worker and interval scheduler
+Sources.cs          Automatic/feed/page collection strategy and source health
+Feeds.cs            RSS/Atom parsing/discovery and article extraction
+Listings.cs         website article-card/headline/structured-list extraction
+HtmlTokenizer.cs    tolerant HTML tokenizer used by the extractors
+Network.cs          bounded HTTP transport and public-address checks for news sources
+UrlTools.cs         URL splitting, joining, and canonical forms matching stored story URLs
+Reviewer.cs         model adapters, editorial prompt, output validation
+Feedback.cs         bounded ratings, profile validation, and compact model context
+ModelKeys.cs        provider/server credentials and separate atomic key-file persistence
+Auth.cs             persistent password hashes and first-run setup tokens
+Validation.cs       strict JSON typing and source/settings input validation
+Search.cs           TaskList-compatible date/time range parsing
+Transfer.cs         validated ZIP snapshots, transactional restoration, and the backup command
+PyText.cs           code-point lengths and ISO timestamps matching stored records
+SingleFileLogger.cs single-file logging with in-place 10 MiB truncation (shared with TaskList)
+wwwroot/
   login.html        TaskList-style setup/login page
   login.js          setup token, password creation, and sign-in
   auth.css          shared sibling-app login layout
@@ -564,33 +560,30 @@ static/
   transfer.js       browser ZIP download/upload and restore confirmation
   dropdowns.js      shared Win95 single-select and editable category menus
   icon.svg          application icon
-tests/              unit/integration tests, optional browser checks, and a live website-listing preview
+tests/
+  NewsReview.Tests/         unit and integration tests
+  NewsReview.BrowserTests/  optional Playwright browser checks
 deploy/             example systemd unit
 ```
 
-The authentication browser check (`python3 -m tests.browser_auth`) verifies first-run setup, incorrect credentials, logout/login, and mobile layout.
-
-The optional browser check `python3 -m tests.browser_purge` exercises purge confirmation, cancellation, bookmark preservation, empty state, and mobile layout using temporary data.
-
-The optional browser check `python3 -m tests.browser_review_stop` uses a blocked model HTTP fixture to verify the active Stop review button, stopping state, queue preservation, and resume behavior.
-
-The optional browser check `python3 -m tests.browser_feedback` verifies article rating/reason edits, profile generation and manual settings, reset cancellation, persistence after reload, and summary-only mobile tiles.
-
-The optional browser check `python3 -m tests.browser_read` verifies headline activation, read-label placement, reload/Bookmarks persistence, and unchanged unopened stories.
-
-The optional browser check `python3 -m tests.browser_topics` verifies preservation of existing topics, add/rename/delete and cancellation, duplicate-name handling, active filter selection, retained bookmarks/read markers, reload persistence, and mobile dialogs.
-
-The optional browser check `python3 -m tests.browser_model_keys` verifies saved/hidden values, immediate replacement, server/provider scopes, reload persistence, remove/cancel, environment fallback, and mobile key dialogs using temporary credentials and local model fixtures.
-
 ## Maintenance and cleanup
 
-Cleanup is behavior-preserving work in the owning modules, not a rewrite or a line-count target. Keep migration/compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. The initial-name database import, acceptance of older source markers in ZIP restores, and legacy API aliases are retained for existing installations.
+Cleanup is behavior-preserving work in the owning files, not a rewrite or a line-count target. Keep compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. Acceptance of older source markers and schema-2/3 layouts in ZIP restores is retained for existing backups.
 
-The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. Persistence owns the current schema version and archive validation imports it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
+The application owns dataset reloads after reset/restore, invalidating pending feed reads before replacing cached tiles and loading settings/sources once. Fresh-start checkbox defaults live in the HTML form; opening the dialog resets that form rather than maintaining a second JavaScript default list. `Store` owns the current schema version and archive validation uses it. ZIP and standalone SQLite backup paths remain separate because their output formats and recovery/error handling differ.
 
-For verification, run `python3 -m compileall -q newsreview tests`, the unit/integration suite, and the relevant browser suites listed above. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body. No frontend build or .NET build applies to NewsReview.
+For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.0
+
+- Rewrite the backend in ASP.NET Core on .NET 10, matching TaskList and TaskList Stats. The frontend, API routes and responses, database schema, `auth.json`, `model-credentials.json`, and ZIP format are unchanged, so existing installations and backups keep working. Python is no longer required.
+- Start with `dotnet run`; choose the listening address with `--urls` (default `http://127.0.0.1:8714`). `--data-dir` and `--no-scheduler` are unchanged; the backup command is `NewsReview backup`.
+- Use 30-day sliding sign-in cookies whose keys live in `data/keys/`, so restarts no longer sign you out. Mark cookies Secure automatically over HTTPS and accept existing password hashes, re-hashing older ones once at 600,000 iterations.
+- Check that news sources resolve to public addresses on the connection actually made, closing a DNS-rebinding gap. Keep canonical story URLs byte-identical to the Python release so archived stories still deduplicate.
+- Remove `NEWSREVIEW_PASSWORD`, `NEWSREVIEW_SECURE_COOKIE`, the first-name `tech-news.db` import, the unused API aliases, and the `tests.check_sources` script (use Preview stories instead).
+- Port the test suite to xUnit and the browser checks to Playwright for .NET, and verify the same API responses as the Python release on a large existing dataset.
 
 ### v0.13.0
 

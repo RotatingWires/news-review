@@ -5,11 +5,12 @@ After=network-online.target
 
 [Service]
 Type=simple
-# Replace these paths and account before installation.
+# Replace these paths and account before installation. Build first with:
+#   dotnet publish -c Release -o /opt/newsreview
 User=newsreview
 WorkingDirectory=/opt/newsreview
 EnvironmentFile=-/etc/newsreview.env
-ExecStart=/usr/bin/python3 -m newsreview --host 127.0.0.1 --port 8714 --data-dir /var/lib/newsreview
+ExecStart=/usr/bin/dotnet /opt/newsreview/NewsReview.dll --urls http://127.0.0.1:8714 --data-dir /var/lib/newsreview
 Restart=on-failure
 RestartSec=5
 UMask=0077

@@ -1,0 +1,355 @@
+{
+ "canonical": [
+  {
+   "input": "https://Example.COM/a/b?utm_source=x&b=2&a=1#frag",
+   "expected": {
+    "ok": "https://example.com/a/b?b=2&a=1"
+   }
+  },
+  {
+   "input": "http://example.com",
+   "expected": {
+    "ok": "http://example.com/"
+   }
+  },
+  {
+   "input": "http://example.com/?a=1&a=2&utm_medium=y",
+   "expected": {
+    "ok": "http://example.com/?a=1&a=2"
+   }
+  },
+  {
+   "input": "https://example.com/path%2Fencoded?q=hello%20world&r=a+b&s=%E2%9C%93&t=%ZZ&u",
+   "expected": {
+    "ok": "https://example.com/path%2Fencoded?q=hello+world&r=a+b&s=%E2%9C%93&t=%25ZZ&u="
+   }
+  },
+  {
+   "input": "https://example.com/p?x=a/b&y=c:d&z=~_.-",
+   "expected": {
+    "ok": "https://example.com/p?x=a%2Fb&y=c%3Ad&z=~_.-"
+   }
+  },
+  {
+   "input": "https://example.com/?fbclid=1&gclid=2&MC_CID=3&mc_eid=4&keep=5",
+   "expected": {
+    "ok": "https://example.com/?keep=5"
+   }
+  },
+  {
+   "input": "https://user@example.com/",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com:8443/x?",
+   "expected": {
+    "ok": "https://example.com:8443/x"
+   }
+  },
+  {
+   "input": "https://example.com/café?n=ü",
+   "expected": {
+    "ok": "https://example.com/café?n=%C3%BC"
+   }
+  },
+  {
+   "input": "https://[2001:db8::1]:8080/a?b=c",
+   "expected": {
+    "ok": "https://[2001:db8::1]:8080/a?b=c"
+   }
+  },
+  {
+   "input": "https://example.com/a;params?q=1",
+   "expected": {
+    "ok": "https://example.com/a;params?q=1"
+   }
+  },
+  {
+   "input": "ftp://example.com/x",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com:99999/",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com/a?b=%",
+   "expected": {
+    "ok": "https://example.com/a?b=%25"
+   }
+  },
+  {
+   "input": "https://example.com/a?=empty&&b=",
+   "expected": {
+    "ok": "https://example.com/a?=empty&b="
+   }
+  },
+  {
+   "input": "HTTPS://EXAMPLE.com/A?B=C",
+   "expected": {
+    "ok": "https://example.com/A?B=C"
+   }
+  }
+ ],
+ "valid": [
+  {
+   "input": "https://Example.COM/a/b?utm_source=x&b=2&a=1#frag",
+   "expected": {
+    "ok": "https://Example.COM/a/b?utm_source=x&b=2&a=1#frag"
+   }
+  },
+  {
+   "input": "http://example.com",
+   "expected": {
+    "ok": "http://example.com"
+   }
+  },
+  {
+   "input": "http://example.com/?a=1&a=2&utm_medium=y",
+   "expected": {
+    "ok": "http://example.com/?a=1&a=2&utm_medium=y"
+   }
+  },
+  {
+   "input": "https://example.com/path%2Fencoded?q=hello%20world&r=a+b&s=%E2%9C%93&t=%ZZ&u",
+   "expected": {
+    "ok": "https://example.com/path%2Fencoded?q=hello%20world&r=a+b&s=%E2%9C%93&t=%ZZ&u"
+   }
+  },
+  {
+   "input": "https://example.com/p?x=a/b&y=c:d&z=~_.-",
+   "expected": {
+    "ok": "https://example.com/p?x=a/b&y=c:d&z=~_.-"
+   }
+  },
+  {
+   "input": "https://example.com/?fbclid=1&gclid=2&MC_CID=3&mc_eid=4&keep=5",
+   "expected": {
+    "ok": "https://example.com/?fbclid=1&gclid=2&MC_CID=3&mc_eid=4&keep=5"
+   }
+  },
+  {
+   "input": "https://user@example.com/",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com:8443/x?",
+   "expected": {
+    "ok": "https://example.com:8443/x?"
+   }
+  },
+  {
+   "input": "https://example.com/café?n=ü",
+   "expected": {
+    "ok": "https://example.com/café?n=ü"
+   }
+  },
+  {
+   "input": "https://[2001:db8::1]:8080/a?b=c",
+   "expected": {
+    "ok": "https://[2001:db8::1]:8080/a?b=c"
+   }
+  },
+  {
+   "input": "https://example.com/a;params?q=1",
+   "expected": {
+    "ok": "https://example.com/a;params?q=1"
+   }
+  },
+  {
+   "input": "ftp://example.com/x",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com:99999/",
+   "expected": {
+    "error": "ValueError"
+   }
+  },
+  {
+   "input": "https://example.com/a?b=%",
+   "expected": {
+    "ok": "https://example.com/a?b=%"
+   }
+  },
+  {
+   "input": "https://example.com/a?=empty&&b=",
+   "expected": {
+    "ok": "https://example.com/a?=empty&&b="
+   }
+  },
+  {
+   "input": "HTTPS://EXAMPLE.com/A?B=C",
+   "expected": {
+    "ok": "HTTPS://EXAMPLE.com/A?B=C"
+   }
+  }
+ ],
+ "join": [
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "../d",
+   "expected": "https://example.com/a/d"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "./e",
+   "expected": "https://example.com/a/b/e"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "/f",
+   "expected": "https://example.com/f"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "g?h=1",
+   "expected": "https://example.com/a/b/g?h=1"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "//other.org/x",
+   "expected": "https://other.org/x"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "?q=2",
+   "expected": "https://example.com/a/b/c?q=2"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "#frag",
+   "expected": "https://example.com/a/b/c#frag"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "../../../x",
+   "expected": "https://example.com/x"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "https://abs.example/y",
+   "expected": "https://abs.example/y"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "g/../h",
+   "expected": "https://example.com/a/b/h"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": ".",
+   "expected": "https://example.com/a/b/"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "..",
+   "expected": "https://example.com/a/"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "",
+   "expected": "https://example.com/a/b/c"
+  },
+  {
+   "base": "https://example.com/a/b/c",
+   "url": "a//b",
+   "expected": "https://example.com/a/b/a/b"
+  }
+ ],
+ "dates": [
+  {
+   "input": "Wed, 15 Oct 2026 10:30:00 GMT",
+   "expected": "2026-10-15T10:30:00+00:00"
+  },
+  {
+   "input": "Wed, 15 Oct 2026 10:30:00 +0200",
+   "expected": "2026-10-15T08:30:00+00:00"
+  },
+  {
+   "input": "15 Oct 2026 10:30 EST",
+   "expected": "2026-10-15T15:30:00+00:00"
+  },
+  {
+   "input": "2026-10-15T10:30:00Z",
+   "expected": "2026-10-15T10:30:00+00:00"
+  },
+  {
+   "input": "2026-10-15T10:30:00.123456+05:30",
+   "expected": "2026-10-15T05:00:00+00:00"
+  },
+  {
+   "input": "2026-10-15",
+   "expected": "2026-10-15T00:00:00+00:00"
+  },
+  {
+   "input": "2026-10-15 10:30:00",
+   "expected": "2026-10-15T10:30:00+00:00"
+  },
+  {
+   "input": "Thu, 1 Jan 70 00:00:00 -0000",
+   "expected": "1970-01-01T00:00:00+00:00"
+  },
+  {
+   "input": "not a date",
+   "expected": null
+  },
+  {
+   "input": "Monday, 03-Nov-26 08:49:37 GMT",
+   "expected": "2026-11-03T08:49:37+00:00"
+  },
+  {
+   "input": "20261015T103000Z",
+   "expected": "2026-10-15T10:30:00+00:00"
+  },
+  {
+   "input": "Oct 15 2026 10:30:00 PST",
+   "expected": "2026-10-15T18:30:00+00:00"
+  },
+  {
+   "input": "2026-13-40T00:00:00Z",
+   "expected": null
+  },
+  {
+   "input": "Sun, 6 Nov 1994 08:49:37",
+   "expected": "1994-11-06T08:49:37+00:00"
+  },
+  {
+   "input": "  2026-10-15T10:30:00+00:00  ",
+   "expected": "2026-10-15T10:30:00+00:00"
+  },
+  {
+   "input": "Wed, 15 Oct 2026 10:30:00 UT",
+   "expected": "2026-10-15T10:30:00+00:00"
+  }
+ ],
+ "plain": [
+  {
+   "input": "<p>Hello</p><p>world &amp; radio</p>",
+   "expected": "Hello world & radio"
+  },
+  {
+   "input": "&amp;lt;b&amp;gt; x",
+   "expected": "<b> x"
+  },
+  {
+   "input": "<script>bad()</script>Text<br>more",
+   "expected": "Text more"
+  },
+  {
+   "input": "a &copy b &#8217; c &#x27; &#150;",
+   "expected": "a © b ’ c ' –"
+  }
+ ],
+ "_source": "Expected values produced by the Python implementation of NewsReview 0.13.0 (urllib.parse, email.utils, html.parser)."
+}
