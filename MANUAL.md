@@ -397,7 +397,7 @@ The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatical
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
-The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie are stored in `data/keys/` (protected with DPAPI on Windows), so sessions survive restarts. Delete that folder while NewsReview is stopped to sign every browser out. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
+The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie are stored in `data/keys/` (protected with machine-scope DPAPI on Windows, so it works when Task Scheduler runs without a loaded profile), so sessions survive restarts. Delete that folder while NewsReview is stopped to sign every browser out. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
 
 API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
@@ -575,6 +575,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.1
+
+- Fix sign-in failing with a DPAPI error on Windows when NewsReview runs from Task Scheduler without a loaded user profile. Cookie keys in `data/keys/` are now protected with machine-scope DPAPI. Nothing to migrate; sign in again after updating.
 
 ### v1.0.0
 

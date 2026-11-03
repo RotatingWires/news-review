@@ -60,12 +60,13 @@ builder.Services.AddSingleton<Collector>();
 
 // Session-cookie keys live in the data folder so sign-ins survive restarts even when the service
 // account has no usable profile (systemd ProtectHome, Task Scheduler without a loaded profile).
+// Windows uses machine-scope DPAPI: user-scope DPAPI fails when the account's profile isn't loaded.
 builder.Services.AddDataProtection().SetApplicationName("NewsReview");
 builder.Services.AddOptions<KeyManagementOptions>().Configure<IServiceProvider>((options, services) =>
 {
     var loggers = services.GetRequiredService<ILoggerFactory>();
     options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(DataDirectory(services), "keys")), loggers);
-    if (OperatingSystem.IsWindows()) options.XmlEncryptor = new DpapiXmlEncryptor(protectToLocalMachine: false, loggers);
+    if (OperatingSystem.IsWindows()) options.XmlEncryptor = new DpapiXmlEncryptor(protectToLocalMachine: true, loggers);
 });
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
