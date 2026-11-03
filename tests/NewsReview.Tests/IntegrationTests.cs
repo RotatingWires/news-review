@@ -443,7 +443,7 @@ public class CollectionTests : IntegrationBase
     {
         store.SaveSettings(new JsonObject { ["ai"] = ModelConfig() });
         for (var number = 0; number < 5; number++)
-            store.InsertStory(EnabledSource(), Fixtures.Entry($"Protocol article {number}", Root + $"/excerpt?empty={number}", null,
+            store.InsertStory(EnabledSource(), Fixtures.Entry($"Protocol article {number}", Root + (number == 3 ? "/blank" : $"/excerpt?empty={number}"), null,
                 number < 4 ? "" : "A readable source excerpt with technical details."), "Protocols", "2026-10-29");
         var before = RequestCount();
         await Collect("review");
@@ -456,7 +456,9 @@ public class CollectionTests : IntegrationBase
         var pending = store.Pending(10);
         Assert.Equal(4, pending.Count);
         Assert.All(pending, s => Assert.True(s["attempts"]!.AsLong() == 1 && ((string)s["summary"]!).Length == 0));
-        Assert.All(pending, s => Assert.Contains("No readable article", (string)s["review_error"]!));
+        const string noExcerpt = " and the source gave no excerpt; showing headline and link only";
+        Assert.Equal([.. Enumerable.Repeat("Article could not be read (HTTP 404 from 127.0.0.1)" + noExcerpt, 3), "Article page had no readable text" + noExcerpt],
+            pending.OrderBy(s => (string)s["headline"]!).Select(s => (string)s["review_error"]!));
         await Collect("review");
         await Collect("review");
         Assert.Empty(store.Pending(10));

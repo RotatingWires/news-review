@@ -289,7 +289,7 @@ Clearing history or runs restarts the automatic collection interval from the res
 1. Snapshot the saved source, collection, model, and editorial settings for the job.
 2. Read each enabled source using its saved Automatic/feed/page method. Sort by publication date when available; undated website entries retain page order. Initial limits are eight entries per source from the last three days; undated entries remain eligible. Limits select the newest available candidates, not eight guaranteed new entries per run.
 3. Normalize URLs by removing fragments and known tracking parameters. A unique URL constraint prevents repeated insertion. Preserve original headlines, excerpts, and publication dates separately from discovery/edition dates.
-4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error.
+4. If configured, process a bounded batch of pending reviews. Extract article text from JSON-LD `articleBody`, or substantial paragraphs under `<article>`/`<main>`. A failed, blocked, or unreadable article falls back to its source excerpt. Missing text leaves the headline/link with a review error that says whether the article page could not be downloaded (with the reason, such as a Cloudflare browser check or a timeout) or downloaded without readable text.
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured review model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
 7. Validate exact output fields, types, tag limits, score range, milestone, and duplicate ID. Keep only tags from the managed Topics list; unknown names are discarded without invalidating the summary. Save the valid review together with provider/model, input basis, current interests, review time, and token counts when the server reports them. Reviews can have an empty tags array even when configured topics exist.
@@ -576,6 +576,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.7
+
+- Say why an article had no readable text: review errors now include the download failure (for example a Cloudflare browser check, HTTP status, or timeout) or state that the page had no readable text, instead of a generic "No readable article or source excerpt".
 
 ### v1.0.6
 

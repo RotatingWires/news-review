@@ -229,6 +229,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             Update(("message", $"Reviewing {number}/{pending.Count} · {headline}"));
             var text = (string)story["article_text"]!;
             var basis = (string)story["content_basis"]!;
+            string? articleError = null;
             if (text.Length == 0)
             {
                 try
@@ -237,7 +238,11 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
                     text = Feeds.ExtractArticle(page.Text);
                     basis = text.Length > 0 ? "article" : "excerpt";
                 }
-                catch (ValidationException) { basis = "excerpt"; }
+                catch (ValidationException error)
+                {
+                    basis = "excerpt";
+                    articleError = PyText.Truncate(error.Message, 200);
+                }
                 if (text.Length == 0) text = (string)story["excerpt"]!;
             }
             var stored = PyText.Truncate(text, 100000);
@@ -245,7 +250,9 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             {
                 if (text.Trim().Length == 0)
                 {
-                    const string unreadable = "No readable article or source excerpt; showing headline and link only";
+                    // Keep why the article failed: a blocked or timed-out page needs a different fix than an empty one.
+                    var unreadable = (articleError is null ? "Article page had no readable text" : $"Article could not be read ({articleError})") +
+                        " and the source gave no excerpt; showing headline and link only";
                     store.ReviewFailed(id, unreadable, stored, basis);
                     errors.Add($"Review #{id}: {unreadable}");
                     continue;

@@ -55,6 +55,8 @@ sealed class NewsFixture : IDisposable
                     """);
             case "/excerpt":
                 return Html("Subscription required", 403);
+            case "/blank":
+                return Html("<html><body><nav><a href=\"/\">Home</a></nav></body></html>");
             default:
                 return Html("Not found", 404);
         }
