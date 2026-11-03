@@ -71,7 +71,7 @@ The Daily Feed date picker and archive date ranges use story publication dates i
 
 On mobile, use your browser’s Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
 
-A fresh install starts with no sources, no interest topics, and no article topics. Updating NewsReview never adds, removes, or edits an existing installation's sources, interests, or topics. **Settings → Sources → Check new sources** collects only sources that have never been checked.
+A fresh install starts with no sources, no interest topics, and no article topics. Updating NewsReview never adds, removes, or edits an existing installation's sources, interests, or topics. **Settings → Sources → Check new sources** collects only sources that have never been checked, and each source's **Check** button collects just that source.
 
 Day/date-range browsing uses an indexed publication timestamp and reads display fields only for the selected 48-story page. Schema-2/3 ZIP backups still restore and are indexed during the restore. Opening a database on a sleeping hard drive still has wake-up latency.
 
@@ -81,7 +81,7 @@ Use **Settings → Collection & history → Purge duplicates** to remove AI-mark
 
 The **Filter...** dropdown combines topic selection, relevance levels, and Include filtered / duplicates. Uncheck relevance levels to hide them; all start enabled.
 
-Use **Settings → Topics** to add, rename, or delete article topics. All existing topics are preserved on upgrade. AI reviews only choose names from your list; sources and interests are managed separately. Renaming updates saved article labels, and deleting removes the label while keeping the articles. Topics are included in ZIP backups.
+Edit article topics in **Settings → Topics**, one per line. All existing topics are preserved on upgrade. AI reviews only choose names from your list; sources and interests are managed separately. Editing a line in place renames the topic on saved articles; deleting a line removes that label after confirmation while keeping the articles. Topics are included in ZIP backups.
 
 For OpenRouter, select **OpenRouter** in **Settings → AI → Server type**, use `https://openrouter.ai/api/v1`, and enter a model ID such as `anthropic/claude-haiku-5.5`. Enter your API key below and click **Save key**, then test the model and save the AI settings. **Replace key** and **Remove key...** apply immediately without restarting. Saved keys are scoped to the provider and server URL. Thinking is explicitly disabled for article reviews, sample tests, and feedback-profile updates. OpenRouter sends review data to the cloud and charges API usage; see the [setup instructions](MANUAL.md#openrouter) and [API-key details](MANUAL.md#api-keys).
 

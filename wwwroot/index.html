@@ -105,9 +105,12 @@
       </section>
 
       <section id="panel-topics" class="settings-panel" hidden>
-        <div class="edition-header"><div><h2>Topics</h2><p class="muted">Manage article labels and feed filters. AI reviews can only choose from this list. Interests guide relevance separately.</p></div><button id="add-topic" type="button">+ Add topic</button></div>
-        <p class="muted">Renaming updates labels on saved stories. Deleting removes that label while keeping the articles. Source categories do not change this list.</p>
-        <div id="topic-rows" class="topic-list"></div>
+        <h2>Topics</h2><p class="muted">Article labels and feed filters. AI reviews can only choose from this list. Interests guide relevance separately.</p>
+        <form id="topics-form">
+          <label>Topic list <span class="muted">One topic per line</span><textarea id="topics-text" rows="14" spellcheck="false" autocomplete="off" placeholder="No topics yet. Add one per line, for example:&#10;Linux&#10;Security"></textarea></label>
+          <p class="muted">Edit a line in place to rename that topic; saved stories keep the label under its new name. Delete a line to remove the topic and its saved labels (the stories are kept). Source categories do not change this list.</p>
+          <button class="primary" type="submit">Save</button>
+        </form>
       </section>
       <section id="panel-sources" class="settings-panel" hidden>
         <div class="section-heading"><div><h2>Your sources</h2><p class="muted">Collect from RSS/Atom or directly from a news listing page.</p></div><div class="button-row"><button id="check-new-sources" title="Check only enabled sources with no recorded check">Check new sources</button><button id="refresh-sources">Refresh sources</button><button id="add-source" class="primary">+ Add source</button></div></div>
@@ -191,15 +194,10 @@
     <div class="dialog-body"><p>Remove the saved key for <strong id="model-key-remove-target"></strong>?</p><p>Current model requests finish using the key they already received. Future requests use the updated key configuration.</p><p id="model-key-environment-fallback" hidden>An environment key is also configured. It will be used after the saved key is removed.</p></div>
     <div class="dialog-actions"><button type="button" data-close="model-key-remove-dialog">Cancel</button><button class="danger" type="submit">Remove</button></div>
   </form></dialog>
-  <dialog id="topic-edit-dialog"><form id="topic-edit-form" class="dialog-layout">
-    <div class="dialog-heading"><h2 id="topic-edit-title">Add topic</h2><button type="button" data-close="topic-edit-dialog" aria-label="Close">×</button></div>
-    <div class="dialog-body"><label>Topic name<input id="topic-name-input" maxlength="60" required autocomplete="off"></label><p class="muted">AI reviews use this name exactly. Adding a topic makes it available for future reviews; saved articles are not reassessed automatically.</p></div>
-    <div class="dialog-actions"><button type="button" data-close="topic-edit-dialog">Cancel</button><button class="primary" type="submit">Save</button></div>
-  </form></dialog>
-  <dialog id="topic-delete-dialog"><form id="topic-delete-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Delete topic</h2><button type="button" data-close="topic-delete-dialog" aria-label="Close">×</button></div>
-    <div class="dialog-body"><p>Delete <strong id="topic-delete-name"></strong> from the topic list and saved article labels?</p><p>Articles, summaries, scores, bookmarks, read markers, interests, and source settings are kept. This cannot be undone in the app.</p></div>
-    <div class="dialog-actions"><button type="button" data-close="topic-delete-dialog">Cancel</button><button class="danger" type="submit">Delete</button></div>
+  <dialog id="topic-remove-dialog"><form id="topic-remove-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Remove topics</h2><button type="button" data-close="topic-remove-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Remove these topics from the list and from saved article labels?</p><ul id="topic-remove-names"></ul><p>Articles, summaries, scores, bookmarks, read markers, interests, and source settings are kept. This cannot be undone in the app.</p></div>
+    <div class="dialog-actions"><button type="button" data-close="topic-remove-dialog">Cancel</button><button class="danger" type="submit">Remove</button></div>
   </form></dialog>
   <dialog id="confirm-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Reassess saved history?</h2><button data-close="confirm-dialog" aria-label="Close">×</button></div>
@@ -251,7 +249,7 @@
     <div class="dialog-heading"><h2>Help - NewsReview</h2><button data-close="help-dialog" aria-label="Close">×</button></div>
     <div class="dialog-body help-content">
       <h3>What AI reviews do</h3>
-      <p>Your configured model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, selects tags from Settings → Topics, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage. Add, rename, or delete topics there; AI cannot invent new ones.</p>
+      <p>Your configured model checks each story against your interests, editorial guidance, and exclusions. It scores relevance, summarizes what happened, selects tags from Settings → Topics, identifies milestones such as proposals versus shipped features, and checks likely duplicate coverage. Edit the list there, one topic per line; AI cannot invent new ones.</p>
       <p>NewsReview tries to summarize the extracted article text. If the article page cannot be read reliably, it falls back to the source's RSS/Atom excerpt and marks that tile <strong>AI summary · based on source excerpt</strong>. Full-article summaries are left unlabeled to keep the feed uncluttered.</p>
       <p>Filtered stories remain in the database but are hidden in the normal feed. Open Filter... and select Include filtered / duplicates to inspect them. Bookmarked stories remain visible if later filtered. Without a configured model, collection still saves headlines and available excerpts; Review pending runs the AI stage later.</p>
       <h3>Article feedback</h3><p>Use thumbs up/down on a tile and optionally explain why. Ratings and reasons stay saved; a compact preference profile is refreshed once before a review batch when needed. Edit, disable, update, or reset it in Settings, Interests. Written interests and guidance take priority. All stories show a summary without a separate Why it matters section.</p>
@@ -265,7 +263,7 @@
       <h3>Search and source health</h3>
       <p>Combine dates and times with a comma: 9/1/26 - 10/1/26, 10am - 3pm. A date range or time range alone also works. Times match the displayed publication time in your browser timezone, or collection time for undated stories; overnight ranges are supported. Topics match any checked selection.</p>
       <p>Sort orders Daily Feed and Bookmarks by publication time (newest or oldest first) or relevance rank (highest or lowest first). Rank uses the saved AI score. The choice applies before pagination and is remembered in this browser; changing it does not run AI again.</p>
-      <p>Check new sources collects only enabled sources that have never been checked, including newly added sources. Refresh sources checks all enabled sources, including failed ones. The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
+      <p>Check new sources collects only enabled sources that have never been checked, including newly added sources. Each source's Check button collects just that source and reviews its new stories. Refresh sources checks all enabled sources, including failed ones. The Sources tab warns about failed checks, repeated failures, stale checks, and possible inactivity. Change each source's warning interval for slower publishers. The yellow/orange indicator means collection or review is running.</p>
       <h3>Backups and fresh starts</h3>
       <p>Open Settings, Collection &amp; history, then Import/Export to download a complete ZIP containing stories, bookmarks, sources, preferences, and run history. Restoring replaces the current dataset after validation and saves a recovery ZIP on the server first. Login credentials and the browser theme are kept.</p>
       <p>Fresh start in Settings lets you clear selected data, including history, bookmarks, interests, guidance, sources, or settings. Unchecked categories are preserved. Keeping Bookmarks unchecked preserves saved stories when clearing other history.</p>

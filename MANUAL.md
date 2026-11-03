@@ -149,7 +149,7 @@ Collection/review messages and their blinking activity light appear only in the 
 
 The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative CSS drawings in equal-size boxes, so minimize, maximize, and close stay aligned regardless of font; TaskList/Stats use the same markup and styles.
 
-Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
+Manage article labels in **Settings → Topics**: a text box with one topic per line and **Save**. Names are 1–60 characters (surrounding spaces and blank lines are ignored) and cannot duplicate another topic regardless of capitalization. When saving, lines that did not change anchor the comparison; a line edited in place (between the same unchanged neighbors) renames that topic, so saved stories keep the label under its new name, and a capitalization-only change is also a rename. Moving a line never removes it. A deleted line removes the topic and its saved labels after a **Remove topics** confirmation listing the names; articles are kept. New lines add topics. Unsaved edits survive switching Settings tabs. The list is saved in one transaction (`PUT /api/topics` with the full list, an explicit rename map, and the `DELETE TOPIC` confirmation when topics are removed). AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
 
 On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with an empty list; add topics if you want reviewed articles labeled. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
 
@@ -242,12 +242,13 @@ If the website cannot be downloaded or parsed, usable feed entries are retained 
 
 - **Check sources** on Daily Feed and **Refresh sources** in Settings check every enabled source and then review a bounded batch from the pending archive.
 - **Check new sources (N)** in Settings → Sources checks only enabled, active sources whose `last_checked` is empty. It shows the eligible count and is disabled when the count is zero or a job is running.
+- **Check** on a source row collects only that enabled source, then reviews only its pending stories, up to the usual review limit. It is disabled for disabled sources and while a job runs. Run history marks it **(source name) only**, and like a new-source check it does not restart the scheduled full-collection interval.
 - A successful or failed collection attempt records a check, so failed sources are excluded from Check new sources thereafter. Use Refresh sources to retry them. Disabled sources are skipped by both buttons.
 - Adding a source makes it eligible; Preview stories and Find RSS/Atom feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
 - New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
 - The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not restart the scheduled full-collection interval; normal manual full collection still does.
 
-The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. A review-only job cannot be combined with `unchecked_only`. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
+The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. Use `{"kind":"collect","source_id":N}` to check one enabled source; it cannot be combined with `unchecked_only`. A review-only job cannot be combined with either. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
 
 ### Health and refresh results
 
@@ -575,6 +576,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.6
+
+- Add a **Check** button to each source that collects only that source and reviews its new stories (`source_id` on `POST /api/jobs/start`). One-source checks do not restart the scheduled collection interval.
+- Replace the per-topic rows, Rename/Delete buttons, and dialogs with one Win95 text box, one topic per line. Editing a line in place renames it on saved stories; deleted lines are removed after a confirmation listing them. `PUT /api/topics` replaces the former add/rename/delete `POST`.
 
 ### v1.0.5
 

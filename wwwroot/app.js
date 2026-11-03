@@ -202,13 +202,15 @@ class App {
     catch (error) { notify(error.message, true); }
   }
 
-  async collect(kind, button, uncheckedOnly = false) {
+  /** scope: { uncheckedOnly } for never-checked sources, or { sourceId, name } for one source. */
+  async collect(kind, button, { uncheckedOnly = false, sourceId = null, name = '' } = {}) {
     const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
       try {
-        await api('jobs/start', 'POST', { kind, unchecked_only: uncheckedOnly });
+        await api('jobs/start', 'POST', { kind, unchecked_only: uncheckedOnly, ...(sourceId ? { source_id: sourceId } : {}) });
         if (kind === 'collect') this.unconfirmedRefresh = null;
-        notify(kind === 'collect' ? uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.' : 'Reviewing queued stories.');
+        notify(kind !== 'collect' ? 'Reviewing queued stories.' : sourceId ? `Checking ${name} in the background.`
+          : uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.');
       } catch (error) {
         if (error.connection) {
           if (kind === 'collect') this.unconfirmedRefresh = previousRun;

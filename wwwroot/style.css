@@ -236,10 +236,8 @@ footer > span { padding: 3px 5px; border: 2px solid; border-color: var(--shadow)
 .full { grid-column: 1 / -1; }
 .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .callout { background: var(--note); border: 1px solid var(--shadow); padding: 10px; font-size: 13px; }
-.source-list, .topic-list { display: grid; gap: 8px; }
+.source-list { display: grid; gap: 8px; }
 .source-row, .topic-row { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--surface); border: 1px solid var(--shadow); }
-.managed-topic-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.topic-row .button-row { flex-shrink: 0; }
 .source-info { flex: 1; min-width: 0; }
 .source-info strong, .source-info small { display: block; overflow-wrap: anywhere; }
 .source-info small, .source-state { color: var(--muted); font-size: 12px; }

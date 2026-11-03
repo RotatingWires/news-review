@@ -39,10 +39,23 @@ static class Fixtures
         return value;
     }
 
+    /// <summary>One topic edit expressed as the full-list save the Topics editor sends.</summary>
+    public static JsonObject ChangeTopic(Store store, string action, string name, string? replacement = null)
+    {
+        var names = store.Topics().Select(t => (string)t!).ToList();
+        return action switch
+        {
+            "add" => store.SaveTopics([.. names, name], new Dictionary<string, string>()),
+            "rename" => store.SaveTopics(names.Select(n => n == name ? replacement! : n).ToList(), new Dictionary<string, string> { [name] = replacement! }),
+            "delete" => store.SaveTopics(names.Where(n => n != name).ToList(), new Dictionary<string, string>(), removalConfirmed: true),
+            _ => throw new ArgumentException(action),
+        };
+    }
+
     /// <summary>An enabled source whose default category is also a managed topic.</summary>
     public static JsonObject AddSource(Store store, string category = "Technology")
     {
-        if (!store.Topics().Any(t => (string)t! == category)) store.ChangeTopic("add", category);
+        if (!store.Topics().Any(t => (string)t! == category)) Fixtures.ChangeTopic(store, "add", category);
         var id = store.SaveSource(new JsonObject
         {
             ["name"] = "Example News", ["url"] = "https://example.com/news/", ["feed_url"] = "", ["category"] = category, ["enabled"] = true,

@@ -361,15 +361,17 @@ app.MapPost("/api/model-key/remove", async (HttpRequest request) =>
     if (!Api.Confirmed(data, "REMOVE MODEL KEY")) throw new ValidationException("Confirm removing the saved API key before continuing");
     return Api.Send(collector.ModelKeys.Remove(data));
 });
-app.MapPost("/api/topics", async (HttpRequest request) =>
+app.MapPut("/api/topics", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
-    if (!Json.IsString(data["action"], out var action) || action is not ("add" or "rename" or "delete")) throw new ValidationException("Choose add, rename, or delete");
-    var name = Validation.Text(data["name"], "Topic", 60);
-    var replacement = action == "rename" ? Validation.Text(data["new_name"], "Topic", 60) : null;
-    if (action == "delete" && !Api.Confirmed(data, "DELETE TOPIC")) throw new ValidationException("Confirm deleting the topic before continuing");
+    if (data["topics"] is not JsonArray list) throw new ValidationException("Send the topic list");
+    var topics = list.Select(topic => Validation.Text(topic, "Topic", 60)).ToList();
+    var renames = new Dictionary<string, string>(StringComparer.Ordinal);
+    if (Json.Get(data, "renames", new JsonObject()) is not JsonObject renameObject) throw new ValidationException("Renames must map old to new topic names");
+    foreach (var (from, to) in renameObject) renames[Validation.Text(JsonValue.Create(from), "Topic", 60)] = Validation.Text(to, "Topic", 60);
+    var removalConfirmed = Api.Confirmed(data, "DELETE TOPIC");
     return Exclusive("Wait for collection/review or restore to finish before editing topics",
-        () => Api.Send(store.ChangeTopic(action, name, replacement), action == "add" ? 201 : 200));
+        () => Api.Send(store.SaveTopics(topics, renames, removalConfirmed)));
 });
 app.MapPost("/api/maintenance/duplicates/purge", async (HttpRequest request) =>
 {
@@ -466,8 +468,10 @@ app.MapPost("/api/jobs/start", async (HttpRequest request) =>
     var data = await Api.Body(request);
     if (!Json.IsString(Json.Get(data, "kind", "collect"), out var kind) || kind is not ("collect" or "review")) throw new ValidationException("Unknown job type");
     var uncheckedOnly = Validation.Boolean(Json.Get(data, "unchecked_only", false), "Unchecked only");
-    if (uncheckedOnly && kind != "collect") throw new ValidationException("New-source checks require a collection job");
-    var started = collector.Start(kind, uncheckedOnly: uncheckedOnly);
+    var sourceNode = Json.Get(data, "source_id", null);
+    long? sourceId = sourceNode is null ? null : Validation.Integer(sourceNode, "Source", 1, long.MaxValue);
+    if ((uncheckedOnly || sourceId is not null) && kind != "collect") throw new ValidationException("Source checks require a collection job");
+    var started = collector.Start(kind, uncheckedOnly: uncheckedOnly, sourceId: sourceId);
     return Api.Send(new JsonObject { ["ok"] = started, ["error"] = started ? null : "A job is already running" }, started ? 202 : 409);
 });
 app.MapPost("/api/requeue", async (HttpRequest request) =>

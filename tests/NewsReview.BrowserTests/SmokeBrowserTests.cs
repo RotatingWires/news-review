@@ -37,7 +37,7 @@ public class SmokeBrowserTests : BrowserTest
             var (headline, category, summary) = Samples[index];
             var tags = new[] { category }.Concat(Enumerable.Range(0, 5).Select(n => $"Topic {index}-{n}")).ToList();
             foreach (var name in tags)
-                if (!Store.Topics().Any(t => (string)t! == name)) Store.ChangeTopic("add", name);
+                if (!Store.Topics().Any(t => (string)t! == name)) Fixtures.ChangeTopic(Store, "add", name);
             Store.InsertStory(source, Fixtures.Entry(headline, $"https://example.com/{index}", null, summary), category, today);
             var id = Store.Read(db => db.Long("SELECT id FROM stories WHERE url=?", $"https://example.com/{index}"));
             var review = Reviewer.ValidateReview(Fixtures.Review(r =>
@@ -368,6 +368,11 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#check-new-sources")).ToHaveTextAsync("Check new sources (0)");
         await Expect(page.Locator("#check-new-sources")).ToBeDisabledAsync();
         await Expect(page.Locator(".source-state.healthy")).ToHaveCountAsync(2);
+        await Expect(page.Locator(".check-source[data-enabled=false]").First).ToBeDisabledAsync();
+        await Button("Check Fixture source").ClickAsync();
+        await Expect(page.Locator("#source-refresh-status")).ToContainTextAsync("Checked Fixture source · Saved", new() { Timeout = 15000 });
+        await Expect(Button("Check Fixture source")).ToBeEnabledAsync();
+        await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-sources.png") });
         await page.RouteAsync("**/api/jobs/start", route => route.AbortAsync("blockedbyclient"));
         await Button("Refresh sources").ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Could not send POST /api/jobs/start");

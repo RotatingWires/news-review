@@ -47,7 +47,7 @@ public class ArchiveTests : IDisposable
     {
         store = new Store(directory.File("newsreview.db"));
         source = Fixtures.AddSource(store)["id"]!.AsLong();
-        foreach (var name in new[] { "Radio", "Science", "Standards" }) store.ChangeTopic("add", name);
+        foreach (var name in new[] { "Radio", "Science", "Standards" }) Fixtures.ChangeTopic(store, "add", name);
     }
 
     public void Dispose() => directory.Dispose();

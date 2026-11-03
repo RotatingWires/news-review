@@ -1,6 +1,38 @@
 import { syncDropdowns } from './dropdowns.js';
 import { $, api, busy, el, externalLink, formatTime, notify } from './shared.js';
 
+/**
+ * Turns an edited one-per-line list into explicit renames and removals. Unchanged lines anchor the diff; between
+ * anchors, removed and added lines pair up in order as renames (a line edited in place). A name present in both
+ * lists is never removed, so moving a line cannot drop its labels.
+ */
+export function topicEdits(before, after) {
+  const lcs = Array.from({ length: before.length + 1 }, () => new Array(after.length + 1).fill(0));
+  for (let i = before.length - 1; i >= 0; i--)
+    for (let j = after.length - 1; j >= 0; j--)
+      lcs[i][j] = before[i] === after[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const kept = new Set(after), existing = new Set(before);
+  const renames = {}, removed = [];
+  let gone = [], added = [];
+  const flush = () => {
+    added = added.filter(name => !existing.has(name));
+    gone.filter(name => !kept.has(name)).forEach((name, index) => {
+      if (index < added.length) renames[name] = added[index];
+      else removed.push(name);
+    });
+    gone = [];
+    added = [];
+  };
+  let i = 0, j = 0;
+  while (i < before.length || j < after.length) {
+    if (i < before.length && j < after.length && before[i] === after[j]) { flush(); i++; j++; }
+    else if (j < after.length && (i === before.length || lcs[i][j + 1] >= lcs[i + 1][j])) added.push(after[j++]);
+    else gone.push(before[i++]);
+  }
+  flush();
+  return { renames, removed };
+}
+
 export class Settings {
   constructor(app) {
     this.app = app;
@@ -8,21 +40,10 @@ export class Settings {
     this.sources = [];
     this.keyStatusSequence = 0;
     document.querySelectorAll('[data-tab]').forEach(button => { button.onclick = () => this.tab(button.dataset.tab); });
-    $('add-topic').onclick = () => this.editTopic();
-    $('topic-edit-form').onsubmit = event => this.submit(event, async () => {
-      const name = $('topic-name-input').value.trim();
-      const previous = this.editingTopic;
-      const result = await api('topics', 'POST', previous === null ? { action: 'add', name } : { action: 'rename', name: previous, new_name: name });
-      $('topic-edit-dialog').close();
-      await this.topicsChanged(result, previous, name);
-      notify(previous === null ? 'Topic added. Future reviews can use it.' : `Topic renamed on ${result.updated_stories} stories.`);
-    });
-    $('topic-delete-form').onsubmit = event => this.submit(event, async () => {
-      const name = $('topic-delete-name').textContent;
-      const result = await api('topics', 'POST', { action: 'delete', name, confirmation: 'DELETE TOPIC' });
-      $('topic-delete-dialog').close();
-      await this.topicsChanged(result, name, null);
-      notify(`Topic deleted. Label removed from ${result.updated_stories} stories. Articles were kept.`);
+    $('topics-form').onsubmit = event => this.submit(event, () => this.saveTopics());
+    $('topic-remove-form').onsubmit = event => this.submit(event, async () => {
+      $('topic-remove-dialog').close();
+      await this.saveTopics(true);
     });
     $('add-interest').onclick = () => this.interestRow({ name: '', preference: 'favor' });
     $('interests-form').onsubmit = event => this.submit(event, async () => {
@@ -146,7 +167,7 @@ export class Settings {
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();
-    $('check-new-sources').onclick = () => this.app.collect('collect', $('check-new-sources'), true);
+    $('check-new-sources').onclick = () => this.app.collect('collect', $('check-new-sources'), { uncheckedOnly: true });
     $('refresh-sources').onclick = () => this.app.collect('collect', $('refresh-sources'));
     $('discover-feed').onclick = () => busy($('discover-feed'), async () => {
       $('source-error').textContent = '';
@@ -196,7 +217,7 @@ export class Settings {
       document.querySelector(`[data-tab="${id}"]`).classList.toggle('active', name === id);
     });
     if (name === 'sources' && this.values) this.refreshSources().catch(error => notify(error.message, true));
-    if (name === 'topics' && this.values) this.loadTopics().catch(error => notify(error.message, true));
+    if (name === 'topics' && this.values) this.loadTopics(true).catch(error => notify(error.message, true));
   }
 
   async load() {
@@ -235,45 +256,32 @@ export class Settings {
     }
   }
 
-  async loadTopics() { this.renderTopics(await api('topics')); }
+  async loadTopics(keepEdits = false) { this.renderTopics(await api('topics'), keepEdits); }
 
-  renderTopics(topics) {
+  /** Unsaved edits in the text box survive tab switches; a save or initial load replaces them. */
+  renderTopics(topics, keepEdits = false) {
+    const edited = keepEdits && this.topics && $('topics-text').value !== this.topics.join('\n');
+    this.topics = topics;
     // Default category suggestions are the managed topics; a match becomes a new story's initial label.
     $('source-categories').replaceChildren(...topics.map(name => el('option', '', name)));
-    $('topic-rows').replaceChildren(...topics.map(name => {
-      const row = el('div', 'topic-row');
-      const title = el('span', 'managed-topic-name', name);
-      const controls = el('div', 'button-row');
-      const rename = el('button', '', 'Rename');
-      rename.type = 'button';
-      rename.setAttribute('aria-label', 'Rename topic ' + name);
-      rename.onclick = () => this.editTopic(name);
-      const remove = el('button', 'danger', 'Delete');
-      remove.type = 'button';
-      remove.setAttribute('aria-label', 'Delete topic ' + name);
-      remove.onclick = () => {
-        $('topic-delete-name').textContent = name;
-        $('topic-delete-dialog').showModal();
-        $('topic-delete-dialog').querySelector('[data-close]').focus();
-      };
-      controls.append(rename, remove);
-      row.append(title, controls);
-      return row;
-    }));
-    if (!topics.length) $('topic-rows').append(el('p', 'muted', 'No topics configured. Add one to label future AI reviews.'));
+    if (!edited) $('topics-text').value = topics.join('\n');
   }
 
-  editTopic(name = null) {
-    this.editingTopic = name;
-    $('topic-edit-title').textContent = name === null ? 'Add topic' : 'Rename topic';
-    $('topic-name-input').value = name || '';
-    $('topic-edit-dialog').showModal();
-    $('topic-name-input').focus();
-  }
-
-  async topicsChanged(result, previous, name) {
-    if (previous !== null && this.app.feed.selectedTopics.delete(previous) && name !== null) this.app.feed.selectedTopics.add(name);
+  async saveTopics(removalConfirmed = false) {
+    const lines = $('topics-text').value.split('\n').map(line => line.trim()).filter(Boolean);
+    const { renames, removed } = topicEdits(this.topics, lines);
+    if (removed.length && !removalConfirmed) {
+      $('topic-remove-names').replaceChildren(...removed.map(name => el('li', '', name)));
+      $('topic-remove-dialog').showModal();
+      $('topic-remove-dialog').querySelector('[data-close]').focus();
+      return;
+    }
+    const result = await api('topics', 'PUT', { topics: lines, renames, ...(removed.length ? { confirmation: 'DELETE TOPIC' } : {}) });
+    const selected = this.app.feed.selectedTopics;
+    for (const [from, to] of Object.entries(result.renamed)) if (selected.delete(from)) selected.add(to);
+    result.removed.forEach(name => selected.delete(name));
     this.renderTopics(result.topics);
+    notify(`Topics saved. Labels updated on ${result.updated_stories} stories; articles were kept.`);
     await this.app.refreshOverview();
     await this.app.feed.load();
   }
@@ -356,15 +364,16 @@ export class Settings {
   }
 
   syncNewSources() {
+    const running = Boolean(this.app.overview?.collector.running);
     const count = this.sources.filter(source => source.enabled && source.last_checked === null).length;
     $('check-new-sources').textContent = `Check new sources (${count})`;
-    $('check-new-sources').disabled = Boolean(this.app.overview?.collector.running) || count === 0;
+    $('check-new-sources').disabled = running || count === 0;
+    document.querySelectorAll('#source-list .check-source').forEach(button => { button.disabled = running || button.dataset.enabled !== 'true'; });
     $('check-new-sources').title = count ? 'Check only enabled sources with no recorded check' : 'No enabled sources are awaiting their first check';
   }
 
   async refreshSources() {
     this.sources = await api('sources');
-    this.syncNewSources();
     $('source-list').replaceChildren(...this.sources.map(source => {
       const row = el('div', 'source-row');
       const info = el('div', 'source-info');
@@ -377,6 +386,11 @@ export class Settings {
       source.health.warnings.forEach(warning => info.append(el('small', 'source-warning', warning)));
       if (source.last_checked) info.append(el('small', '', `Checked ${formatTime(source.last_checked)} · Last success ${formatTime(source.last_success)} · ${source.last_count ?? 'Unknown'} entries · ${source.last_method || 'Method unknown'}`));
       if (source.newest_published) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newest_published)));
+      const check = el('button', 'check-source', 'Check');
+      check.setAttribute('aria-label', `Check ${source.name}`);
+      check.title = source.enabled ? 'Check only this source now' : 'Enable the source to check it';
+      check.dataset.enabled = String(Boolean(source.enabled));
+      check.onclick = () => this.app.collect('collect', check, { sourceId: source.id, name: source.name });
       const edit = el('button', '', 'Edit');
       edit.setAttribute('aria-label', `Edit ${source.name}`);
       edit.onclick = () => this.editSource(source);
@@ -386,9 +400,10 @@ export class Settings {
         await api('sources/' + source.id, 'PUT', { ...source, enabled: !source.enabled });
         await this.refreshSources();
       });
-      row.append(info, edit, toggle);
+      row.append(info, check, edit, toggle);
       return row;
     }));
+    this.syncNewSources();
   }
 
   editSource(source = null) {
@@ -415,7 +430,7 @@ export class Settings {
     $('schedule-timezone').textContent = `Collects every configured number of hours after the last full collection starts. The server must be running; overdue work catches up after startup. Manual full collections restart the interval.`;
     const runs = overview.runs.map(run => {
       const details = el('details', 'run');
-      details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : ''} · ${run.status}`));
+      details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : run.details.scope === 'source' ? ` (${run.details.source} only)` : ''} · ${run.status}`));
       const d = run.details;
       details.append(el('p', '', `${d.added || 0} added · ${d.reviewed || 0} reviewed · ${d.duplicates || 0} duplicates · ${d.filtered || 0} filtered`));
       if (d.note) details.append(el('p', '', d.note));

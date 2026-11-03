@@ -556,45 +556,51 @@ sealed class Store
 
     public JsonArray Topics() => Read(db => (JsonArray)db.SettingJson("topics")!);
 
-    public JsonObject ChangeTopic(string action, string name, string? replacement = null)
+    /// <summary>
+    /// Replaces the managed list. A rename keeps saved story labels under the new name (a case-only change is a rename);
+    /// a name left out of the list and not renamed is removed from saved story labels.
+    /// </summary>
+    public JsonObject SaveTopics(IReadOnlyList<string> topics, IReadOnlyDictionary<string, string> renames, bool removalConfirmed = false) => Write(db =>
     {
-        if (action is not ("add" or "rename" or "delete")) throw new ValidationException("Choose add, rename, or delete");
-        return Write(db =>
+        if (topics.Count > 1000) throw new ValidationException("Keep the topic list to at most 1,000 topics");
+        for (var index = 0; index < topics.Count; index++)
+            if (topics.Take(index).FirstOrDefault(earlier => PyText.FoldEquals(earlier, topics[index])) is { } duplicate)
+                throw new ValidationException($"A topic named \u201c{duplicate}\u201d already exists");
+        var current = ((JsonArray)db.SettingJson("topics")!).Select(t => (string)t!).ToList();
+        var mapping = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (from, to) in renames)
         {
-            var names = ((JsonArray)db.SettingJson("topics")!).Select(t => (string)t!).ToList();
-            if (action != "add" && !names.Contains(name)) throw new ValidationException("Topic not found; reload the topic list");
-            string? target;
-            if (action != "delete")
+            if (!current.Contains(from) || topics.Contains(from)) throw new ValidationException("Topic list changed; reload the topics and try again");
+            if (!topics.Contains(to) || mapping.ContainsValue(to)) throw new ValidationException("Each renamed topic needs one new name in the list");
+            if (current.Contains(to) && !renames.ContainsKey(to)) throw new ValidationException($"A topic named \u201c{to}\u201d already exists");
+            mapping[from] = to;
+        }
+        foreach (var name in current.Where(name => !topics.Contains(name) && !mapping.ContainsKey(name)))
+            mapping[name] = topics.FirstOrDefault(topic => PyText.FoldEquals(topic, name) && !current.Contains(topic) && !mapping.ContainsValue(topic));
+        if (!removalConfirmed && mapping.ContainsValue(null)) throw new ValidationException("Confirm removing topics before continuing");
+        long updated = 0;
+        if (mapping.Count > 0)
+        {
+            var rows = db.Rows($"SELECT id,tags FROM stories WHERE EXISTS (SELECT 1 FROM json_each(stories.tags) WHERE value IN ({string.Join(',', mapping.Keys.Select(_ => "?"))}))",
+                [.. mapping.Keys]);
+            foreach (var row in rows)
             {
-                target = action == "rename" ? replacement! : name;
-                if (names.Where(value => action == "add" || value != name).Any(value => PyText.FoldEquals(value, target)))
-                    throw new ValidationException("A topic with that name already exists");
-                names = names.Select(value => value == name && action == "rename" ? target : value).ToList();
-                if (action == "add") names.Add(target);
+                var tags = ((JsonArray)Json.Load((string)row["tags"]!)!).Select(t => (string)t!)
+                    .Select(value => mapping.TryGetValue(value, out var target) ? target : value).OfType<string>().Distinct()
+                    .Select(t => (JsonNode)t).ToArray();
+                db.Execute("UPDATE stories SET tags=? WHERE id=?", new JsonArray(tags), row["id"]!.AsLong());
             }
-            else
-            {
-                target = null;
-                names.Remove(name);
-            }
-            long updated = 0;
-            if (action != "add")
-            {
-                var rows = db.Rows("SELECT id,tags FROM stories WHERE EXISTS (SELECT 1 FROM json_each(stories.tags) WHERE value=?)", name);
-                foreach (var row in rows)
-                {
-                    var tags = ((JsonArray)Json.Load((string)row["tags"]!)!).Select(t => (string)t!)
-                        .Where(value => value != name || target is not null)
-                        .Select(value => value == name ? target! : value).Distinct().Select(t => (JsonNode)t).ToArray();
-                    db.Execute("UPDATE stories SET tags=? WHERE id=?", new JsonArray(tags), row["id"]!.AsLong());
-                }
-                updated = rows.Count;
-            }
-            var sorted = new JsonArray(PyText.SortFolded(names).Select(n => (JsonNode)n).ToArray());
-            db.Execute("UPDATE settings SET value=? WHERE key='topics'", sorted);
-            return new JsonObject { ["topics"] = sorted.DeepClone(), ["updated_stories"] = updated };
-        });
-    }
+            updated = rows.Count;
+        }
+        var sorted = new JsonArray(PyText.SortFolded(topics).Select(n => (JsonNode)n).ToArray());
+        db.Execute("UPDATE settings SET value=? WHERE key='topics'", sorted);
+        return new JsonObject
+        {
+            ["topics"] = sorted.DeepClone(), ["updated_stories"] = updated,
+            ["renamed"] = new JsonObject(mapping.Where(pair => pair.Value is not null).Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)pair.Value))),
+            ["removed"] = new JsonArray(mapping.Where(pair => pair.Value is null).Select(pair => (JsonNode)pair.Key).ToArray()),
+        };
+    });
 
     public JsonObject Overview() => Read(db =>
     {
@@ -737,6 +743,6 @@ sealed class Store
 
     /// <summary>The newest full-collection start and the last history reset, which anchor the interval schedule.</summary>
     public (string? LastCollection, string? HistoryCleared) ScheduleAnchors() => Read(db => (
-        (string?)db.Scalar("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' AND COALESCE(json_extract(details,'$.scope'),'all')!='unchecked' ORDER BY id DESC LIMIT 1"),
+        (string?)db.Scalar("SELECT started_at FROM runs WHERE kind='collect' AND status!='interrupted' AND COALESCE(json_extract(details,'$.scope'),'all')='all' ORDER BY id DESC LIMIT 1"),
         db.Scalar("SELECT value FROM settings WHERE key='history_cleared_at'") is string reset ? (string?)Json.Load(reset) : null));
 }

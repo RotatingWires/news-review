@@ -45,12 +45,19 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
 
     string Message() => (string)Status()["message"]!;
 
-    public bool Start(string kind = "collect", bool scheduled = false, bool uncheckedOnly = false)
+    /// <summary>Starts a job; a manual collection can be limited to unchecked sources or to one enabled source.</summary>
+    public bool Start(string kind = "collect", bool scheduled = false, bool uncheckedOnly = false, long? sourceId = null)
     {
-        if (uncheckedOnly && (kind != "collect" || scheduled)) throw new ValidationException("New-source checks must be a manual collection");
+        if ((uncheckedOnly || sourceId is not null) && (kind != "collect" || scheduled)) throw new ValidationException("Source checks must be a manual collection");
+        if (uncheckedOnly && sourceId is not null) throw new ValidationException("Check new sources or one source, not both");
         // Validate storage synchronously so a start request cannot be acknowledged for a job
         // which can only fail because its data folder was removed.
         store.Settings();
+        if (sourceId is not null)
+        {
+            var source = store.Sources().Cast<JsonObject>().FirstOrDefault(s => s["id"]!.AsLong() == sourceId) ?? throw new ValidationException("Source not found");
+            if (source["enabled"]!.AsLong() == 0) throw new ValidationException("Enable the source before checking it");
+        }
         if (!jobLock.Wait(0)) return false;
         if (scheduled && !ScheduleDue(DateTimeOffset.Now))
         {
@@ -59,7 +66,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
         }
         reviewStop = false;
         Update(("running", true), ("kind", kind), ("reviewing", false), ("review_stop_requested", false), ("message", "Starting…"));
-        _ = Task.Run(() => Run(kind, uncheckedOnly));
+        _ = Task.Run(() => Run(kind, uncheckedOnly, sourceId));
         return true;
     }
 
@@ -75,8 +82,9 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
         }
     }
 
-    async Task Run(string kind, bool uncheckedOnly)
+    async Task Run(string kind, bool uncheckedOnly, long? sourceId)
     {
+        var scope = sourceId is not null ? "source" : uncheckedOnly ? "unchecked" : "all";
         long? runId = null;
         var modelUsed = false;
         JsonObject? ai = null;
@@ -84,7 +92,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
         var details = new JsonObject
         {
             ["added"] = 0, ["reviewed"] = 0, ["duplicates"] = 0, ["filtered"] = 0, ["errors"] = errors,
-            ["scope"] = uncheckedOnly ? "unchecked" : "all", ["sources_checked"] = 0,
+            ["scope"] = scope, ["sources_checked"] = 0,
         };
         var cancel = stopping.Token;
         try
@@ -98,8 +106,10 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             if (kind == "collect")
             {
                 var enabled = store.Sources().Cast<JsonObject>()
-                    .Where(s => s["enabled"]!.AsLong() != 0 && (!uncheckedOnly || s["last_checked"] is null)).ToList();
+                    .Where(s => s["enabled"]!.AsLong() != 0 && (!uncheckedOnly || s["last_checked"] is null) &&
+                                (sourceId is null || s["id"]!.AsLong() == sourceId)).ToList();
                 sourceIds = enabled.Select(s => s["id"]!.AsLong()).ToList();
+                if (sourceId is not null) details["source"] = enabled.Select(s => (string)s["name"]!).FirstOrDefault() ?? "";
                 var number = 0;
                 foreach (var source in enabled)
                 {
@@ -136,7 +146,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             if (((string)ai["model"]!).Trim().Length == 0)
                 details["note"] = "No model configured. Stories are saved with source excerpts; configure AI and run Review pending.";
             else
-                modelUsed = await Review(ai, config, uncheckedOnly ? sourceIds : null, details, errors, cancel);
+                modelUsed = await Review(ai, config, scope != "all" ? sourceIds : null, details, errors, cancel);
             Update(("reviewing", false));
             if (reviewStop)
             {
@@ -145,7 +155,13 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             }
             var status = cancel.IsCancellationRequested ? "interrupted" : errors.Count > 0 || reviewStop ? "partial" : "complete";
             store.FinishRun(runId.Value, status, details);
-            Update(("message", (uncheckedOnly ? $"Checked {details["sources_checked"]} new sources · " : "") +
+            var checkedPrefix = scope switch
+            {
+                "unchecked" => $"Checked {details["sources_checked"]} new sources · ",
+                "source" => $"Checked {details["source"]} · ",
+                _ => "",
+            };
+            Update(("message", checkedPrefix +
                 $"Saved {details["added"]} new stories · {details["reviewed"]} reviewed" +
                 (errors.Count > 0 ? " · See run details for errors" : "") +
                 (reviewStop ? " · AI review stopped; remaining stories are queued" : "")));

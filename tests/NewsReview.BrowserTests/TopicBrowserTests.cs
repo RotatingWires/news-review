@@ -40,40 +40,47 @@ public class TopicBrowserTests : BrowserTest
             await Button("Topics").ClickAsync();
             await Expect(page.Locator("#panel-topics")).ToBeVisibleAsync();
         }
+        // Line edits become explicit renames/removals; moving a line never removes it.
+        var edits = await page.EvaluateAsync<string>(@"async () => {
+            const { topicEdits } = await import('/settings.js');
+            return JSON.stringify([
+                topicEdits(['A', 'B', 'C'], ['C', 'A', 'B']),
+                topicEdits(['A', 'B', 'C'], ['A', 'New', 'B2', 'C']),
+                topicEdits(['ai', 'Linux'], ['AI', 'Linux']),
+                topicEdits(['A', 'B', 'C'], ['A', 'C', 'D']),
+                topicEdits(['A', 'B', 'C'], ['A', 'X', 'Y']),
+            ]);
+        }");
+        Assert.Equal("""[{"renames":{},"removed":[]},{"renames":{"B":"New"},"removed":[]},{"renames":{"ai":"AI"},"removed":[]},{"renames":{},"removed":["B"]},{"renames":{"B":"X","C":"Y"},"removed":[]}]""",
+            edits);
         await OpenTopics();
-        await Expect(page.Locator("#topic-rows .topic-row")).ToHaveCountAsync(original.Count);
-        await Expect(page.Locator("#topic-rows")).ToContainTextAsync("Existing custom topic");
-        var editor = page.Locator("#topic-edit-dialog");
-        ILocator EditorButton(string name) => editor.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
-        await page.Locator("#add-topic").ClickAsync();
-        await EditorButton("Cancel").ClickAsync();
-        Assert.Equal(original, Topics());
-        await page.Locator("#add-topic").ClickAsync();
-        await page.Locator("#topic-name-input").FillAsync("SDR Projects");
-        await EditorButton("Save").ClickAsync();
-        await Expect(editor).Not.ToBeVisibleAsync();
-        await Expect(page.Locator("#topic-rows")).ToContainTextAsync("SDR Projects");
+        var text = page.Locator("#topics-text");
+        string Lines(IEnumerable<string> names) => string.Join("\n", names);
+        await Expect(text).ToHaveValueAsync(Lines(original));
+        await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-topic-editor.png") });
+        var save = page.Locator("#topics-form").GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true });
+        await text.FillAsync(Lines([.. original, "  SDR Projects  ", ""]));
+        await save.ClickAsync();
+        await Fixtures.WaitUntil(() => Topics().Contains("SDR Projects"));
+        await Expect(page.Locator("#status-message")).ToContainTextAsync("Topics saved");
         Assert.Subset(Topics().ToHashSet(), original.ToHashSet());
-        await page.Locator("#add-topic").ClickAsync();
-        await page.Locator("#topic-name-input").FillAsync("sdr PROJECTS");
-        await EditorButton("Save").ClickAsync();
+        await text.FillAsync(Lines([.. Topics(), "sdr PROJECTS"]));
+        await save.ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("already exists");
-        await Expect(editor).ToBeVisibleAsync();
-        await EditorButton("Cancel").ClickAsync();
+        Assert.DoesNotContain("sdr PROJECTS", Topics());
 
-        await Button("Rename topic " + category).ClickAsync();
-        await page.Locator("#topic-name-input").FillAsync("Device Engineering");
-        await EditorButton("Save").ClickAsync();
-        await Expect(editor).Not.ToBeVisibleAsync();
+        // Editing a line in place renames it: saved labels and the selected feed filter follow.
+        await text.FillAsync(Lines(Topics().Select(name => name == category ? "Device Engineering" : name)));
+        await save.ClickAsync();
+        await Fixtures.WaitUntil(() => Topics().Contains("Device Engineering"));
+        await Expect(page.Locator("#topic-remove-dialog")).Not.ToBeVisibleAsync();
+        Assert.DoesNotContain(category, Topics());
         // Default category suggestions follow the managed list; the source keeps its own stored category.
         await Button("Sources").ClickAsync();
         await Button("Edit " + (string)source["name"]!).ClickAsync();
         await Expect(page.Locator("#source-category")).ToHaveValueAsync(category);
         await Button("Choose default category").ClickAsync();
         Assert.Equal(Topics(), await page.Locator("#source-dialog .editable-dropdown .dropdown-option span:not(.dropdown-check)").AllTextContentsAsync());
-        Assert.Contains("Device Engineering", Topics());
-        Assert.Contains("SDR Projects", Topics());
-        Assert.DoesNotContain(category, Topics());
         await page.Locator("#source-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await Button("Daily Feed").ClickAsync();
         await Expect(page.Locator(".story")).ToHaveCountAsync(2);
@@ -84,29 +91,39 @@ public class TopicBrowserTests : BrowserTest
         Assert.Equal(1, Store.Stories(new() { Bookmarks = true })["total"]!.AsLong());
         await Expect(page.Locator(".read-label")).ToHaveCountAsync(1);
 
+        // Deleting a line asks first; Cancel keeps everything.
         await OpenTopics();
-        await Button("Delete topic Device Engineering").ClickAsync();
-        var deletion = page.Locator("#topic-delete-dialog");
-        await deletion.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await text.FillAsync(Lines(Topics().Where(name => name != "Device Engineering")));
+        await save.ClickAsync();
+        var removal = page.Locator("#topic-remove-dialog");
+        await Expect(removal).ToBeVisibleAsync();
+        await Expect(page.Locator("#topic-remove-names li")).ToHaveTextAsync(["Device Engineering"]);
+        await removal.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         Assert.Contains("Device Engineering", Topics());
-        await Button("Delete topic Device Engineering").ClickAsync();
+        await save.ClickAsync();
         await page.SetViewportSizeAsync(390, 844);
-        await Expect(deletion.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true })).ToBeInViewportAsync();
-        await deletion.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true }).ClickAsync();
-        await Expect(deletion).Not.ToBeVisibleAsync();
-        Assert.DoesNotContain("Device Engineering", Topics());
+        await Expect(removal.GetByRole(AriaRole.Button, new() { Name = "Remove", Exact = true })).ToBeInViewportAsync();
+        // The feed reloads only after the saved list has been rendered back into the text box.
+        await page.RunAndWaitForRequestAsync(() => removal.GetByRole(AriaRole.Button, new() { Name = "Remove", Exact = true }).ClickAsync(),
+            request => request.Url.Contains("/api/stories"));
+        await Expect(removal).Not.ToBeVisibleAsync();
+        await Expect(text).ToHaveValueAsync(Lines(Topics()));
         Assert.Contains("Existing custom topic", Topics());
         Assert.Equal(2, Store.Stories(new())["total"]!.AsLong());
         Assert.Equal(1, Store.Stories(new() { Bookmarks = true })["total"]!.AsLong());
+
+        // Unsaved edits survive switching tabs; a reload shows the saved list.
+        await text.FillAsync(Lines([.. Topics(), "Radio, scanners, antennas and homebrew projects"]));
+        await Button("Sources").ClickAsync();
+        await Button("Topics").ClickAsync();
+        await Expect(text).ToHaveValueAsync(new System.Text.RegularExpressions.Regex("homebrew projects$"));
+        await save.ClickAsync();
+        await Fixtures.WaitUntil(() => Topics().Contains("Radio, scanners, antennas and homebrew projects"));
         await page.ReloadAsync();
         await OpenTopics();
-        await Expect(page.Locator("#topic-rows")).ToContainTextAsync("Existing custom topic");
-        await Expect(page.Locator("#topic-rows")).ToContainTextAsync("SDR Projects");
-        await Button("Rename topic SDR Projects").ClickAsync();
-        await page.Locator("#topic-name-input").FillAsync("Radio, scanners, antennas and homebrew projects");
-        await EditorButton("Save").ClickAsync();
-        await Expect(editor).Not.ToBeVisibleAsync();
-        await Expect(page.Locator("#topic-rows")).ToContainTextAsync("Radio, scanners, antennas and homebrew projects");
+        await Expect(text).ToHaveValueAsync(Lines(Topics()));
+        Assert.Contains("Radio, scanners, antennas and homebrew projects", Topics());
+        Assert.Contains("SDR Projects", Topics());
         Assert.True(await page.Locator("body").EvaluateAsync<bool>("el => el.scrollWidth <= innerWidth"));
         AssertNoErrors();
     }

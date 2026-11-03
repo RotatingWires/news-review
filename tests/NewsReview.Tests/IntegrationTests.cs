@@ -16,7 +16,7 @@ public abstract class IntegrationBase : IAsyncLifetime
     {
         store = host.Store;
         collector = host.Collector;
-        store.ChangeTopic("add", "Standards");
+        Fixtures.ChangeTopic(store, "add", "Standards");
         store.SaveSource(new JsonObject { ["name"] = "Fixture", ["url"] = Root, ["feed_url"] = "", ["category"] = "Standards", ["enabled"] = true });
         client = await host.SignedIn();
     }
@@ -146,34 +146,47 @@ public class ApiTests : IntegrationBase
     }
 
     [Fact]
-    public async Task TopicsApiPreservesExistingTopicsAndGuardsEdits()
+    public async Task TopicsApiSavesTheListWithRenamesAndConfirmedRemovals()
     {
-        var existing = (await Request("/api/topics")).Body!.AsArray().Select(t => (string)t!).ToHashSet();
-        Assert.Equal(existing, store.Topics().Select(t => (string)t!).ToHashSet());
-        var add = new { action = "add", name = "Custom topic" };
-        Assert.Equal(401, (await Anonymous("/api/topics", "POST", add)).Status);
+        var existing = (await Request("/api/topics")).Body!.AsArray().Select(t => (string)t!).ToList();
+        Assert.Equal(existing, store.Topics().Select(t => (string)t!));
+        object Save(IEnumerable<string> topics, object? renames = null, string? confirmation = null) =>
+            new { topics = topics.ToArray(), renames = renames ?? new { }, confirmation };
+        var add = Save([.. existing, "Custom topic"]);
+        Assert.Equal(401, (await Anonymous("/api/topics", "PUT", add)).Status);
         Assert.True(collector.TryAcquire());
-        try { Assert.Equal(409, (await Request("/api/topics", "POST", add)).Status); }
+        try { Assert.Equal(409, (await Request("/api/topics", "PUT", add)).Status); }
         finally { collector.Release(); }
-        var (status, result) = await Request("/api/topics", "POST", add);
-        Assert.Equal(201, status);
-        Assert.Subset(result!["topics"]!.AsArray().Select(t => (string)t!).ToHashSet(), existing);
-        Assert.Equal(400, (await Request("/api/topics", "POST", new { action = "add", name = "custom TOPIC" })).Status);
-        Assert.Equal(400, (await Request("/api/topics", "POST", new { action = "add", name = "" })).Status);
+        var (status, result) = await Request("/api/topics", "PUT", add);
+        Assert.Equal(200, status);
+        Assert.Subset(result!["topics"]!.AsArray().Select(t => (string)t!).ToHashSet(), existing.ToHashSet());
+        List<string> Current() => store.Topics().Select(t => (string)t!).ToList();
+        Assert.Equal(400, (await Request("/api/topics", "PUT", Save([.. Current(), "custom TOPIC"]))).Status);
+        Assert.Equal(400, (await Request("/api/topics", "PUT", Save([.. Current(), ""]))).Status);
         store.InsertStory(EnabledSource(), Fixtures.Entry("A useful protocol update", Root + "/article", null, "Source details."), "Standards", "2026-10-25");
         var story = store.Stories(new())["items"]![0]!["id"]!.AsLong();
-        store.ReviewResult(story, Fixtures.Review(r => { r["tags"] = new JsonArray("Custom topic"); r["status"] = "reviewed"; }),
+        store.ReviewResult(story, Fixtures.Review(r => { r["tags"] = new JsonArray("Custom topic", "Standards"); r["status"] = "reviewed"; }),
             ModelConfig(), (JsonObject)store.Settings()["interests"]!, "Article text.", "article");
         store.Bookmark(story, true);
+        List<string> StoryTags() => Tags(store.Stories(new() { Bookmarks = true })["items"]![0]!);
         const string renamed = "SDR / scanner's projects";
-        (status, result) = await Request("/api/topics", "POST", new { action = "rename", name = "Custom topic", new_name = renamed });
+        IEnumerable<string> Replace(string from, string to) => Current().Select(n => n == from ? to : n);
+        Assert.Equal(400, (await Request("/api/topics", "PUT", Save(Replace("Custom topic", "Standards").Distinct(), new Dictionary<string, string> { ["Custom topic"] = "Standards" }))).Status);
+        (status, result) = await Request("/api/topics", "PUT", Save(Replace("Custom topic", renamed), new Dictionary<string, string> { ["Custom topic"] = renamed }));
         Assert.Equal((200, 1L), (status, result!["updated_stories"]!.AsLong()));
-        Assert.Equal([renamed], Tags(store.Stories(new() { Bookmarks = true })["items"]![0]!));
-        Assert.Equal(400, (await Request("/api/topics", "POST", new { action = "delete", name = renamed })).Status);
-        Assert.Equal(200, (await Request("/api/topics", "POST", new { action = "delete", name = renamed, confirmation = "DELETE TOPIC" })).Status);
-        Assert.Empty(Tags(store.Stories(new() { Bookmarks = true })["items"]![0]!));
+        Assert.Equal([renamed, "Standards"], StoryTags());
+        // A case-only edit is a rename even without an explicit mapping.
+        Assert.Equal(200, (await Request("/api/topics", "PUT", Save(Replace(renamed, renamed.ToUpperInvariant())))).Status);
+        Assert.Equal([renamed.ToUpperInvariant(), "Standards"], StoryTags());
+        var without = Current().Where(n => n != renamed.ToUpperInvariant()).ToList();
+        Assert.Equal(400, (await Request("/api/topics", "PUT", Save(without))).Status);
+        Assert.Equal([renamed.ToUpperInvariant(), "Standards"], StoryTags());
+        (status, result) = await Request("/api/topics", "PUT", Save(without, confirmation: "DELETE TOPIC"));
+        Assert.Equal(200, status);
+        Assert.Equal([renamed.ToUpperInvariant()], result!["removed"]!.AsArray().Select(t => (string)t!));
+        Assert.Equal(["Standards"], StoryTags());
         Assert.Equal(1, Total(new()));
-        Assert.Subset(store.Topics().Select(t => (string)t!).ToHashSet(), existing);
+        Assert.Subset(Current().ToHashSet(), existing.ToHashSet());
     }
 }
 
@@ -182,10 +195,10 @@ public class ModelTransportTests : IntegrationBase
     [Fact]
     public async Task EmptyAndCustomOwnedTopicListsWorkWithModelReview()
     {
-        foreach (var name in store.Topics().Select(t => (string)t!).ToList()) store.ChangeTopic("delete", name);
+        foreach (var name in store.Topics().Select(t => (string)t!).ToList()) Fixtures.ChangeTopic(store, "delete", name);
         foreach (var provider in new[] { "ollama", "compatible", "openrouter" })
             Assert.Empty(Tags(await collector.Reviewer.Test(ModelConfig(provider), [])));
-        store.ChangeTopic("add", "Only my custom label");
+        Fixtures.ChangeTopic(store, "add", "Only my custom label");
         store.SaveSettings(new JsonObject { ["ai"] = ModelConfig() });
         await Collect();
         Assert.Equal(["Only my custom label"], store.Topics().Select(t => (string)t!));
@@ -305,6 +318,37 @@ public class CollectionTests : IntegrationBase
         await Fixtures.WaitUntil(() => !collector.Status()["running"]!.GetValue<bool>());
         Assert.Equal(0, LatestRun()["details"]!["sources_checked"]!.AsLong());
         Assert.Equal(0, StoryItems().First(s => (string)s!["headline"]! == "Old queued story")!["attempts"]!.AsLong());
+    }
+
+    [Fact]
+    public async Task SingleSourceCheckCollectsAndReviewsOnlyThatSource()
+    {
+        var otherId = store.Sources().Cast<JsonObject>().First(s => (string)s["name"]! == "Fixture")["id"]!.AsLong();
+        store.SourceChecked(otherId, "Previously failed");
+        var otherBefore = (string)store.Sources().Cast<JsonObject>().First(s => s["id"]!.AsLong() == otherId)["last_checked"]!;
+        store.InsertStory(otherId, Fixtures.Entry("Other queued story", Root + "/other-queued", null, "Other text"), "Standards", "2026-10-15");
+        var targetId = store.SaveSource(new JsonObject { ["name"] = "Chosen listing", ["url"] = Root + "/listing", ["feed_url"] = "", ["category"] = "Radio", ["mode"] = "page", ["enabled"] = true });
+        var disabledId = store.SaveSource(new JsonObject { ["name"] = "Disabled", ["url"] = Root + "/disabled", ["feed_url"] = "", ["category"] = "Radio", ["enabled"] = false });
+        store.SaveSettings(new JsonObject { ["ai"] = ModelConfig() });
+        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { kind = "review", source_id = targetId })).Status);
+        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = "one" })).Status);
+        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = 999999 })).Status);
+        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = disabledId })).Status);
+        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { unchecked_only = true, source_id = targetId })).Status);
+        Assert.Equal(202, (await Request("/api/jobs/start", "POST", new { source_id = targetId })).Status);
+        await Fixtures.WaitUntil(() => !collector.Status()["running"]!.GetValue<bool>());
+        var sources = store.Sources().Cast<JsonObject>().ToDictionary(s => s["id"]!.AsLong());
+        Assert.NotNull(sources[targetId]["last_checked"]);
+        Assert.Equal(otherBefore, (string)sources[otherId]["last_checked"]!);
+        Assert.Null(sources[disabledId]["last_checked"]);
+        var other = StoryItems().First(s => (string)s!["headline"]! == "Other queued story")!;
+        Assert.Equal(("pending", 0L), ((string)other["status"]!, other["attempts"]!.AsLong()));
+        var details = LatestRun()["details"]!;
+        Assert.Equal(("source", "Chosen listing", 1L), ((string)details["scope"]!, (string)details["source"]!, details["sources_checked"]!.AsLong()));
+        Assert.Equal(2, details["added"]!.AsLong());
+        Assert.StartsWith("Checked Chosen listing · Saved 2 new stories", (string)collector.Status()["message"]!);
+        // A one-source check is not a full collection, so it does not restart the schedule.
+        Assert.True(collector.ScheduleDue(DateTimeOffset.Now));
     }
 
     [Fact]
