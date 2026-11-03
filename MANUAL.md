@@ -139,7 +139,7 @@ A small model must still follow instructions and produce valid structured output
 
 ## Interface and help
 
-**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
+**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups, and ends with about.lehighradio.com above the application version, as TaskList and TaskList Stats do. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
 
 The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
 
@@ -147,7 +147,7 @@ Notifications and errors appear in the fixed bottom-left status bar. Hover over 
 
 Collection/review messages and their blinking activity light appear only in the footer. Review progress keeps the full article title; the status bar adds an ellipsis when it exceeds the available width, and hovering reveals the full message. **Review pending** sits beside **Check sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category remains editable for custom values; the daily topic selector retains multi-select checkboxes.
 
-The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative, matching TaskList/Stats.
+The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative CSS drawings in equal-size boxes, so minimize, maximize, and close stay aligned regardless of font; TaskList/Stats use the same markup and styles.
 
 Manage article labels in **Settings → Topics** with **Add topic**, **Rename**, and **Delete**. Names are 1–60 characters; new names cannot duplicate another topic regardless of capitalization. AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
 
@@ -575,6 +575,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.2
+
+- Draw the titlebar minimize, maximize, and close symbols with CSS in equal-size boxes so they line up; the old `_` sat on the text baseline below the other two.
+- End Help with about.lehighradio.com and the application version, matching TaskList and TaskList Stats.
 
 ### v1.0.1
 

@@ -133,7 +133,9 @@ public class SmokeBrowserTests : BrowserTest
         countBox = await Box(page.Locator("#story-count"));
         Assert.True(countBox.Y >= heading.Y + heading.Height);
         Assert.Equal(heading.X, countBox.X);
-        Assert.Equal("_ □ ×", await page.Locator(".title-buttons").InnerTextAsync());
+        var titleButtons = await page.Locator(".title-buttons > span").EvaluateAllAsync<double[][]>("els => els.map(el => { const r = el.getBoundingClientRect(); return [r.top, r.height]; })");
+        Assert.Equal(3, titleButtons.Length);
+        Assert.All(titleButtons, box => Assert.Equal(titleButtons[0], box));
         Assert.Equal("none", await Style("body", "userSelect"));
         Assert.Equal("text", await Style(".story", "userSelect"));
         Assert.Equal("none", await Style(".bookmark", "userSelect"));
@@ -151,6 +153,7 @@ public class SmokeBrowserTests : BrowserTest
 
         await Button("Help").ClickAsync();
         await Expect(page.Locator("#help-dialog")).ToBeVisibleAsync();
+        await Expect(page.Locator("#help-dialog .help-content > p").Last).ToHaveTextAsync(new Regex(@"^about\.lehighradio\.comNewsReview v\d+\.\d+\.\d+$"));
         const string positionsScript = "el => [el.querySelector('.dialog-heading').getBoundingClientRect().top, el.querySelector('.dialog-actions').getBoundingClientRect().bottom]";
         var positions = await page.Locator("#help-dialog").EvaluateAsync<double[]>(positionsScript);
         await page.Locator("#help-dialog .dialog-body").EvaluateAsync("el => { el.scrollTop = el.scrollHeight; }");
