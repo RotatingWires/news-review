@@ -253,7 +253,7 @@ The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unche
 
 The Sources tab shows a persistent refresh status while collection/review runs, followed by its recorded result. **Refresh sources** uses the same background job as **Check sources**: collect candidates, then review a bounded batch if a model is configured. Individual failures remain attached to their sources and in run history; they do not prevent other sources from finishing.
 
-Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Check failed**, **Broken** (three or more consecutive failed checks), and **Disabled**. Stale/inactivity warnings show their detailed red explanation without a redundant Needs attention heading. A successful check resets the failure counter.
+Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Check failed**, **Broken** (three or more consecutive failed checks), and **Disabled**. Stale/inactivity warnings show their detailed red explanation without a redundant Needs attention heading. When the collection note already explains a stale or undated feed, the separate age warning is omitted so the same observation is not listed twice. A successful check resets the failure counter.
 
 The default inactivity warning interval is **14 days**, editable per source (1–365). Warnings cover checks older than that interval, an old newest publication date, an empty result, or no newly observed stories when dates are unavailable. An inactive/stale warning is an observation, not proof a publisher has shut down. Increase the interval for monthly/occasional publishers. An automatic switch from a configured broken feed to a usable website page is marked as a warning, with the original feed error visible.
 
@@ -261,7 +261,7 @@ Browser-to-app connection failures are separate from publisher/source errors. A 
 
 ### Feed availability
 
-Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Availability can vary by host, region, or time, and feed addresses can change. Use **Preview stories** in the source editor to check a feed or website listing without saving anything.
+Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Sites behind a Cloudflare browser check ("Just a moment...") open normally in a browser, which runs the check's JavaScript, but refuse NewsReview; the error says so. Look for a feed address the site does not challenge, or disable the source. Availability can vary by host, region, or time, and feed addresses can change. Use **Preview stories** in the source editor to check a feed or website listing without saving anything.
 
 An individual source failure is recorded next to that source and in run history. Other sources continue.
 
@@ -310,7 +310,7 @@ Stored discovery/edition dates are retained for collection history; Daily Feed b
 - Collection is due when the configured hours have elapsed since the most recent full collection started. Manual full collections restart the interval; review-only and new-source-only jobs do not. With no previous full collection it runs on the next scheduler tick. Existing daily settings become a 24-hour interval; their old hour/minute fields are retained for archive compatibility but no longer control scheduling.
 - There is no wake-from-sleep mechanism. If the service was offline, it checks current feeds when it resumes; it cannot reconstruct stories that have already disappeared from those feeds.
 - The schedule survives restarts through the SQLite run history. Partial/failed full runs also restart the interval to avoid rapid retries; retry manually if needed. Missed intervals produce one catch-up run, not a replay of every missed run. An interrupted process is marked interrupted at the next startup.
-- Source requests are bounded in size and time, with a short pause between sources. Article downloads are limited to 3 MB; model responses to 1 MB.
+- Source requests are bounded in size and time, with a short pause between sources. Feed, website, and article downloads are limited to 10 MB, enough for full-content feeds; model responses to 1 MB.
 
 Opening a story headline with a click, keyboard activation, or middle click adds **Read** beneath the publisher after the save succeeds. The first-open timestamp persists across reloads/devices and ZIP backups, and is preserved when a story is reviewed again or bookmarked. Opening additional-source links marks that linked story, not the main article. No Unread label or automatic read-content detection is added; this tracks openings through NewsReview. Clearing/deleting a story also removes its marker. Existing stories begin with no marker. Schema-2 backups remain importable and get empty read markers.
 
@@ -575,6 +575,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.5
+
+- Explain Cloudflare browser-check refusals ("the site requires a Cloudflare browser check that NewsReview cannot complete") instead of a bare HTTP 403, for both the HTTP/2 `cf-mitigated` header and the HTTP/1.1 challenge page.
+- Raise the feed/page download limit from 3 MB to 10 MB so full-content feeds such as This Week in GNOME (about 3.8 MB) are read instead of falling back to the website; the error now states the limit.
+- Show a stale or undated feed once in source health: the age warning is omitted when the collection note already reports it.
 
 ### v1.0.4
 

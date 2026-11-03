@@ -7,18 +7,22 @@ sealed record SourceResult(List<Entry> Entries, string Method, string? FeedUrl, 
 /// <summary>Feed-first collection with website checks for failed or stale Automatic feeds.</summary>
 static class Sources
 {
+    // Source health reports these same observations from stored dates, so it omits its own copy when a note leads with one.
+    public static string StaleFeedReason(long days) => $"Feed's newest publication is at least {days} days old";
+    public static string UndatedFeedReason(long days) => $"Undated feed has no newly observed stories for at least {days} days";
+
     static string StaleReason(List<Entry> entries, JsonObject source, DateTimeOffset now)
     {
         var days = source["stale_days"]?.AsLong() ?? 14;
         var dates = entries.Where(item => item.PublishedAt is not null).Select(item => PyText.ParseInstant(item.PublishedAt)!.Value).ToList();
         if (entries.Count == 0) return "Feed returned no story entries";
         if (dates.Count > 0 && (now - dates.Max()).TotalSeconds >= days * 86400)
-            return $"Feed's newest publication is at least {days} days old";
+            return StaleFeedReason(days);
         if (dates.Count == 0)
         {
             var observed = (string?)source["last_new_story"] ?? (string?)source["first_checked"];
             if (observed is not null && (now - PyText.ParseInstant(observed)!.Value).TotalSeconds >= days * 86400)
-                return $"Undated feed has no newly observed stories for at least {days} days";
+                return UndatedFeedReason(days);
         }
         return "";
     }
@@ -125,13 +129,19 @@ static class Health
         if (string.IsNullOrEmpty(lastChecked)) return new JsonObject { ["status"] = "unchecked", ["warnings"] = new JsonArray("Refresh sources to test it.") };
         if (Age(lastChecked) >= threshold) warnings.Add($"Not checked in at least {threshold} days; source health is stale.");
         var newest = (string?)source["newest_published"];
-        if (!string.IsNullOrEmpty(newest) && Age(newest) >= threshold)
-            warnings.Add($"Newest reported publication is over {threshold} days old; this source may be inactive or its feed may be stale.");
-        else if (string.IsNullOrEmpty(newest) && Age(NullIfEmpty((string?)source["last_new_story"]) ?? (string?)source["first_checked"]) >= threshold)
-            warnings.Add($"No new stories observed for at least {threshold} days. Publication dates are unavailable; activity is uncertain.");
+        var note = (string?)source["collection_note"] ?? "";
+        var noteReportsAge = note.StartsWith(Sources.StaleFeedReason(threshold), StringComparison.Ordinal) ||
+                             note.StartsWith(Sources.UndatedFeedReason(threshold), StringComparison.Ordinal);
+        if (!noteReportsAge)
+        {
+            if (!string.IsNullOrEmpty(newest) && Age(newest) >= threshold)
+                warnings.Add($"Newest reported publication is over {threshold} days old; this source may be inactive or its feed may be stale.");
+            else if (string.IsNullOrEmpty(newest) && Age(NullIfEmpty((string?)source["last_new_story"]) ?? (string?)source["first_checked"]) >= threshold)
+                warnings.Add($"No new stories observed for at least {threshold} days. Publication dates are unavailable; activity is uncertain.");
+        }
         if (source["last_count"] is { } count && count.AsLong() == 0 && string.IsNullOrEmpty(lastError))
             warnings.Add("The last check returned no story entries.");
-        if ((string?)source["collection_note"] is { Length: > 0 } note) warnings.Add(note);
+        if (note.Length > 0) warnings.Add(note);
         var status = failures >= 3 ? "broken" : !string.IsNullOrEmpty(lastError) ? "error" : warnings.Count > 0 ? "warning" : "healthy";
         return new JsonObject { ["status"] = status, ["warnings"] = warnings };
     }

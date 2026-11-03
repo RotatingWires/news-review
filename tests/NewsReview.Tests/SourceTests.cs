@@ -90,6 +90,27 @@ public class SourceTests : IDisposable
     }
 
     [Fact]
+    public void HealthReportsAStaleFeedOnceWhenTheCollectionNoteExplainsIt()
+    {
+        var now = new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
+        var config = Configured();
+        config["last_checked"] = "2026-10-15T00:00:00+00:00";
+        config["first_checked"] = "2026-10-01T00:00:00+00:00";
+        config["newest_published"] = "2026-09-01T00:00:00+00:00";
+        List<string> Warnings() => Health.For(config, now)["warnings"]!.AsArray().Select(w => (string)w!).ToList();
+        foreach (var reason in new[] { Sources.StaleFeedReason(14), Sources.UndatedFeedReason(14) })
+        {
+            var note = reason + ". Website listing also checked; combined website and feed entries.";
+            config["collection_note"] = note;
+            Assert.Equal([note], Warnings());
+        }
+        config["collection_note"] = "Using website-page collection. Feed unavailable: HTTP 404 from example.com";
+        var warnings = Warnings();
+        Assert.Equal(2, warnings.Count);
+        Assert.Contains("may be inactive", warnings[0]);
+    }
+
+    [Fact]
     public void ExistingSourcesAndLegacyMarkersSurviveRestartWithoutReseeding()
     {
         Fixtures.Sql(store, "INSERT INTO settings VALUES ('sources_seeded','true'),('source_additions_048','true')");
@@ -116,5 +137,49 @@ public class SourceTests : IDisposable
             config[key] = value;
             Assert.Throws<ValidationException>(() => Validation.Source(config));
         }
+    }
+}
+
+public class PublisherFetchTests : IDisposable
+{
+    readonly FixtureServer server = new();
+
+    public PublisherFetchTests() => server.Handler = (path, _, _, response) =>
+    {
+        // HTTP/2 challenges carry cf-mitigated; HTTP/1.1 ones only the Cloudflare server and challenge page.
+        if (path == "/challenge") response.Headers["cf-mitigated"] = "challenge";
+        if (path is "/challenge-page" or "/cloudflare-refusal") response.Headers["Server"] = "cloudflare";
+        if (path is "/challenge" or "/challenge-page" or "/forbidden") return (403, "<html><title>Just a moment...</title></html>", "text/html");
+        if (path == "/cloudflare-refusal") return (403, "<html><title>Access denied</title></html>", "text/html");
+        var items = path switch { "/feed-4mb" => 8500, "/feed-11mb" => 23500, _ => 0 };
+        var feed = string.Concat(Enumerable.Range(0, items).Select(n =>
+            $"<item><title>Full-content story {n}</title><link>https://example.com/{n}</link><description>{new string('x', 400)}</description></item>"));
+        return (200, $"<rss><channel>{feed}</channel></rss>", "application/rss+xml");
+    };
+
+    public void Dispose() => server.Dispose();
+
+    [Fact]
+    public async Task CloudflareChallengesAreExplainedAndPlainRefusalsAreNot()
+    {
+        var fetcher = new Fetcher(publicOnly: false);
+        foreach (var path in new[] { "/challenge", "/challenge-page" })
+        {
+            var challenge = await Assert.ThrowsAsync<ValidationException>(() => fetcher.Request(server.Root + path));
+            Assert.Equal("HTTP 403 from 127.0.0.1: the site requires a Cloudflare browser check that NewsReview cannot complete", challenge.Message);
+        }
+        foreach (var path in new[] { "/forbidden", "/cloudflare-refusal" })
+            Assert.Equal("HTTP 403 from 127.0.0.1", (await Assert.ThrowsAsync<ValidationException>(() => fetcher.Request(server.Root + path))).Message);
+    }
+
+    [Fact]
+    public async Task FullContentFeedsUpToTheDownloadLimitAreRead()
+    {
+        var fetcher = new Fetcher(publicOnly: false);
+        var feed = await fetcher.Request(server.Root + "/feed-4mb");
+        Assert.True(feed.Text.Length > 3_000_000);
+        Assert.Equal(8500, Feeds.ParseFeed(feed.Text, feed.Url).Count);
+        var error = await Assert.ThrowsAsync<ValidationException>(() => fetcher.Request(server.Root + "/feed-11mb"));
+        Assert.Equal("Response exceeds the 10 MB download size limit", error.Message);
     }
 }

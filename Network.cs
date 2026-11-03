@@ -11,7 +11,7 @@ record FetchResult(string Text, string Url, string ContentType);
 
 interface IFetcher
 {
-    Task<FetchResult> Request(string url, JsonNode? payload = null, int timeoutSeconds = 25, int limit = 3_000_000,
+    Task<FetchResult> Request(string url, JsonNode? payload = null, int timeoutSeconds = 25, int limit = Fetcher.DownloadLimit,
         IReadOnlyDictionary<string, string>? headers = null, CancellationToken cancel = default);
 
     async Task<JsonNode?> Json(string url, JsonNode payload, int timeoutSeconds = 180,
@@ -29,6 +29,8 @@ interface IFetcher
 /// </summary>
 sealed class Fetcher : IFetcher, IDisposable
 {
+    /// <summary>Feeds and pages; some full-content feeds are several megabytes.</summary>
+    public const int DownloadLimit = 10_000_000;
     public static readonly string UserAgent = $"NewsReview/{typeof(Fetcher).Assembly.GetName().Version?.ToString(3)} (+self-hosted personal news reader)";
     const int MaxRedirects = 10;
     readonly bool publicOnly;
@@ -91,7 +93,7 @@ sealed class Fetcher : IFetcher, IDisposable
         await ResolvePublic(UrlTools.Split(url).Hostname!, cancel);
     }
 
-    public async Task<FetchResult> Request(string url, JsonNode? payload = null, int timeoutSeconds = 25, int limit = 3_000_000,
+    public async Task<FetchResult> Request(string url, JsonNode? payload = null, int timeoutSeconds = 25, int limit = Fetcher.DownloadLimit,
         IReadOnlyDictionary<string, string>? headers = null, CancellationToken cancel = default)
     {
         UrlTools.Valid(url);
@@ -159,7 +161,8 @@ sealed class Fetcher : IFetcher, IDisposable
         var message = $"HTTP {status} from {hostname}";
         // Model APIs return useful JSON errors; never surface arbitrary publisher HTML or request bodies.
         var modelRequest = hasPayload && !publicOnly;
-        if (!modelRequest) return message;
+        if (!modelRequest)
+            return await CloudflareChallenge(response, status, cancel) ? message + ": the site requires a Cloudflare browser check that NewsReview cannot complete" : message;
         try
         {
             var bytes = await ReadLimited(response.Content, 8192, cancel, truncate: true);
@@ -183,6 +186,19 @@ sealed class Fetcher : IFetcher, IDisposable
         return message;
     }
 
+    /// <summary>
+    /// Cloudflare's managed challenge only admits browsers that run its JavaScript. HTTP/2 responses mark it with
+    /// cf-mitigated; HTTP/1.1 responses only carry the "Just a moment..." challenge page.
+    /// </summary>
+    static async Task<bool> CloudflareChallenge(HttpResponseMessage response, int status, CancellationToken cancel)
+    {
+        if (response.Headers.TryGetValues("cf-mitigated", out var mitigation) && mitigation.Contains("challenge", StringComparer.OrdinalIgnoreCase)) return true;
+        if (status is not (403 or 503) || !response.Headers.Server.Any(product => product.Product?.Name.Equals("cloudflare", StringComparison.OrdinalIgnoreCase) == true))
+            return false;
+        try { return Encoding.UTF8.GetString(await ReadLimited(response.Content, 8192, cancel, truncate: true)).Contains("<title>Just a moment...</title>", StringComparison.OrdinalIgnoreCase); }
+        catch (Exception error) when (error is IOException or HttpRequestException) { return false; }
+    }
+
     static async Task<byte[]> ReadLimited(HttpContent content, int limit, CancellationToken cancel, bool truncate = false)
     {
         await using var stream = await content.ReadAsStreamAsync(cancel);
@@ -195,7 +211,7 @@ sealed class Fetcher : IFetcher, IDisposable
             if (buffer.Length > limit)
             {
                 if (truncate) return buffer.ToArray()[..limit];
-                throw new ValidationException("Response exceeds the download size limit");
+                throw new ValidationException($"Response exceeds the {limit / 1_000_000} MB download size limit");
             }
         }
         return buffer.ToArray();
