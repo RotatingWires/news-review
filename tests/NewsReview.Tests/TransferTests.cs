@@ -118,7 +118,7 @@ public class TransferTests : IDisposable
         var (manifest, database) = ReadZip(current);
         var legacy = directory.File("legacy.db");
         File.WriteAllBytes(legacy, database);
-        Execute(legacy, "DROP INDEX stories_publication", "DROP INDEX stories_bookmarks", "ALTER TABLE stories DROP COLUMN sort_timestamp",
+        Execute(legacy, "DROP INDEX stories_publication", "DROP INDEX stories_bookmarks", "DROP INDEX stories_search", "ALTER TABLE stories DROP COLUMN sort_timestamp",
             "ALTER TABLE stories DROP COLUMN read_at", "PRAGMA user_version=2");
         var legacyBytes = File.ReadAllBytes(legacy);
         manifest["schema_version"] = 2;

@@ -135,6 +135,60 @@ public class FeedQueryTests : IDisposable
         }
     }
 
+    void InsertArchive(int count) => store.Write(db =>
+    {
+        for (var number = 0; number < count; number++)
+        {
+            var stamp = "2025-01-01T12:00:00+00:00";
+            db.Execute("""
+                INSERT INTO stories(source_id,headline,url,published_at,discovered_at,day,sort_timestamp,summary,tags,status,article_text,interests_snapshot)
+                    VALUES (?,?,?,?,?,'2025-01-01',?,?,?,'reviewed',?,?)
+                """, source, $"Story {number}", $"https://example.com/{number}", stamp, stamp, Store.PublicationTime(stamp),
+                number % 100 == 0 ? "KDE Plasma release" : "Other news", number % 2 == 0 ? "[\"Linux\"]" : "[\"AI\"]",
+                string.Concat(Enumerable.Repeat("Article body ", 200)), string.Concat(Enumerable.Repeat("Private snapshot ", 100)));
+        }
+    });
+
+    [Fact]
+    public void ArchiveSearchesScanTheSearchIndexInsteadOfStoryRows()
+    {
+        InsertArchive(3000);
+        var statements = new List<string>();
+        store.Opened = connection => raw.sqlite3_trace(connection.Handle!, (_, sql) => { lock (statements) statements.Add(sql.utf8_to_string()); }, null);
+        foreach (var (query, expected) in new (Store.StoryQuery, long)[]
+        {
+            (new() { Query = "kde" }, 30), (new() { Tags = ["Linux"] }, 1500),
+            (new() { Query = "KDE", Tags = ["Linux"], ExcludedRelevance = ["low"], Sort = "published" }, 30),
+        })
+        {
+            statements.Clear();
+            Assert.Equal(expected, store.Stories(query)["total"]!.AsLong());
+            List<string> queries;
+            lock (statements) queries = statements.Where(sql => sql.Contains("SELECT COUNT(*) FROM stories s WHERE") || sql.Contains("WITH page AS MATERIALIZED")).ToList();
+            Assert.Equal(2, queries.Count);
+            store.Read(db =>
+            {
+                foreach (var sql in queries)
+                {
+                    var plan = db.Rows("EXPLAIN QUERY PLAN " + sql).Select(row => (string)row["detail"]!).ToList();
+                    Assert.Contains(plan, step => step.Contains("USING COVERING INDEX stories_search"));
+                    Assert.DoesNotContain("SCAN s", plan);
+                }
+                return 0;
+            });
+        }
+    }
+
+    [Fact]
+    public void AbandonedSearchInterruptsItsScan()
+    {
+        InsertArchive(2000);
+        using var cancel = new CancellationTokenSource();
+        store.Opened = connection => raw.sqlite3_progress_handler(connection.Handle!, 1000, _ => { cancel.Cancel(); return 0; }, null);
+        var error = Assert.Throws<SqliteException>(() => store.Stories(new() { Query = "absent" }, cancel.Token));
+        Assert.Equal(raw.SQLITE_INTERRUPT, error.SqliteErrorCode);
+    }
+
     [Fact]
     public void SchemaThreeUpgradeAndZipRestorePreserveOriginalRecords()
     {
@@ -147,6 +201,7 @@ public class FeedQueryTests : IDisposable
         {
             db.Execute("DROP INDEX stories_publication");
             db.Execute("DROP INDEX stories_bookmarks");
+            db.Execute("DROP INDEX stories_search");
             db.Execute("ALTER TABLE stories DROP COLUMN sort_timestamp");
         });
         store.Read(db => db.Execute("PRAGMA user_version=3"));
@@ -170,6 +225,7 @@ public class FeedQueryTests : IDisposable
         {
             db.Execute("DROP INDEX stories_publication");
             db.Execute("DROP INDEX stories_bookmarks");
+            db.Execute("DROP INDEX stories_search");
             db.Execute("ALTER TABLE stories DROP COLUMN sort_timestamp");
             for (var number = 0; number < 1005; number++)
                 db.Execute("INSERT INTO stories(headline,url,published_at,discovered_at,day) VALUES (?,?,?,?, '2026-10-31')",

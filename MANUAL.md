@@ -359,7 +359,7 @@ Schema 4 adds an indexed UTC publication timestamp in exact integer microseconds
 
 Day and date-range searches translate browser-local calendar boundaries into UTC bounds and look up the matching index range. Adjacent local midnights are converted separately so 23/25-hour daylight-saving days and offset timestamps remain correct. Time-of-day filters then apply within the selected date range. Without an explicit browser timezone, the existing server-local interpretation is retained.
 
-The feed counts matching records, selects at most 48 page IDs, and only then retrieves display fields for those stories. Article bodies, legacy significance text, and review-interest snapshots are not selected for feed reads. Related-source counts use the duplicate index. Overview requests still calculate archive counts and available discovery days from compact indexes and return the eight most recent runs; the app does not keep the entire database in RAM. There is no added idle polling or full-history browser download.
+The feed counts matching records, selects at most 48 page IDs, and only then retrieves display fields for those stories. Article bodies, legacy significance text, and review-interest snapshots are not selected for feed reads. Related-source counts use the duplicate index. Keyword, topic, and all-time searches must check every story, so they scan a covering search index holding the headline, summary, excerpt, topics, source, status, score, bookmark, and timestamp instead of the story rows; reading those rows would also read each stored article body from disk. The search index adds roughly the size of those text fields and is built once on the first start after upgrading. If the browser abandons a feed request (it gives up after 30 seconds), the server interrupts the query instead of finishing it. Overview requests still calculate archive counts and available discovery days from compact indexes and return the eight most recent runs; the app does not keep the entire database in RAM. There is no added idle polling or full-history browser download.
 
 Broad archive keyword searches and ranking across all history can still examine many matching records; those requests intentionally span the archive. Opening SQLite, reading assets/logging requests, and scheduled collection still involve disk access. A sleeping drive can therefore still need to spin up even though a daily feed no longer scans unrelated article records.
 
@@ -575,6 +575,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.3
+
+- Fix keyword, topic, and all-time searches that timed out and kept the disk busy on large archives. They read every full story row, including stored article bodies and review snapshots; a covering `stories_search` index now answers them without touching those rows. In a 3,000-story test, a cold search read about 3 MB instead of about 78 MB per query, from one contiguous index instead of scattered pages.
+- Interrupt the feed query when the browser abandons the request, so a slow search no longer keeps running after the page has given up.
+- The index is built once on the first start after upgrading, which reads the stories table one time.
 
 ### v1.0.2
 

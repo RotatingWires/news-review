@@ -185,6 +185,9 @@ sealed class Store
         }
         db.Execute("CREATE INDEX IF NOT EXISTS stories_publication ON stories(sort_timestamp,id,score,status,bookmarked)");
         db.Execute("CREATE INDEX IF NOT EXISTS stories_bookmarks ON stories(bookmarked,sort_timestamp,id,score,status)");
+        // Keyword, topic, and undated searches scan every story. Covering their filter and sort columns keeps that scan
+        // out of the table rows, whose article bodies and review snapshots would otherwise be read from disk for each story.
+        db.Execute("CREATE INDEX IF NOT EXISTS stories_search ON stories(sort_timestamp,id,score,status,bookmarked,source_id,tags,headline,summary,excerpt)");
         var sourceColumns = Columns(db, "sources");
         foreach (var (name, definition) in new (string, string)[]
         {
@@ -394,7 +397,7 @@ sealed class Store
         public string Sort { get; init; } = "rank";
     }
 
-    public JsonObject Stories(StoryQuery q)
+    public JsonObject Stories(StoryQuery q, CancellationToken cancellation = default)
     {
         if (!StorySorts.TryGetValue(q.Sort, out var order)) throw new ValidationException("Choose a valid story sort order");
         TimeZoneInfo? zone = null;
@@ -452,6 +455,8 @@ sealed class Store
                 var local = TimeZoneInfo.ConvertTime(PyText.FromMicroseconds(timestamp), clockZone);
                 return (long)(local.Hour * 60 + local.Minute);
             }, isDeterministic: true);
+            // Stop reading once the browser abandons the request instead of finishing a scan nobody will see.
+            using var interrupt = cancellation.Register(() => SQLitePCL.raw.sqlite3_interrupt(db.Connection.Handle));
             var total = db.Long($"SELECT COUNT(*) FROM stories s WHERE {where}", [.. args]);
             // Materialize only the page IDs before reading display fields. Article bodies and
             // review snapshots never enter the feed query or sort.

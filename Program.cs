@@ -229,7 +229,7 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
     return Api.Send(new JsonObject { ["ok"] = true });
 });
 
-app.MapGet("/api/stories", (HttpRequest request) =>
+app.MapGet("/api/stories", (HttpRequest request, CancellationToken cancellation) =>
 {
     string First(string key) => request.Query[key].Where(value => value is { Length: > 0 }).FirstOrDefault() ?? "";
     List<string> All(string key) => request.Query[key].Where(value => value is { Length: > 0 }).Select(value => value!).ToList();
@@ -261,7 +261,7 @@ app.MapGet("/api/stories", (HttpRequest request) =>
         TimeStart = timeStart, TimeEnd = timeEnd, TimeZone = First("time_zone"), ExcludedRelevance = excluded,
         Bookmarks = request.Query["bookmarks"] is [ "1" ], ShowHidden = request.Query["hidden"] is [ "1" ], Page = page,
         Sort = sort.Length > 0 ? sort : "rank",
-    }));
+    }, cancellation));
 });
 app.MapGet("/api/export", () =>
 {
