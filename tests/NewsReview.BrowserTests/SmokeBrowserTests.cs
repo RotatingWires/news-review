@@ -286,9 +286,11 @@ public class SmokeBrowserTests : BrowserTest
         Assert.True(categoryBox.Width <= 225);
         var arrowBox = await Box(page.Locator(".editable-dropdown .dropdown-arrow"));
         Assert.True(Math.Abs(categoryBox.Y + categoryBox.Height / 2 - (arrowBox.Y + arrowBox.Height / 2)) < 1);
+        await Expect(page.Locator("#source-category")).ToHaveValueAsync((string)Store.Topics()[0]!);
         await Button("Choose default category").ClickAsync();
-        await page.GetByRole(AriaRole.Option, new() { Name = "Hardware", Exact = true }).ClickAsync();
-        await Expect(page.Locator("#source-category")).ToHaveValueAsync("Hardware");
+        Assert.Equal(Store.Topics().Select(t => (string)t!), await page.Locator("#source-dialog .editable-dropdown .dropdown-option span:not(.dropdown-check)").AllTextContentsAsync());
+        await page.GetByRole(AriaRole.Option, new() { Name = "Protocols", Exact = true }).ClickAsync();
+        await Expect(page.Locator("#source-category")).ToHaveValueAsync("Protocols");
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-source-dialog.png") });
         await page.Locator("#source-category").FillAsync("Custom radio category");
         await Button("Choose default category").ClickAsync();

@@ -23,7 +23,7 @@ document.addEventListener('close', () => closeMenu(), true);
 
 function build(field) {
   const combo = field.tagName === 'INPUT';
-  const options = combo ? [...field.list.options] : [...field.options];
+  const source = combo ? field.list : field;
   const label = field.getAttribute('aria-label') || field.closest('label')?.firstChild.textContent.trim() || 'Choose option';
   if (!field.hasAttribute('aria-label')) field.setAttribute('aria-label', label);
   const wrapper = el('span', 'custom-dropdown' + (combo ? ' editable-dropdown' : ''));
@@ -58,7 +58,8 @@ function build(field) {
     if (!combo) text.textContent = field.selectedOptions[0]?.textContent || '';
     for (const choice of menu.children) choice.setAttribute('aria-selected', String(choice.dataset.value === field.value));
   };
-  options.forEach(option => {
+  // Options can change after the first build (the combo's datalist follows the managed topic list).
+  const render = () => menu.replaceChildren(...[...source.options].map(option => {
     const choice = el('button', 'dropdown-option');
     choice.type = 'button';
     choice.setAttribute('role', 'option');
@@ -75,8 +76,8 @@ function build(field) {
       closeMenu();
       (combo ? field : trigger).focus();
     };
-    menu.append(choice);
-  });
+    return choice;
+  }));
   const open = () => {
     closeMenu();
     opened = { wrapper, trigger, menu };
@@ -102,7 +103,8 @@ function build(field) {
   };
   field.addEventListener('change', sync);
   field.addEventListener('input', sync);
-  controls.set(field, sync);
+  controls.set(field, () => { render(); sync(); });
+  render();
   sync();
 }
 

@@ -65,6 +65,16 @@ public class TopicBrowserTests : BrowserTest
         await page.Locator("#topic-name-input").FillAsync("Device Engineering");
         await EditorButton("Save").ClickAsync();
         await Expect(editor).Not.ToBeVisibleAsync();
+        // Default category suggestions follow the managed list; the source keeps its own stored category.
+        await Button("Sources").ClickAsync();
+        await Button("Edit " + (string)source["name"]!).ClickAsync();
+        await Expect(page.Locator("#source-category")).ToHaveValueAsync(category);
+        await Button("Choose default category").ClickAsync();
+        Assert.Equal(Topics(), await page.Locator("#source-dialog .editable-dropdown .dropdown-option span:not(.dropdown-check)").AllTextContentsAsync());
+        Assert.Contains("Device Engineering", Topics());
+        Assert.Contains("SDR Projects", Topics());
+        Assert.DoesNotContain(category, Topics());
+        await page.Locator("#source-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await Button("Daily Feed").ClickAsync();
         await Expect(page.Locator(".story")).ToHaveCountAsync(2);
         await page.Locator("#topic-button").ClickAsync();

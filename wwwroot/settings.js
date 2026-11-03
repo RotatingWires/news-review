@@ -238,6 +238,8 @@ export class Settings {
   async loadTopics() { this.renderTopics(await api('topics')); }
 
   renderTopics(topics) {
+    // Default category suggestions are the managed topics; a match becomes a new story's initial label.
+    $('source-categories').replaceChildren(...topics.map(name => el('option', '', name)));
     $('topic-rows').replaceChildren(...topics.map(name => {
       const row = el('div', 'topic-row');
       const title = el('span', 'managed-topic-name', name);
@@ -399,7 +401,7 @@ export class Settings {
     $('source-pattern').value = source?.link_pattern || '';
     $('source-stale-days').value = source?.stale_days || 14;
     $('source-preview').hidden = true;
-    $('source-category').value = source?.category || 'News';
+    $('source-category').value = source?.category || $('source-categories').options[0]?.value || 'News';
     $('source-enabled').checked = source ? Boolean(source.enabled) : true;
     $('source-error').textContent = '';
     syncDropdowns($('source-dialog'));
