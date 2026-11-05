@@ -1,0 +1,49 @@
+/* Light/Dark Windows 95 theme tokens for NewsReview. Every color in the other stylesheets comes from here. */
+:root {
+  color-scheme: light;
+  --face: #c0c0c0;
+  --surface: #fff;
+  --surface-alt: #f4f4f4;
+  --ink: #000;
+  --muted: #555;
+  --light-edge: #fff;
+  --mid-edge: #dfdfdf;
+  --shadow: #808080;
+  --dark-edge: #404040;
+  --black: #000;
+  --title: #000080;
+  --title-text: #fff;
+  --link: #000080;
+  --error: #800000;
+  --note: #ffffe1;
+  --desktop: #008080;
+  --backdrop: #0007;
+
+  /* Same in both themes: these colors carry meaning, not decoration. */
+  --status-idle: #008000;
+  --status-collecting: #ffc800;
+  --status-collecting-alt: #f07800;
+  --relevance-high: #259b43;
+  --relevance-medium: #e9b62c;
+  --relevance-low: #ce4242;
+  --relevance-pending: #858585;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --face: #303030;
+  --surface: #191919;
+  --surface-alt: #242424;
+  --ink: #f1f1f1;
+  --muted: #b8b8b8;
+  --light-edge: #666;
+  --mid-edge: #494949;
+  --shadow: #181818;
+  --dark-edge: #0e0e0e;
+  --title: #111858;
+  --title-text: #fff;
+  --link: #91adff;
+  --error: #ff9c9c;
+  --note: #3b3825;
+  --desktop: #002f2f;
+}

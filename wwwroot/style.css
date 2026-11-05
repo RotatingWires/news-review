@@ -1,39 +1,7 @@
-/* NewsReview uses the same raised/recessed Windows 95 language in both themes. */
+/* NewsReview uses the same raised/recessed Windows 95 language in both themes. Colors come from theme.css. */
 :root {
-  color-scheme: light;
-  --face: #c0c0c0;
-  --surface: #fff;
-  --surface-alt: #f4f4f4;
-  --ink: #000;
-  --muted: #555;
-  --light-edge: #fff;
-  --mid-edge: #dfdfdf;
-  --shadow: #808080;
-  --dark-edge: #404040;
-  --title: #000080;
-  --title-text: #fff;
-  --link: #000080;
-  --error: #800000;
-  --note: #ffffe1;
   font-family: Tahoma, "MS Sans Serif", Arial, sans-serif;
   font-size: 14px;
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --face: #303030;
-  --surface: #191919;
-  --surface-alt: #242424;
-  --ink: #f1f1f1;
-  --muted: #b8b8b8;
-  --light-edge: #666;
-  --mid-edge: #494949;
-  --shadow: #181818;
-  --dark-edge: #0e0e0e;
-  --title: #111858;
-  --title-text: #fff;
-  --link: #91adff;
-  --error: #ff9c9c;
-  --note: #3b3825;
 }
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -95,7 +63,7 @@ h3 { font-size: 15px; }
   background: var(--face);
   border: 2px solid;
   border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge);
-  box-shadow: 1px 1px #000;
+  box-shadow: 1px 1px var(--black);
   display: flex;
   flex-direction: column;
 }
@@ -144,10 +112,10 @@ footer {
   color: var(--muted);
   font-size: 12px;
 }
-.status-dot { width: 8px; height: 8px; background: #008000; flex-shrink: 0; }
-.status-dot.collecting { background: #ffc800; animation: collection-pulse 1s steps(1, end) infinite; }
-@keyframes collection-pulse { 50% { background: #f07800; } }
-@media (prefers-reduced-motion: reduce) { .status-dot.collecting { animation: none; background: #f07800; } }
+.status-dot { width: 8px; height: 8px; background: var(--status-idle); flex-shrink: 0; }
+.status-dot.collecting { background: var(--status-collecting); animation: collection-pulse 1s steps(1, end) infinite; }
+@keyframes collection-pulse { 50% { background: var(--status-collecting-alt); } }
+@media (prefers-reduced-motion: reduce) { .status-dot.collecting { animation: none; background: var(--status-collecting-alt); } }
 .text-button, .icon-button { padding: 3px 8px; }
 .browse-bar, .day-controls, #search { display: flex; gap: 6px; align-items: center; }
 .browse-bar { justify-content: space-between; flex-wrap: wrap; }
@@ -197,10 +165,10 @@ footer {
 .feedback-button, .bookmark, .relevance-indicator { width: 28px; height: 28px; min-height: 28px; padding: 0; flex-shrink: 0; display: inline-grid; place-items: center; }
 .bookmark { font-size: 18px; line-height: 1; }
 .relevance-indicator { border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); user-select: none; -webkit-user-select: none; }
-.relevance-high { background: #259b43; }
-.relevance-medium { background: #e9b62c; }
-.relevance-low { background: #ce4242; }
-.relevance-pending { background: #858585; }
+.relevance-high { background: var(--relevance-high); }
+.relevance-medium { background: var(--relevance-medium); }
+.relevance-low { background: var(--relevance-low); }
+.relevance-pending { background: var(--relevance-pending); }
 #relevance-key { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin-top: 5px; font-size: 12px; color: var(--muted); }
 .relevance-key-heading { font-weight: bold; }
 .relevance-key-item { display: inline-flex; align-items: center; gap: 5px; }
@@ -258,12 +226,12 @@ dialog {
   padding: 3px;
   border: 3px solid;
   border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge);
-  box-shadow: 2px 2px #000;
+  box-shadow: 2px 2px var(--black);
   width: min(620px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   overflow: hidden;
 }
-dialog::backdrop { background: #0007; }
+dialog::backdrop { background: var(--backdrop); }
 .dialog-layout { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: calc(100dvh - 36px); margin: 0; }
 .dialog-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; background: var(--title); padding: 3px; }
 .dialog-heading h2 { margin: 0; padding: 2px 4px; font-size: 15px; color: var(--title-text); }
@@ -320,7 +288,7 @@ button.danger:disabled { color: var(--error); opacity: 1; }
 .dropdown-trigger { display: flex; align-items: stretch; justify-content: space-between; gap: 8px; width: 100%; padding: 3px 4px 3px 7px; text-align: left; background: var(--surface); }
 .dropdown-label { align-self: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdown-arrow { display: grid; place-items: center; flex: 0 0 22px; width: 22px; min-height: 22px; font-size: 10px; line-height: 1; color: var(--ink); background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); }
-.dropdown-menu { position: absolute; z-index: 10; left: 0; top: 100%; margin-top: 2px; min-width: 100%; width: max-content; max-width: min(440px, calc(100vw - 48px)); max-height: 180px; overflow: auto; padding: 2px; background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); box-shadow: 2px 2px #000; }
+.dropdown-menu { position: absolute; z-index: 10; left: 0; top: 100%; margin-top: 2px; min-width: 100%; width: max-content; max-width: min(440px, calc(100vw - 48px)); max-height: 180px; overflow: auto; padding: 2px; background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); box-shadow: 2px 2px var(--black); }
 .dropdown-option { display: flex; gap: 7px; align-items: center; width: 100%; border: 0; box-shadow: none; text-align: left; padding: 4px 6px; }
 .dropdown-option:hover, .dropdown-option:focus-visible { background: var(--title); color: var(--title-text); outline: none; }
 .dropdown-check { width: 14px; flex-shrink: 0; visibility: hidden; }

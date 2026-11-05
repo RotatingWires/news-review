@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.8
+# NewsReview v1.0.9
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -187,7 +187,7 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 - **Relevance:** all four levels start checked in Filter...: highly relevant, somewhat relevant, low relevance, and awaiting review. Uncheck any level to hide it, including bookmarked stories in that level. Levels combine with topics, search, dates, and Include filtered / duplicates on Daily Feed and Bookmarks. Unchecking all levels intentionally shows no stories. Clear search, Today, and previous/next navigation restore all levels.
 - **Include filtered / duplicates** (inside Filter...): reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
 - **Ordering and pagination:** 48 results per page using your chosen Sort order. Rank sorting compares scores across the entire selected date range, so an older green story can precede a newer yellow one. Publication sorting compares the actual timestamp, including the time within a day. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
-- **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage.
+- **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage. Every color is a token in `wwwroot/theme.css`, defined once per theme with the same names TaskList, TaskList Stats, and SpendTracker use; the other stylesheets contain no color values of their own.
 
 Tiles show the original headline and source, tags, the generated summary when available, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
@@ -558,9 +558,10 @@ src/
 wwwroot/
   login.html              TaskList-style setup/login page
   login.js                setup token, password creation, and sign-in
+  theme.css               light/dark color tokens shared by every stylesheet
   auth.css                shared sibling-app login layout
   index.html              reader, settings panels, dialogs
-  style.css               responsive Windows 95 light/dark layout
+  style.css               responsive Windows 95 layout and components
   app.js                  startup, navigation and collection status
   shared.js               API, DOM, notification and formatting helpers
   feed.js                 tiles, search, dates, pagination and bookmarks
@@ -583,6 +584,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.9
+
+- Move every color into `wwwroot/theme.css` as light/dark tokens, using the token names shared with TaskList, TaskList Stats, and SpendTracker. `style.css` and `auth.css` no longer contain color values; the teal login background is now `--desktop`, and fixed meaning colors (status light, relevance swatches, shadows, dialog backdrop) are named tokens.
+- Fix the dark-theme login and setup fields, which stayed white; they now use the dark field colors like the rest of the app. Every other screen renders exactly as before in both themes.
 
 ### v1.0.8
 
