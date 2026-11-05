@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.9
+# NewsReview v1.0.10
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -429,7 +429,7 @@ Build once with `dotnet build` (or `dotnet publish -c Release -o C:\path\to\news
 
 ### ZIP import/export in Settings
 
-**Settings → Collection & history → Import/Export... → Download Export** snapshots the live database, including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (version, checksum, counts). It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
+**Settings → Collection & history → Import/Export... → Download Export** snapshots the live database, including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (`format`, `formatVersion`, `applicationVersion`, `schemaVersion`, `exportedAt`, `sha256`, and per-table `totals`), the same manifest naming TaskList and SpendTracker use. Backups from v1.0.9 and earlier, which spell those keys in snake_case, still restore. It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
 
 Choose an export ZIP and check the replacement confirmation to restore. This replaces rather than merges the dataset. Uploads are limited to 256 MiB compressed and 1 GiB of database data. The server rejects extra archive members, damaged checksums, unsupported/newer versions, unexpected schema objects, invalid relationships, or invalid configuration. It imports validated rows into its own schema, without executing imported schema SQL. Before replacing data, it writes a recovery ZIP to `data/backups/before-restore-*.zip`; failure to save it aborts the operation. Keep enough free disk space for the current database, upload, extracted database, and recovery ZIP. Restore is blocked while collection/review runs. Interrupted imported runs are marked interrupted.
 
@@ -584,6 +584,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.10
+
+- Write backup manifest keys in camelCase (`formatVersion`, `applicationVersion`, `schemaVersion`, `exportedAt`), matching TaskList and SpendTracker. Existing ZIPs and recovery copies with the earlier snake_case keys still restore; a manifest that spells a field both ways is rejected.
 
 ### v1.0.9
 

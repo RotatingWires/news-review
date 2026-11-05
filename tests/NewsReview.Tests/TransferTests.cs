@@ -121,14 +121,42 @@ public class TransferTests : IDisposable
         Execute(legacy, "DROP INDEX stories_publication", "DROP INDEX stories_bookmarks", "DROP INDEX stories_search", "ALTER TABLE stories DROP COLUMN sort_timestamp",
             "ALTER TABLE stories DROP COLUMN read_at", "PRAGMA user_version=2");
         var legacyBytes = File.ReadAllBytes(legacy);
-        manifest["schema_version"] = 2;
-        manifest["application_version"] = "0.9.2";
+        manifest["schemaVersion"] = 2;
+        manifest["applicationVersion"] = "0.9.2";
         manifest["sha256"] = Sha256(legacyBytes);
         Transfer.RestoreArchive(store, WriteZip("legacy.zip", manifest, legacyBytes));
         Assert.Null(store.Stories(new())["items"]![0]!["read_at"]);
         Assert.Equal(Store.SchemaVersion, store.Read(db => db.Long("PRAGMA user_version")));
         // The same version-2 file also upgrades normally when starting the app.
         Assert.Null(new Store(legacy).Stories(new())["items"]![0]!["read_at"]);
+    }
+
+    [Fact]
+    public void ManifestUsesCamelCaseKeysAndSnakeCaseBackupsStillRestore()
+    {
+        var (manifest, database) = ReadZip(archive);
+        Assert.Equal(["applicationVersion", "exportedAt", "format", "formatVersion", "schemaVersion", "sha256", "totals"],
+            manifest.Select(pair => pair.Key).Order(StringComparer.Ordinal).ToArray());
+
+        // Backups written before v1.0.10 spell these keys in snake_case.
+        var legacy = new JsonObject();
+        foreach (var (key, value) in manifest)
+        {
+            var name = key switch
+            {
+                "formatVersion" => "format_version",
+                "applicationVersion" => "application_version",
+                "schemaVersion" => "schema_version",
+                "exportedAt" => "exported_at",
+                _ => key
+            };
+            legacy[name] = value?.DeepClone();
+        }
+        Transfer.RestoreArchive(store, WriteZip("snake-case.zip", legacy, database));
+        Assert.Equal(1, Total(new()));
+
+        legacy["formatVersion"] = 1;
+        Assert.Throws<ValidationException>(() => Transfer.RestoreArchive(store, WriteZip("both-names.zip", legacy, database)));
     }
 
     [Theory]
@@ -141,7 +169,7 @@ public class TransferTests : IDisposable
     {
         var (manifest, database) = ReadZip(archive);
         if (mutation == "checksum") manifest["sha256"] = new string('0', 64);
-        if (mutation == "version") manifest["application_version"] = "99.0.0";
+        if (mutation == "version") manifest["applicationVersion"] = "99.0.0";
         if (mutation is "view" or "sort_timestamp")
         {
             var path = directory.File("mutant.db");

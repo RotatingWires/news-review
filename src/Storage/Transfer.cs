@@ -61,8 +61,8 @@ static class Transfer
                 throw new ValidationException("The database exceeds the 1 GiB ZIP restore limit; use the offline SQLite backup command instead");
             var manifest = new JsonObject
             {
-                ["format"] = Format, ["format_version"] = 1, ["application_version"] = Version, ["schema_version"] = version,
-                ["exported_at"] = PyText.Format(DateTimeOffset.UtcNow), ["sha256"] = Digest(snapshot), ["totals"] = totals,
+                ["format"] = Format, ["formatVersion"] = 1, ["applicationVersion"] = Version, ["schemaVersion"] = version,
+                ["exportedAt"] = PyText.Format(DateTimeOffset.UtcNow), ["sha256"] = Digest(snapshot), ["totals"] = totals,
             };
             using (var stream = new FileStream(output, FileMode.Create, FileAccess.Write))
             using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
@@ -80,6 +80,26 @@ static class Transfer
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    static readonly (string Legacy, string Current)[] LegacyManifestKeys =
+        [("format_version", "formatVersion"), ("application_version", "applicationVersion"), ("schema_version", "schemaVersion"), ("exported_at", "exportedAt")];
+
+    /// <summary>
+    /// Backups made before v1.0.10 spell manifest keys in snake_case. Existing ZIPs and recovery copies must
+    /// still restore, so their keys are renamed once here and every check below uses the current names.
+    /// </summary>
+    static JsonObject CurrentManifestKeys(JsonObject manifest)
+    {
+        foreach (var (legacy, current) in LegacyManifestKeys)
+        {
+            if (!manifest.ContainsKey(legacy)) continue;
+            if (manifest.ContainsKey(current)) throw new ValidationException("Backup manifest repeats a field under two names");
+            var value = manifest[legacy];
+            manifest.Remove(legacy);
+            manifest[current] = value;
+        }
+        return manifest;
     }
 
     static int[] ParseVersion(JsonNode? value)
@@ -194,11 +214,11 @@ static class Transfer
                         throw new ValidationException("Backup member is encrypted, unsupported, or exceeds its size limit");
                 }
                 using (var reader = new StreamReader(archive.GetEntry("manifest.json")!.Open(), Encoding.UTF8))
-                    manifest = JsonNode.Parse(reader.ReadToEnd()) as JsonObject ?? throw new ValidationException("This is not a supported NewsReview backup format");
-                if (!Json.IsString(manifest["format"], out var format) || format != Format || !Json.IsInteger(manifest["format_version"], out var formatVersion) ||
-                    formatVersion != 1 || !Json.IsInteger(manifest["schema_version"], out var schema) || schema is not (2 or 3 or Store.SchemaVersion))
+                    manifest = CurrentManifestKeys(JsonNode.Parse(reader.ReadToEnd()) as JsonObject ?? throw new ValidationException("This is not a supported NewsReview backup format"));
+                if (!Json.IsString(manifest["format"], out var format) || format != Format || !Json.IsInteger(manifest["formatVersion"], out var formatVersion) ||
+                    formatVersion != 1 || !Json.IsInteger(manifest["schemaVersion"], out var schema) || schema is not (2 or 3 or Store.SchemaVersion))
                     throw new ValidationException("This is not a supported NewsReview backup format");
-                if (CompareVersions(ParseVersion(manifest["application_version"]), ParseVersion(Version)) > 0)
+                if (CompareVersions(ParseVersion(manifest["applicationVersion"]), ParseVersion(Version)) > 0)
                     throw new ValidationException("This backup is from a newer NewsReview version. Update the application first.");
                 using var source = archive.GetEntry("newsreview.db")!.Open();
                 using var destination = File.Create(databasePath);
@@ -214,7 +234,7 @@ static class Transfer
             }
             if (!Json.IsString(manifest["sha256"], out var checksum) || Digest(databasePath) != checksum)
                 throw new ValidationException("Backup database checksum does not match its manifest");
-            var schemaVersion = manifest["schema_version"]!.AsLong();
+            var schemaVersion = manifest["schemaVersion"]!.AsLong();
             using var imported = ReadOnly(databasePath);
             using var live = store.Open();
             var objects = imported.Rows("SELECT type,name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'");
