@@ -353,7 +353,7 @@ logs/
 
 Both directories are Git-ignored. Runtime logs use TaskList's logger: application startup/shutdown, HTTP requests, warnings, errors, and exceptions go to the interactive console and `logs/console.log` under the content root. Before an entry would exceed 10 MiB, that same file is truncated and writing continues; no rotated copies are created. `--data-dir` moves the database, credentials, and cookie keys, not the log directory. File logging failures leave console logging available. Logs are excluded from exports and Fresh start. SQLite uses WAL, foreign keys, a busy timeout, and `synchronous=NORMAL`. Use local storage; WAL is not intended for an SMB/NFS network share. A sudden power loss can lose the newest commits even though the database should remain structurally consistent.
 
-`Store.SchemaVersion` in `Store.cs` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields. The app refuses to open a newer schema version. It creates fresh tables and default settings once; future schema changes belong in explicit migrations.
+`Store.SchemaVersion` in `src/Storage/Store.cs` is the authoritative current SQLite schema version (4); database startup and ZIP validation use the same value. `PRAGMA user_version` records that version in each database. The v0.3.0 migration adds source collection/health fields. The app refuses to open a newer schema version. It creates fresh tables and default settings once; future schema changes belong in explicit migrations.
 
 ### Feed reads and upgrade work
 
@@ -529,43 +529,49 @@ GitHub Actions builds the app and runs `tests/NewsReview.Tests` on every push. A
 ## Project layout
 
 ```text
-NewsReview.csproj   project file and authoritative version
-Program.cs          startup, options, authentication, security headers, and API routes
-Store.cs            SQLite schema, queries, queue and settings persistence
-Defaults.cs         first-run interests and collection/model settings
-Collector.cs        collection/review worker and interval scheduler
-Sources.cs          Automatic/feed/page collection strategy and source health
-Feeds.cs            RSS/Atom parsing/discovery and article extraction
-Listings.cs         website article-card/headline/structured-list extraction
-HtmlTokenizer.cs    tolerant HTML tokenizer used by the extractors
-Network.cs          bounded HTTP transport and public-address checks for news sources
-UrlTools.cs         URL splitting, joining, and canonical forms matching stored story URLs
-Reviewer.cs         model adapters, editorial prompt, output validation
-Feedback.cs         bounded ratings, profile validation, and compact model context
-ModelKeys.cs        provider/server credentials and separate atomic key-file persistence
-Auth.cs             persistent password hashes and first-run setup tokens
-Validation.cs       strict JSON typing and source/settings input validation
-Search.cs           TaskList-compatible date/time range parsing
-Transfer.cs         validated ZIP snapshots, transactional restoration, and the backup command
-PyText.cs           code-point lengths and ISO timestamps matching stored records
-SingleFileLogger.cs single-file logging with in-place 10 MiB truncation (shared with TaskList)
+NewsReview.csproj         project file and authoritative version
+src/
+  Program.cs              startup, options, authentication, security headers, and API routes
+  Hosting/
+    Auth.cs               persistent password hashes and first-run setup tokens
+    SingleFileLogger.cs   single-file logging with in-place 10 MiB truncation (shared with TaskList)
+  Storage/
+    Store.cs              SQLite schema, queries, queue and settings persistence
+    Defaults.cs           first-run interests and collection/model settings
+    Search.cs             TaskList-compatible date/time range parsing
+    Transfer.cs           validated ZIP snapshots, transactional restoration, and the backup command
+  Collection/
+    Collector.cs          collection/review worker and interval scheduler
+    Sources.cs            Automatic/feed/page collection strategy and source health
+    Feeds.cs              RSS/Atom parsing/discovery and article extraction
+    Listings.cs           website article-card/headline/structured-list extraction
+    HtmlTokenizer.cs      tolerant HTML tokenizer used by the extractors
+    Network.cs            bounded HTTP transport and public-address checks for news sources
+    UrlTools.cs           URL splitting, joining, and canonical forms matching stored story URLs
+  Review/
+    Reviewer.cs           model adapters, editorial prompt, output validation
+    Feedback.cs           bounded ratings, profile validation, and compact model context
+    ModelKeys.cs          provider/server credentials and separate atomic key-file persistence
+  Common/
+    Validation.cs         strict JSON typing and source/settings input validation
+    PyText.cs             code-point lengths and ISO timestamps matching stored records
 wwwroot/
-  login.html        TaskList-style setup/login page
-  login.js          setup token, password creation, and sign-in
-  auth.css          shared sibling-app login layout
-  index.html        reader, settings panels, dialogs
-  style.css         responsive Windows 95 light/dark layout
-  app.js            startup, navigation and collection status
-  shared.js         API, DOM, notification and formatting helpers
-  feed.js           tiles, search, dates, pagination and bookmarks
-  settings.js       interests, topics, sources, AI and scheduling controls
-  transfer.js       browser ZIP download/upload and restore confirmation
-  dropdowns.js      shared Win95 single-select and editable category menus
-  icon.svg          application icon
+  login.html              TaskList-style setup/login page
+  login.js                setup token, password creation, and sign-in
+  auth.css                shared sibling-app login layout
+  index.html              reader, settings panels, dialogs
+  style.css               responsive Windows 95 light/dark layout
+  app.js                  startup, navigation and collection status
+  shared.js               API, DOM, notification and formatting helpers
+  feed.js                 tiles, search, dates, pagination and bookmarks
+  settings.js             interests, topics, sources, AI and scheduling controls
+  transfer.js             browser ZIP download/upload and restore confirmation
+  dropdowns.js            shared Win95 single-select and editable category menus
+  icon.svg                application icon
 tests/
-  NewsReview.Tests/         unit and integration tests
-  NewsReview.BrowserTests/  optional Playwright browser checks
-deploy/             example systemd unit
+  NewsReview.Tests/       unit and integration tests
+  NewsReview.BrowserTests/ optional Playwright browser checks
+deploy/                   example systemd unit
 ```
 
 ## Maintenance and cleanup
@@ -577,6 +583,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.8
+
+- Move the C# sources into `src/`, grouped into `Hosting`, `Storage`, `Collection`, `Review`, and `Common` folders. The project file, `wwwroot/`, tests, and every command stay where they were; behavior is unchanged.
 
 ### v1.0.7
 
