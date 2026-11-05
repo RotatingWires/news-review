@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview
+# NewsReview v1.0.8
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -504,7 +504,7 @@ DrivePool is a local pooled filesystem when accessed directly on its host; it is
 
 The code may remain on the pooled drive. Moving the data folder also moves login credentials and saved model keys; ZIP exports exclude those files. There is no automatic copy or change to your storage. For an actual SMB/NFS share, SQLite WAL requires local storage; see [SQLite's WAL requirements](https://sqlite.org/wal.html).
 
-## Tests and verification
+## Development checks
 
 The automated suite needs only the .NET SDK:
 
