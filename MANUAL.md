@@ -6,6 +6,7 @@
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
 Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Local model review needs no paid API, ChatGPT subscription, or cloud model; OpenRouter is an optional paid API provider.
+<img width="2560" height="1301" alt="image" src="https://github.com/user-attachments/assets/55098e81-e3db-46bb-8583-f5ed1b1b9398" />
 
 ## Stack and project conventions
 
