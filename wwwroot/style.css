@@ -248,6 +248,31 @@ dialog::backdrop { background: var(--backdrop); }
 .help-content p { margin-bottom: 10px; }
 .reset-options { display: grid; gap: 10px; border: 1px solid var(--shadow); min-width: 0; }
 .reset-options label { align-items: flex-start; }
+.reset-options .retro-check { margin-top: 3px; }
+/* A Win95 check box like SpendTracker's: a sunken white square holding a check mark. Used in the Fresh start dialog. */
+input.retro-check {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid;
+  border-color: var(--shadow) var(--light-edge) var(--light-edge) var(--shadow);
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 var(--dark-edge);
+}
+input.retro-check:checked::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+  clip-path: polygon(0 40%, 35% 72%, 100% 0, 100% 28%, 35% 100%, 0 68%);
+}
+input.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset: 2px; }
 .error { color: var(--error); margin: 0; font-size: 13px; }
 .sr-only, .skip:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .skip:focus { position: fixed; top: 0; left: 0; background: var(--surface); color: var(--ink); padding: 10px; z-index: 10; }

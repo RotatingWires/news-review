@@ -219,16 +219,16 @@
     <div class="dialog-body">
       <p>Only the selected items will be cleared. This cannot be undone in the app. Export a ZIP first if you might want to restore them.</p>
       <fieldset class="reset-options"><legend>Choose what to clear</legend>
-        <label class="checkbox"><input type="checkbox" id="reset-history" checked> Story history (keep bookmarked stories unless Bookmarks is also selected)</label>
-        <label class="checkbox"><input type="checkbox" id="reset-bookmarks"> Bookmarks (remove saved flags; delete saved stories too if Story history is selected)</label>
-        <label class="checkbox"><input type="checkbox" id="reset-runs" checked> Collection/review runs and source check history</label>
-        <label class="checkbox"><input type="checkbox" id="reset-topics"> Interest topics and ranks</label>
-        <label class="checkbox"><input type="checkbox" id="reset-feedback"> Article ratings, reasons, and learned preferences</label>
-        <label class="checkbox"><input type="checkbox" id="reset-guidance"> Editorial guidance</label>
-        <label class="checkbox"><input type="checkbox" id="reset-exclusions"> Exclusions</label>
-        <label class="checkbox"><input type="checkbox" id="reset-sources"> Configured sources (preserve labels on any retained stories)</label>
-        <label class="checkbox"><input type="checkbox" id="reset-ai"> AI settings (restore defaults and pause review)</label>
-        <label class="checkbox"><input type="checkbox" id="reset-collection"> Collection settings (restore defaults)</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-history" checked> Story history (keep bookmarked stories unless Bookmarks is also selected)</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-bookmarks"> Bookmarks (remove saved flags; delete saved stories too if Story history is selected)</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-runs" checked> Collection/review runs and source check history</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-topics"> Interest topics and ranks</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-feedback"> Article ratings, reasons, and learned preferences</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-guidance"> Editorial guidance</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-exclusions"> Exclusions</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-sources"> Configured sources (preserve labels on any retained stories)</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-ai"> AI settings (restore defaults and pause review)</label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-collection"> Collection settings (restore defaults)</label>
       </fieldset>
       <p class="muted">Clearing story/run history restarts the automatic collection interval. Manual Check sources remains available.</p>
       <label>Type RESET SELECTED to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="RESET SELECTED"></label>
