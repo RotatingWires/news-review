@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.10
+# NewsReview v1.0.11
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -140,7 +140,7 @@ A small model must still follow instructions and produce valid structured output
 
 ## Interface and help
 
-**Help**, immediately after Settings, explains reviews, source selection, search, warnings, and backups, and ends with about.lehighradio.com above the application version, as TaskList and TaskList Stats do. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
+**Help**, immediately after Settings, opens **About NewsReview**: a two-paragraph summary about as long as TaskList Stats' About (what NewsReview does, plus tips on choosing sources, collecting without a model, and backups), ending with about.lehighradio.com above the application version, as TaskList and TaskList Stats do. This manual is the full guide. Add a homepage/category listing or RSS/Atom feed, then preview candidates. A single article is not an ongoing source. For forums, prefer a relevant subforum/category or its feed listing threads; each linked thread becomes a candidate. A single thread is one discussion, and later replies do not create fresh stories for the same URL.
 
 The app fills the viewport. Its top and bottom bars stay visible while the central content scrolls. Dialog titles and action bars similarly stay visible while their bodies scroll. A yellow/orange blinking status light indicates collection/review; reduced-motion preferences use a static orange indicator.
 
@@ -294,6 +294,8 @@ Clearing history or runs restarts the automatic collection interval from the res
 5. Skip obvious sponsored/deal/coupon headlines using a small fixed filter. Other editorial decisions use the configured review model and interest snapshot.
 6. Supply up to five likely duplicate candidates, chosen from the 150 most recently collected reviewed stories using overlapping headline terms. The model may group coverage of the same event; meaningful follow-ups should remain separate stories.
 7. Validate exact output fields, types, tag limits, score range, milestone, and duplicate ID. Keep only tags from the managed Topics list; unknown names are discarded without invalidating the summary. Save the valid review together with provider/model, input basis, current interests, review time, and token counts when the server reports them. Reviews can have an empty tags array even when configured topics exist.
+
+Without a configured model, collection still saves headlines and available excerpts; **Review pending** runs the AI stage later.
 
 The model receives article content as untrusted data, has no tools, and is instructed to ignore embedded commands. The app renders publisher/model text using DOM text nodes, never as executable HTML. Model output validation catches structural problems, not every factual or editorial error.
 
@@ -584,6 +586,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.11
+
+- **Help** opens a short **About NewsReview**, about as long as TaskList Stats' About: what NewsReview does and a few tips. The longer explanations it used to hold are in this manual.
 
 ### v1.0.10
 
