@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.20
+# NewsReview v1.0.21
 
 A self-hosted news aggregator that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 
@@ -53,7 +53,7 @@ The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatical
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
-The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you use the app; it is marked Secure automatically over HTTPS. Its keys are kept in `data/keys/`, so restarts do not sign you out. Setup and login allow five attempts per IP address per minute.
+The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you use the app; it is marked Secure automatically over HTTPS. Its keys are kept in your Windows profile's ASP.NET key ring when NewsReview runs from a signed-in Windows account (as TaskList, TaskList Stats, and SpendTracker do), and in `data/keys/` otherwise, so restarts do not sign you out. Setup and login allow five attempts per IP address per minute.
 
 API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
