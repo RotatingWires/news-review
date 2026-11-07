@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.16
+# NewsReview v1.0.17
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -586,6 +586,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.17
+
+- On phones the title bar starts the same distance from the top as TaskList's (`--ios-top-offset`, at least 20px below the status bar).
 
 ### v1.0.16
 

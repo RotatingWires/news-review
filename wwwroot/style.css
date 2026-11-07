@@ -2,6 +2,8 @@
 :root {
   font-family: Tahoma, "MS Sans Serif", Arial, sans-serif;
   font-size: 14px;
+  /* The least room above the title bar on phones, the same in TaskList, TaskList Stats, NewsReview, and SpendTracker. */
+  --ios-top-offset: 20px;
 }
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -290,6 +292,8 @@ input.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset
 }
 @media (max-width: 650px) {
   .window { min-height: 0; border: 0; box-shadow: none; }
+  /* Below iOS' status bar like TaskList: the reported inset, but never less than --ios-top-offset. */
+  .window:not(.login-window) { padding-top: max(env(safe-area-inset-top, 0px), var(--ios-top-offset)); }
   main { padding: 10px; }
   .titlebar { margin: 0; }
   .nav-button { padding: 4px 7px; font-size: 12px; }
