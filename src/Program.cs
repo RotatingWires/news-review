@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.ResponseCompression;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text;
@@ -96,7 +97,17 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
+// Brotli or gzip for text responses (data, scripts, styles), so they cross the network several times smaller.
+// HTTPS responses are left uncompressed, ASP.NET's default, which avoids compression side-channel attacks there.
+builder.Services.AddResponseCompression(options =>
+{
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["image/svg+xml", "application/manifest+json"]);
+});
+
 var app = builder.Build();
+app.UseResponseCompression();
 Store store;
 PasswordStore passwords;
 Collector collector;

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.14
+# NewsReview v1.0.15
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -586,6 +586,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.15
+
+- The server compresses its responses (Brotli or gzip), so pages, data, scripts, and styles cross the network several times smaller.
+- The app icons (icon-512.png, icon-192.png, apple-touch-icon.png) are redrawn crisply from icon.svg as 8-bit PNGs: about 1.9 KB together instead of 216 KB.
+- Removed an unused style and a repeated time-zone parameter in history searches.
 
 ### v1.0.14
 

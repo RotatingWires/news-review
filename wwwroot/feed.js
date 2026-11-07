@@ -173,10 +173,7 @@ export class Feed {
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('story-sort').value });
     if (query) params.set('query', query);
-    if (period) {
-      params.set('period', period);
-      params.set('time_zone', Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
+    if (period) params.set('period', period);
     this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!bookmarked) params.set('day', $('day').value);
     const excludedRelevance = [...document.querySelectorAll('input[name="relevance"]')].filter(input => !input.checked).map(input => input.value);
