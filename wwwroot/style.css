@@ -346,3 +346,8 @@ input:not([type="checkbox"]), textarea { user-select: text; -webkit-user-select:
 .feedback-button img { width: 18px; height: 18px; object-fit: contain; }
 :root[data-theme="dark"] .feedback-button img, .feedback-button[aria-pressed="true"] img { filter: invert(1); }
 .feedback-button[aria-pressed="true"] { background: var(--title); color: var(--title-text); }
+
+/* Phones leave the version out of the title bar, where it would be cut off; the About box still shows it. */
+@media (max-width: 650px) {
+  .title-version { display: none; }
+}

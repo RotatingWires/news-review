@@ -46,7 +46,7 @@ async function request(url, options = {}) {
 async function initialize() {
   try {
     const status = await request('/api/auth/status');
-    titleAppName.textContent = `NewsReview v${status.version}`;
+    titleAppName.replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${status.version}` }));
     if (status.authenticated) {
       window.location.replace(loginReturnUrl());
       return;
