@@ -203,7 +203,7 @@
   <dialog id="confirm-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Reassess saved history?</h2><button data-close="confirm-dialog" aria-label="Close">×</button></div>
     <div class="dialog-body"><p>Queue every saved story for review using your current interests and model. Previous summaries stay visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p></div>
-    <div class="dialog-actions"><button id="confirm-reassess" class="primary">Queue history</button><button data-close="confirm-dialog">Cancel</button></div>
+    <div class="dialog-actions"><button data-close="confirm-dialog">Cancel</button><button id="confirm-reassess" class="primary">Queue history</button></div>
   </div></dialog>
   <dialog id="purge-duplicates-dialog"><form id="purge-duplicates-form" class="dialog-layout">
     <div class="dialog-heading"><h2>Purge duplicates</h2><button type="button" data-close="purge-duplicates-dialog" aria-label="Close">×</button></div>
@@ -234,7 +234,7 @@
       <label>Type RESET SELECTED to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="RESET SELECTED"></label>
       <p id="clear-history-error" class="error" role="alert"></p>
     </div>
-    <div class="dialog-actions"><button class="danger" type="submit">Reset selected data</button><button type="button" data-close="clear-history-dialog">Cancel</button></div>
+    <div class="dialog-actions"><button type="button" data-close="clear-history-dialog">Cancel</button><button class="danger" type="submit">Reset selected data</button></div>
   </form></dialog>
   <dialog id="feedback-dialog"><form id="feedback-form" class="dialog-layout">
     <div class="dialog-heading"><h2 id="feedback-title">Article feedback</h2><button type="button" data-close="feedback-dialog" aria-label="Close">×</button></div>

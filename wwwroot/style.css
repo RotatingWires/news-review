@@ -41,6 +41,11 @@ input, select, textarea {
   padding: 5px 7px;
   min-width: 0;
 }
+/* Phones zoom into a text box whose text is under 16px, so touch screens get 16px boxes; the rest of the page keeps
+   its size. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px; }
+}
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 1px solid var(--title); outline-offset: 1px; }
 input:disabled { color: var(--muted); background: var(--face); }
 textarea { width: 100%; resize: vertical; }

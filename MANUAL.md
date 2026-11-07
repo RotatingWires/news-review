@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.15
+# NewsReview v1.0.16
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -586,6 +586,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.16
+
+- The history reassessment and Fresh start dialogs put **Cancel** first and the confirming button on the right, the same order as every other dialog in NewsReview, TaskList, TaskList Stats, and SpendTracker.
+- On touch screens, text boxes and dropdowns use 16px text so phones do not zoom in when one is focused.
 
 ### v1.0.15
 
