@@ -48,7 +48,7 @@ export class Transfer {
     this.lock(true);
     notify('Preparing a consistent ZIP backup...');
     try {
-      const response = await fetch('/api/export', { credentials: 'same-origin', cache: 'no-store' });
+      const response = await fetch('/api/backup', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok || !response.headers.get('Content-Type')?.startsWith('application/zip')) throw new Error(await errorMessage(response));
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
@@ -75,7 +75,7 @@ export class Transfer {
     notify('Validating the ZIP and restoring data. A recovery backup is saved first...');
     let restored = false;
     try {
-      const response = await fetch('/api/import/backup', { method: 'POST', credentials: 'same-origin',
+      const response = await fetch('/api/restore', { method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/zip', 'X-NewsReview-Confirm': 'RESTORE', ...revisionHeaders() }, body: file });
       if (!response.ok) throw new Error(await errorMessage(response));
       const result = await response.json();

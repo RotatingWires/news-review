@@ -115,7 +115,7 @@ export class Settings {
     }, 'Updating learned preferences...');
     $('feedback-reset').onclick = () => $('feedback-reset-dialog').showModal();
     $('feedback-confirm-reset').onclick = () => busy($('feedback-confirm-reset'), async () => {
-      await api('reset', 'POST', { confirmation: 'RESET SELECTED', selections: { feedback: true } });
+      await api('fresh-start', 'POST', { confirmation: 'RESET SELECTED', selections: { feedback: true } });
       $('feedback-reset-dialog').close();
       await this.app.reloadDataset();
       notify('Article feedback and learned preferences were reset.');
@@ -160,7 +160,7 @@ export class Settings {
     $('clear-history-form').onsubmit = event => this.submit(event, async () => {
       try {
         const selections = Object.fromEntries([...$('clear-history-form').querySelectorAll('.reset-options input')].map(input => [input.id.slice('reset-'.length), input.checked]));
-        const result = await api('reset', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
+        const result = await api('fresh-start', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
         $('clear-history-dialog').close();
         await this.app.reloadDataset();
         notify(`Selected data reset (${result.deleted_stories} stories removed). Unchecked categories were kept.`);

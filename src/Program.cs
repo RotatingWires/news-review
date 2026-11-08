@@ -286,7 +286,7 @@ app.MapGet("/api/stories", (HttpRequest request, CancellationToken cancellation)
         Sort = sort.Length > 0 ? sort : "rank",
     }, cancellation));
 });
-app.MapGet("/api/export", () =>
+app.MapGet("/api/backup", () =>
 {
     var output = Path.Combine(Path.GetTempPath(), "newsreview-download-" + Guid.NewGuid().ToString("N") + ".zip");
     try { Transfer.CreateArchive(store, output); }
@@ -321,7 +321,7 @@ app.MapGet("/api/topics", () => Api.Send(store.Topics()));
 app.MapGet("/api/sources", () => Api.Send(store.Sources()));
 app.MapGet("/api/related/{id}", (string id) => Api.Send(store.Related(Api.ParseInteger(id))));
 
-app.MapPost("/api/import/backup", async (HttpContext context) =>
+app.MapPost("/api/restore", async (HttpContext context) =>
 {
     var request = context.Request;
     if (request.Headers["X-NewsReview-Confirm"] != "RESTORE") throw new ValidationException("Confirm that this restore replaces the current dataset");
@@ -401,7 +401,7 @@ app.MapPost("/api/maintenance/duplicates/purge", async (HttpRequest request) =>
     if (!Api.Confirmed(await Api.Body(request), "PURGE DUPLICATES")) throw new ValidationException("Confirm duplicate purging before continuing");
     return Exclusive("Wait for collection/review or restore to finish before purging duplicates", () => Api.Send(store.PurgeDuplicates()));
 });
-app.MapPost("/api/reset", async (HttpRequest request) =>
+app.MapPost("/api/fresh-start", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
     if (!Api.Confirmed(data, "RESET SELECTED")) throw new ValidationException("Type RESET SELECTED to confirm");

@@ -146,7 +146,7 @@ public class AuthTests : IDisposable
             return await client.SendAsync(request);
         }
         Assert.False((await (await Send("/api/auth/status")).Content.ReadFromJsonAsync<JsonNode>())!["configured"]!.GetValue<bool>());
-        foreach (var path in new[] { "/api/overview", "/api/stories", "/api/sources", "/api/export" })
+        foreach (var path in new[] { "/api/overview", "/api/stories", "/api/sources", "/api/backup" })
         {
             var response = await Send(path);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);

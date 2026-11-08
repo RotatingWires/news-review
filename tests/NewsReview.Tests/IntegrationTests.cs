@@ -927,13 +927,13 @@ public class WorkflowTests : IntegrationBase
         Assert.Equal(200, (await Request("/api/stories?time_range=9am+-+9pm")).Status);
         Assert.Equal(400, (await Request("/api/stories?time_range=nonsense")).Status);
         var everything = new JsonObject { ["history"] = true, ["bookmarks"] = true, ["runs"] = true };
-        Assert.Equal(400, (await Request("/api/reset", "POST", new JsonObject { ["selections"] = everything.DeepClone() })).Status);
+        Assert.Equal(400, (await Request("/api/fresh-start", "POST", new JsonObject { ["selections"] = everything.DeepClone() })).Status);
         Assert.Equal(2, Total(new()));
         Assert.True(collector.TryAcquire());
-        try { Assert.Equal(409, (await Request("/api/reset", "POST", new JsonObject { ["confirmation"] = "RESET SELECTED", ["selections"] = everything.DeepClone() })).Status); }
+        try { Assert.Equal(409, (await Request("/api/fresh-start", "POST", new JsonObject { ["confirmation"] = "RESET SELECTED", ["selections"] = everything.DeepClone() })).Status); }
         finally { collector.Release(); }
         var settings = store.Settings();
-        var (status, result) = await Request("/api/reset", "POST", new JsonObject { ["confirmation"] = "RESET SELECTED", ["selections"] = everything.DeepClone() });
+        var (status, result) = await Request("/api/fresh-start", "POST", new JsonObject { ["confirmation"] = "RESET SELECTED", ["selections"] = everything.DeepClone() });
         Assert.Equal(200, status);
         Assert.Equal(2, result!["deleted_stories"]!.AsLong());
         Assert.True(JsonNode.DeepEquals(settings, store.Settings()));
@@ -945,13 +945,13 @@ public class WorkflowTests : IntegrationBase
     public async Task ZipApiConfirmationLockRevisionAndAtomicRestore()
     {
         await Collect();
-        var export = await client.GetAsync("/api/export");
+        var export = await client.GetAsync("/api/backup");
         Assert.Equal("application/zip", export.Content.Headers.ContentType!.MediaType);
         var archive = await export.Content.ReadAsByteArrayAsync();
         var revision = (string)store.Overview()["revision"]!;
         async Task<(int, JsonNode?)> Upload(Dictionary<string, string>? headers = null)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/import/backup") { Content = new ByteArrayContent(archive) };
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/restore") { Content = new ByteArrayContent(archive) };
             request.Content.Headers.ContentType = new("application/zip");
             foreach (var (name, value) in headers ?? []) request.Headers.TryAddWithoutValidation(name, value);
             var response = await client.SendAsync(request);
@@ -962,8 +962,8 @@ public class WorkflowTests : IntegrationBase
         Assert.True(collector.TryAcquire());
         try { Assert.Equal(409, (await Upload(new() { ["X-NewsReview-Confirm"] = "RESTORE" })).Item1); }
         finally { collector.Release(); }
-        Assert.Equal(400, (await Request("/api/reset", "POST", new { confirmation = "wrong", selections = new { history = true } })).Status);
-        Assert.Equal(200, (await Request("/api/reset", "POST", new { confirmation = "RESET SELECTED", selections = new { history = true } })).Status);
+        Assert.Equal(400, (await Request("/api/fresh-start", "POST", new { confirmation = "wrong", selections = new { history = true } })).Status);
+        Assert.Equal(200, (await Request("/api/fresh-start", "POST", new { confirmation = "RESET SELECTED", selections = new { history = true } })).Status);
         Assert.Equal(0, Total(new()));
         Assert.Equal(409, (await Upload(new() { ["X-NewsReview-Confirm"] = "RESTORE", ["X-NewsReview-Revision"] = revision })).Item1);
         var (status, result) = await Upload(new() { ["X-NewsReview-Confirm"] = "RESTORE" });
