@@ -148,12 +148,13 @@ if (passwords.SetupToken is { } setupToken)
     Console.WriteLine();
 }
 
+// Browser hardening: API replies are never stored, and pages and scripts are checked for changes on every load.
 app.Use(async (context, next) =>
 {
     context.Response.OnStarting(() =>
     {
         var headers = context.Response.Headers;
-        headers.CacheControl = "no-store";
+        headers.CacheControl = context.Request.Path.StartsWithSegments("/api") ? "no-store" : "no-cache";
         headers.XContentTypeOptions = "nosniff";
         headers["Referrer-Policy"] = "no-referrer";
         headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
@@ -170,7 +171,7 @@ app.Use(async (context, next) =>
         var host = context.Request.Host.Value ?? "";
         if (context.Request.Headers["Sec-Fetch-Site"] == "cross-site" || (origin.Length > 0 && UrlTools.Split(origin).Netloc != host))
         {
-            await Api.Write(context, Api.Error("Cross-origin writes are not allowed"), 403);
+            await Api.Write(context, Api.Error("Cross-origin writes are not allowed."), 403);
             return;
         }
     }
