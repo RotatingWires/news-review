@@ -116,10 +116,10 @@ class App {
     const pending = this.overview.counts.pending || 0;
     setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
     $('collect').disabled = state.running;
-    $('review-pending').textContent = state.reviewing ? state.review_stop_requested ? 'Stopping review...' : 'Stop review' : 'Review pending';
+    $('review-pending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping review...' : 'Stop review' : 'Review pending';
     $('review-pending').classList.toggle('danger', Boolean(state.reviewing));
     $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
-    $('review-pending').disabled = state.reviewing ? Boolean(state.review_stop_requested) : state.running || pending === 0;
+    $('review-pending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
     $('clear-history').disabled = state.running;
     $('refresh-sources').disabled = state.running;
@@ -127,7 +127,7 @@ class App {
     this.transfer.sync();
     const last = this.overview.runs.find(run => run.kind === 'collect');
     let refreshStatus = state.running ? state.message : last
-      ? `${state.message} · Last collection: ${last.status} · Started ${formatTime(last.started_at)} · ${last.details.errors?.length || 0} errors. See each source and run history for details.`
+      ? `${state.message} · Last collection: ${last.status} · Started ${formatTime(last.startedAt)} · ${last.details.errors?.length || 0} errors. See each source and run history for details.`
       : state.message;
     if (this.unconfirmedRefresh !== null) {
       if (state.running || (last && last.id > this.unconfirmedRefresh)) this.unconfirmedRefresh = null;
@@ -217,7 +217,7 @@ class App {
     const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
       try {
-        await api('jobs/start', 'POST', { kind, unchecked_only: uncheckedOnly, ...(sourceId ? { source_id: sourceId } : {}) });
+        await api('jobs/start', 'POST', { kind, uncheckedOnly: uncheckedOnly, ...(sourceId ? { sourceId: sourceId } : {}) });
         if (kind === 'collect') this.unconfirmedRefresh = null;
         notify(kind !== 'collect' ? 'Reviewing queued stories.' : sourceId ? `Checking ${name} in the background.`
           : uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.');

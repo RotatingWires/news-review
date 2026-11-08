@@ -275,6 +275,8 @@ public class StoreTests : IDisposable
             Assert.Contains(store.Path, error.Message);
             var startup = Path.Combine(directory.Path, "startup");
             var obstructed = new Store(Path.Combine(startup, "newsreview.db"));
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); // Pooled connections keep the -wal file open.
+            if (File.Exists(obstructed.Path + "-wal")) File.Delete(obstructed.Path + "-wal");
             Directory.CreateDirectory(obstructed.Path + "-wal");
             var app = typeof(Program).Assembly.Location;
             using var process = Process.Start(new ProcessStartInfo("dotnet", [app, "--data-dir", startup, "--no-scheduler", "--urls", "http://127.0.0.1:0"])

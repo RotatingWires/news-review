@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.25
+# NewsReview v1.0.26
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -180,7 +180,7 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 - **Search:** a keyword searches the currently selected publication day, unless an explicit date range is entered, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
 - **Date/time range:** Use one field, for example `9/1/26 - 10/1/26, 10am - 3pm`. Either range alone is also accepted. Dates and times are separated by a comma.
 - **Date syntax:** TaskList-style input such as `10/3 - 10/8`. Each side accepts `m/d`, `m/d/yy`, or `m/d/yyyy`; omitted years use the server's current year. Hyphens, en dashes, and em dashes work. Ranges are inclusive and filter publication dates (collection dates for undated stories). Include years when crossing New Year.
-- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `time_zone` use the server timezone. Overnight ranges include both sides of midnight on each selected calendar date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
+- **Time syntax:** TaskList-style input such as `9am - 9pm` or `9:30pm - 2am`. Times match the displayed publication timestamp in the **browser's timezone**, falling back to collection time for undated stories. Endpoints include the entire displayed minute, so `10am - 12pm` includes noon. Named timezone data handles daylight-saving changes for historical timestamps; direct API requests without `timeZone` use the server timezone. Overnight ranges include both sides of midnight on each selected calendar date. As in TaskList, times without am/pm use the AM interpretation (`12` means midnight); 24-hour notation is not accepted.
 - Keywords and time-only filters combine within the selected day. An explicit date range replaces the day picker as the date scope and searches that range; clearing it returns to the selected day. The day picker and previous/next buttons are disabled while an explicit date range is active; Today clears the range and restores daily browsing. Bookmarks continue to search all saved stories unless a date range is supplied. Press Enter or Search to apply them; changed keyword and date/time fields also apply when you click or tab out. Clearing the keyword and leaving the field removes that filter.
 - **Filter...:** choose multiple topic checkboxes in the Topics section. Results match **any** selected topic; select All topics to remove that restriction. It filters the selected day with keywords or time-only searches, or the explicit date range when one is entered. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
@@ -247,9 +247,9 @@ If the website cannot be downloaded or parsed, usable feed entries are retained 
 - A successful or failed collection attempt records a check, so failed sources are excluded from Check new sources thereafter. Use Refresh sources to retry them. Disabled sources are skipped by both buttons.
 - Adding a source makes it eligible; Preview stories and Find RSS/Atom feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
 - New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
-- The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sources_checked`. Run history marks it **new sources only**. It does not restart the scheduled full-collection interval; normal manual full collection still does.
+- The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sourcesChecked`. Run history marks it **new sources only**. It does not restart the scheduled full-collection interval; normal manual full collection still does.
 
-The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unchecked_only":true}`. Omit `unchecked_only` or use `false` for the existing full-source behavior. Use `{"kind":"collect","source_id":N}` to check one enabled source; it cannot be combined with `unchecked_only`. A review-only job cannot be combined with either. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
+The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","uncheckedOnly":true}`. Omit `uncheckedOnly` or use `false` for the existing full-source behavior. Use `{"kind":"collect","sourceId":N}` to check one enabled source; it cannot be combined with `unchecked_only`. A review-only job cannot be combined with either. The previous `/api/collect` endpoint remains a compatible alias. Successful starts return HTTP 202; HTTP 409 means another job holds the shared lock. Browser writes use the same authentication, origin, and dataset-revision protections as other actions.
 
 ### Health and refresh results
 
@@ -386,6 +386,8 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | `backup --output FILE [--database FILE]` | Consistent SQLite backup; see [Offline SQLite backup](#offline-sqlite-backup-and-restore) |
 
 `.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
+
+The JSON API uses camelCase names, like TaskList, TaskList Stats, and SpendTracker (for example `feedUrl` and `uncheckedOnly`); older snake_case names in requests are still accepted.
 
 ## LAN access and authentication
 
@@ -586,6 +588,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.26
+
+- The JSON API speaks camelCase like the other apps (`feedUrl`, `uncheckedOnly`, `timeZone`); snake_case request names are still accepted. The database and saved settings keep their names.
+- Fixed a test that failed in CI after connections became pooled.
 
 ### v1.0.25
 

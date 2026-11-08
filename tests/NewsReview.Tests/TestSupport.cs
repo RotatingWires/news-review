@@ -225,6 +225,7 @@ static class HttpExtensions
         foreach (var (name, value) in headers ?? []) request.Headers.TryAddWithoutValidation(name, value);
         using var response = await client.SendAsync(request);
         var text = await response.Content.ReadAsStringAsync();
-        return ((int)response.StatusCode, text.Length == 0 ? null : JsonNode.Parse(text));
+        // Tests read replies with the code's snake_case names; ApiUsesCamelCase checks the camelCase the API sends.
+        return ((int)response.StatusCode, text.Length == 0 ? null : JsonCase.ToSnake(JsonNode.Parse(text)));
     }
 }

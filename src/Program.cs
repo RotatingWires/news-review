@@ -231,7 +231,7 @@ app.MapGet("/api/auth/status", (HttpContext context) => Api.Send(new JsonObject
 app.MapPost("/api/auth/setup", async (HttpContext context) =>
 {
     var data = await Api.Body(context.Request);
-    try { passwords.Setup(Api.OptionalString(data, "setupToken"), Api.OptionalString(data, "password"), Api.OptionalString(data, "confirmPassword")); }
+    try { passwords.Setup(Api.OptionalString(data, "setup_token"), Api.OptionalString(data, "password"), Api.OptionalString(data, "confirm_password")); }
     catch (SetupConflictException error) { return Api.Send(Api.Error(error.Message), 409); }
     catch (SetupTokenException error) { return Api.Send(Api.Error(error.Message), 401); }
     await Api.SignIn(context);
@@ -254,8 +254,9 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
 
 app.MapGet("/api/stories", (HttpRequest request, CancellationToken cancellation) =>
 {
-    string First(string key) => request.Query[key].Where(value => value is { Length: > 0 }).FirstOrDefault() ?? "";
-    List<string> All(string key) => request.Query[key].Where(value => value is { Length: > 0 }).Select(value => value!).ToList();
+    // Query names are camelCase like the JSON (dateRange); the older snake_case names still work.
+    string First(string key) => request.Query[JsonCase.Camel(key)].Concat(request.Query[key]).Where(value => value is { Length: > 0 }).FirstOrDefault() ?? "";
+    List<string> All(string key) => request.Query[JsonCase.Camel(key)].Concat(request.Query[key]).Where(value => value is { Length: > 0 }).Select(value => value!).ToList();
     var values = new Dictionary<string, string> { ["day"] = First("day"), ["query"] = First("query"), ["start"] = First("start"), ["end"] = First("end"), ["tag"] = First("tag") };
     if (values.Values.Any(value => PyText.Length(value) > 500)) throw new ValidationException("Search is too long");
     foreach (var key in new[] { "day", "start", "end" }) if (values[key].Length > 0) Search.ParseIsoDate(values[key]);
@@ -529,14 +530,15 @@ static class Api
 {
     public static JsonObject Error(string message) => new() { ["error"] = message };
 
+    // Replies are camelCase like the other apps; see JsonCase.
     public static IResult Send(JsonNode? body, int status = 200) =>
-        Results.Content(body?.ToJsonString(Json.Compact) ?? "null", "application/json; charset=utf-8", Encoding.UTF8, status);
+        Results.Content(JsonCase.ToCamel(body)?.ToJsonString(Json.Compact) ?? "null", "application/json; charset=utf-8", Encoding.UTF8, status);
 
     public static async Task Write(HttpContext context, JsonNode body, int status)
     {
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/json; charset=utf-8";
-        await context.Response.WriteAsync(body.ToJsonString(Json.Compact));
+        await context.Response.WriteAsync(JsonCase.ToCamel(body)!.ToJsonString(Json.Compact));
     }
 
     public static string? MediaType(HttpRequest request) =>
@@ -554,7 +556,8 @@ static class Api
         JsonNode? value;
         try { value = JsonNode.Parse(buffer); }
         catch (Exception error) when (error is JsonException or ArgumentException) { throw new ValidationException("Invalid JSON"); }
-        return value as JsonObject ?? throw new ValidationException("Expected a JSON object");
+        // camelCase from the page becomes the snake_case the code uses; snake_case input still works.
+        return JsonCase.ToSnake(value) as JsonObject ?? throw new ValidationException("Expected a JSON object");
     }
 
     public static string? OptionalString(JsonObject data, string key) => Json.IsString(data[key], out var text) ? text : null;

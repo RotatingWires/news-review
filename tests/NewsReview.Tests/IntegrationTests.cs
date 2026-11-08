@@ -885,6 +885,18 @@ public class WorkflowTests : IntegrationBase
     }
 
     [Fact]
+    public async Task ApiUsesCamelCase()
+    {
+        // Like the other apps: camelCase on the wire, while snake_case input keeps working.
+        var source = new JsonObject { ["name"] = "Camel source", ["url"] = Root + "/camel", ["feedUrl"] = Root + "/feed", ["category"] = "Radio", ["linkPattern"] = "/news/" };
+        Assert.Equal(201, (await Request("/api/sources", "POST", source)).Status);
+        var raw = await client.GetStringAsync("/api/sources");
+        Assert.Contains("\"feedUrl\"", raw);
+        Assert.Contains("\"linkPattern\":\"/news/\"", raw);
+        Assert.DoesNotContain("\"feed_url\"", raw);
+    }
+
+    [Fact]
     public async Task AuthenticationOriginCookieAndRateLimit()
     {
         var anonymous = host.CreateClient(new() { HandleCookies = false });

@@ -81,11 +81,11 @@ export class Feed {
     let saving = false;
     const markRead = async event => {
       if (event.type === 'auxclick' && event.button !== 1) return;
-      if (story.read_at || saving) return;
+      if (story.readAt || saving) return;
       saving = true;
       try {
         const result = await api('read/' + story.id, 'POST', {});
-        story.read_at = result.read_at;
+        story.readAt = result.readAt;
         onRead();
       } catch (error) { notify(error.message, true); }
       finally { saving = false; }
@@ -100,8 +100,8 @@ export class Feed {
     this.feedbackVote = vote;
     $('feedback-title').textContent = vote > 0 ? 'Thumbs up' : 'Thumbs down';
     $('feedback-headline').textContent = story.headline;
-    $('feedback-reason').value = story.feedback_reason || '';
-    $('feedback-remove').hidden = !story.feedback_vote;
+    $('feedback-reason').value = story.feedbackReason || '';
+    $('feedback-remove').hidden = !story.feedbackVote;
     $('feedback-dialog').showModal();
     $('feedback-reason').focus();
   }
@@ -171,13 +171,13 @@ export class Feed {
     ['day', 'previous-day', 'next-day'].forEach(id => { $(id).disabled = history; });
     $('day').title = history ? 'The date range controls which days are searched. Clear it to use this picker.' : 'Publication day';
     const bookmarked = this.app.view === 'bookmarks';
-    const params = new URLSearchParams({ page: this.page, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('story-sort').value });
+    const params = new URLSearchParams({ page: this.page, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('story-sort').value });
     if (query) params.set('query', query);
     if (period) params.set('period', period);
     this.selectedTopics.forEach(topic => params.append('tag', topic));
     if (!bookmarked) params.set('day', $('day').value);
     const excludedRelevance = [...document.querySelectorAll('input[name="relevance"]')].filter(input => !input.checked).map(input => input.value);
-    excludedRelevance.forEach(value => params.append('exclude_relevance', value));
+    excludedRelevance.forEach(value => params.append('excludeRelevance', value));
     if (bookmarked) params.set('bookmarks', '1');
     if ($('show-hidden').checked) params.set('hidden', '1');
     $('stories').setAttribute('aria-busy', 'true');
@@ -195,8 +195,8 @@ export class Feed {
       $('empty-action').hidden = bookmarked || searching;
       $('empty-action').onclick = () => this.app.collect('collect', $('empty-action'));
       $('page-prev').hidden = this.page <= 1;
-      $('page-next').hidden = this.page * result.page_size >= result.total;
-      $('page-label').textContent = result.total > result.page_size ? `Page ${this.page} of ${Math.ceil(result.total / result.page_size)}` : '';
+      $('page-next').hidden = this.page * result.pageSize >= result.total;
+      $('page-label').textContent = result.total > result.pageSize ? `Page ${this.page} of ${Math.ceil(result.total / result.pageSize)}` : '';
     } finally { if (requestId === this.requestId) $('stories').setAttribute('aria-busy', 'false'); }
   }
 
@@ -238,15 +238,15 @@ export class Feed {
       button.append(icon);
       button.type = 'button';
       button.setAttribute('aria-label', (vote > 0 ? 'Like: ' : 'Dislike: ') + story.headline);
-      button.setAttribute('aria-pressed', String(story.feedback_vote === vote));
+      button.setAttribute('aria-pressed', String(story.feedbackVote === vote));
       button.title = vote > 0 ? 'Thumbs up; add or edit an optional reason' : 'Thumbs down; add or edit an optional reason';
       button.onclick = () => this.editFeedback(story, vote);
       controls.append(button);
     });
     controls.append(bookmark, relevance);
     const publisher = el('div', 'story-publisher');
-    publisher.append(el('span', 'source-name', story.source_name || 'Source'));
-    const showRead = () => { if (story.read_at && !publisher.querySelector('.read-label')) publisher.append(el('span', 'read-label', 'Read')); };
+    publisher.append(el('span', 'source-name', story.sourceName || 'Source'));
+    const showRead = () => { if (story.readAt && !publisher.querySelector('.read-label')) publisher.append(el('span', 'read-label', 'Read')); };
     showRead();
     top.append(publisher, controls);
     const heading = el('h3');
@@ -254,7 +254,7 @@ export class Feed {
     card.append(top, heading);
     if (story.status === 'pending') {
       card.append(el('div', 'basis', story.summary ? 'Queued for reassessment · previous summary' : 'Source excerpt · awaiting AI review'));
-    } else if (story.content_basis === 'excerpt') card.append(el('div', 'basis', 'AI summary · based on source excerpt'));
+    } else if (story.contentBasis === 'excerpt') card.append(el('div', 'basis', 'AI summary · based on source excerpt'));
     const summary = story.summary || story.excerpt;
     card.append(el('p', 'story-summary', summary ? summary.slice(0, story.summary ? 2400 : 650) + (!story.summary && summary.length > 650 ? '…' : '') : 'No readable excerpt available. Open the original story to read more.'));
     const tags = el('div', 'tags');
@@ -265,28 +265,28 @@ export class Feed {
     });
     card.append(tags);
     const bottom = el('div', 'story-bottom');
-    const timestamp = story.published_at || story.discovered_at;
-    const time = el('time', '', (story.published_at ? '' : 'Collected ') + formatTime(timestamp));
+    const timestamp = story.publishedAt || story.discoveredAt;
+    const time = el('time', '', (story.publishedAt ? '' : 'Collected ') + formatTime(timestamp));
     time.dateTime = timestamp;
-    time.title = `Collected ${formatTime(story.discovered_at)}`;
+    time.title = `Collected ${formatTime(story.discoveredAt)}`;
     bottom.append(time);
     if (story.milestone !== 'not applicable') bottom.append(el('span', '', story.milestone));
     if (story.model) {
       const model = el('span', '', story.model);
-      model.title = `Reviewed by ${story.provider} · ${formatTime(story.reviewed_at)}`;
+      model.title = `Reviewed by ${story.provider} · ${formatTime(story.reviewedAt)}`;
       bottom.append(model);
     }
     card.append(bottom);
-    if (story.related_count) {
+    if (story.relatedCount) {
       const related = el('details', 'related');
-      related.append(el('summary', '', `${story.related_count} additional source${story.related_count > 1 ? 's' : ''}`));
+      related.append(el('summary', '', `${story.relatedCount} additional source${story.relatedCount > 1 ? 's' : ''}`));
       let loaded = false;
       related.ontoggle = async () => {
         if (!related.open || loaded) return;
         loaded = true;
         try {
           const links = await api('related/' + story.id);
-          links.forEach(item => related.append(this.articleLink({ ...item, headline: `${item.source_name}: ${item.headline}` })));
+          links.forEach(item => related.append(this.articleLink({ ...item, headline: `${item.sourceName}: ${item.headline}` })));
         } catch (error) { loaded = false; notify(error.message, true); }
       };
       card.append(related);

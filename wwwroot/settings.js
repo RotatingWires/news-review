@@ -77,7 +77,7 @@ export class Settings {
     };
     $('model-key-remove').onclick = () => {
       this.removingKeyConfig = this.keyConfig();
-      $('model-key-remove-target').textContent = `${this.removingKeyConfig.provider === 'openrouter' ? 'OpenRouter' : 'Compatible server'} · ${this.removingKeyConfig.base_url}`;
+      $('model-key-remove-target').textContent = `${this.removingKeyConfig.provider === 'openrouter' ? 'OpenRouter' : 'Compatible server'} · ${this.removingKeyConfig.baseUrl}`;
       $('model-key-environment-fallback').hidden = !this.keyStatus?.environment;
       $('model-key-remove-dialog').showModal();
       $('model-key-remove-dialog').querySelector('[data-close]').focus();
@@ -97,19 +97,19 @@ export class Settings {
       } catch (error) { $('model-test-result').textContent = error.message; throw error; }
     });
     $('collection-form').onsubmit = event => this.submit(event, async () => {
-      const collection = { enabled: $('schedule-enabled').checked, interval_hours: Number($('schedule-interval').value),
-        items_per_source: Number($('items-per-source').value), max_reviews: Number($('max-reviews').value), lookback_days: Number($('lookback').value) };
+      const collection = { enabled: $('schedule-enabled').checked, intervalHours: Number($('schedule-interval').value),
+        itemsPerSource: Number($('items-per-source').value), maxReviews: Number($('max-reviews').value), lookbackDays: Number($('lookback').value) };
       await api('settings', 'PUT', { collection });
       this.values.collection = collection;
       notify('Collection settings saved.');
     });
     $('feedback-profile-form').onsubmit = event => this.submit(event, async () => {
-      await api('feedback/profile', 'PUT', { profile: $('feedback-profile').value, enabled: $('feedback-enabled').checked, auto_update: $('feedback-auto').checked });
+      await api('feedback/profile', 'PUT', { profile: $('feedback-profile').value, enabled: $('feedback-enabled').checked, autoUpdate: $('feedback-auto').checked });
       notify('Learned preferences saved.');
       await this.loadFeedback();
     });
     $('feedback-rebuild').onclick = () => busy($('feedback-rebuild'), async () => {
-      await api('feedback/rebuild', 'POST', {}, Number(this.values.ai.timeout_seconds) * 1000 + 15000);
+      await api('feedback/rebuild', 'POST', {}, Number(this.values.ai.timeoutSeconds) * 1000 + 15000);
       await this.loadFeedback();
       notify('Learned preferences updated from recent feedback.');
     }, 'Updating learned preferences...');
@@ -121,7 +121,7 @@ export class Settings {
       notify('Article feedback and learned preferences were reset.');
     });
     $('retry-failed').onclick = () => busy($('retry-failed'), async () => {
-      const result = await api('requeue', 'POST', { failed_only: true });
+      const result = await api('requeue', 'POST', { failedOnly: true });
       notify(`${result.count} failed reviews reset. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
@@ -130,7 +130,7 @@ export class Settings {
       $('confirm-dialog').querySelector('[data-close]').focus();
     };
     $('confirm-reassess').onclick = () => busy($('confirm-reassess'), async () => {
-      const result = await api('requeue', 'POST', { failed_only: false });
+      const result = await api('requeue', 'POST', { failedOnly: false });
       $('confirm-dialog').close();
       notify(`${result.count} stories queued. Use Review pending to process them.`);
       await this.app.refreshOverview();
@@ -163,7 +163,7 @@ export class Settings {
         const result = await api('fresh-start', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
         $('clear-history-dialog').close();
         await this.app.reloadDataset();
-        notify(`Selected data reset (${result.deleted_stories} stories removed). Unchecked categories were kept.`);
+        notify(`Selected data reset (${result.deletedStories} stories removed). Unchecked categories were kept.`);
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();
@@ -173,7 +173,7 @@ export class Settings {
       $('source-error').textContent = '';
       try {
         const result = await api('discover', 'POST', { url: $('source-url').value }, 90000);
-        $('source-feed').value = result.feed_url;
+        $('source-feed').value = result.feedUrl;
         notify('Feed discovered. Save the source to keep it.');
       } catch (error) { $('source-error').textContent = error.message; throw error; }
     });
@@ -183,7 +183,7 @@ export class Settings {
       $('source-preview').textContent = 'Checking the source…';
       try {
         const result = await api('preview-source', 'POST', this.sourceValues(), 120000);
-        if (result.feed_url && !$('source-feed').value) $('source-feed').value = result.feed_url;
+        if (result.feedUrl && !$('source-feed').value) $('source-feed').value = result.feedUrl;
         $('source-preview').replaceChildren(el('strong', '', `Detected: ${({ page: 'Website page', feed: 'RSS/Atom', 'feed+page': 'RSS/Atom + website' })[result.method]} · ${result.entries.length} sample stories`));
         const list = el('ul');
         result.entries.forEach(story => { const item = el('li'); item.append(externalLink(story.url, story.headline)); list.append(item); });
@@ -206,9 +206,9 @@ export class Settings {
   submit(event, work) { event.preventDefault(); return busy(event.submitter, work); }
 
   sourceValues() {
-    return { name: $('source-name').value, url: $('source-url').value, feed_url: $('source-feed').value,
+    return { name: $('source-name').value, url: $('source-url').value, feedUrl: $('source-feed').value,
       category: $('source-category').value, enabled: $('source-enabled').checked, mode: $('source-mode').value,
-      link_pattern: $('source-pattern').value, stale_days: Number($('source-stale-days').value) };
+      linkPattern: $('source-pattern').value, staleDays: Number($('source-stale-days').value) };
   }
 
   tab(name) {
@@ -235,19 +235,19 @@ export class Settings {
       $('exclusions').value = interests.exclusions.join('\n');
       await this.loadFeedback();
       $('ai-provider').value = ai.provider;
-      $('ai-url').value = ai.base_url;
+      $('ai-url').value = ai.baseUrl;
       $('ai-model').value = ai.model;
-      $('ai-timeout').value = ai.timeout_seconds;
-      $('ai-input').value = ai.max_input_chars;
-      $('ai-output').value = ai.max_output_tokens ?? 2400;
-      $('ai-unload').checked = ai.unload_after_use ?? true;
+      $('ai-timeout').value = ai.timeoutSeconds;
+      $('ai-input').value = ai.maxInputChars;
+      $('ai-output').value = ai.maxOutputTokens ?? 2400;
+      $('ai-unload').checked = ai.unloadAfterUse ?? true;
       this.aiHelp();
       await this.refreshKeyStatus(true);
       $('schedule-enabled').checked = collection.enabled;
-      $('schedule-interval').value = collection.interval_hours ?? 24;
-      $('items-per-source').value = collection.items_per_source;
-      $('max-reviews').value = collection.max_reviews;
-      $('lookback').value = collection.lookback_days;
+      $('schedule-interval').value = collection.intervalHours ?? 24;
+      $('items-per-source').value = collection.itemsPerSource;
+      $('max-reviews').value = collection.maxReviews;
+      $('lookback').value = collection.lookbackDays;
       this.renderRuns();
       syncDropdowns();
     } finally {
@@ -281,7 +281,7 @@ export class Settings {
     for (const [from, to] of Object.entries(result.renamed)) if (selected.delete(from)) selected.add(to);
     result.removed.forEach(name => selected.delete(name));
     this.renderTopics(result.topics);
-    notify(`Topics saved. Labels updated on ${result.updated_stories} stories; articles were kept.`);
+    notify(`Topics saved. Labels updated on ${result.updatedStories} stories; articles were kept.`);
     await this.app.refreshOverview();
     await this.app.feed.load();
   }
@@ -311,13 +311,13 @@ export class Settings {
   async loadFeedback() {
     const value = await api('feedback');
     $('feedback-enabled').checked = value.enabled;
-    $('feedback-auto').checked = value.auto_update;
+    $('feedback-auto').checked = value.autoUpdate;
     $('feedback-profile').value = value.profile;
     $('feedback-rebuild').disabled = value.count === 0;
-    $('feedback-profile-status').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profile_revision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
+    $('feedback-profile-status').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profileRevision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
   }
 
-  keyConfig() { return { provider: $('ai-provider').value, base_url: $('ai-url').value }; }
+  keyConfig() { return { provider: $('ai-provider').value, baseUrl: $('ai-url').value }; }
 
   async refreshKeyStatus(clearInput = false) {
     const sequence = ++this.keyStatusSequence;
@@ -346,8 +346,8 @@ export class Settings {
   }
 
   aiValues() {
-    return { provider: $('ai-provider').value, base_url: $('ai-url').value,
-      model: $('ai-model').value.trim(), timeout_seconds: Number($('ai-timeout').value), max_input_chars: Number($('ai-input').value), max_output_tokens: Number($('ai-output').value), unload_after_use: $('ai-unload').checked };
+    return { provider: $('ai-provider').value, baseUrl: $('ai-url').value,
+      model: $('ai-model').value.trim(), timeoutSeconds: Number($('ai-timeout').value), maxInputChars: Number($('ai-input').value), maxOutputTokens: Number($('ai-output').value), unloadAfterUse: $('ai-unload').checked };
   }
 
   aiHelp() {
@@ -365,7 +365,7 @@ export class Settings {
 
   syncNewSources() {
     const running = Boolean(this.app.overview?.collector.running);
-    const count = this.sources.filter(source => source.enabled && source.last_checked === null).length;
+    const count = this.sources.filter(source => source.enabled && source.lastChecked === null).length;
     $('check-new-sources').textContent = `Check new sources (${count})`;
     $('check-new-sources').disabled = running || count === 0;
     document.querySelectorAll('#source-list .check-source').forEach(button => { button.disabled = running || button.dataset.enabled !== 'true'; });
@@ -379,13 +379,13 @@ export class Settings {
       const info = el('div', 'source-info');
       const title = el('strong');
       title.append(externalLink(source.url, source.name));
-      info.append(title, el('small', '', `${source.category} · ${source.mode === 'page' ? 'Website page' : source.feed_url || 'Automatic feed / website discovery'}`));
+      info.append(title, el('small', '', `${source.category} · ${source.mode === 'page' ? 'Website page' : source.feedUrl || 'Automatic feed / website discovery'}`));
       const status = source.health.status;
       const statusLabel = { healthy: 'Healthy', unchecked: 'Not checked', disabled: 'Disabled', broken: 'Broken', error: 'Check failed' }[status];
       if (statusLabel) info.append(el('span', 'source-state ' + status, statusLabel));
       source.health.warnings.forEach(warning => info.append(el('small', 'source-warning', warning)));
-      if (source.last_checked) info.append(el('small', '', `Checked ${formatTime(source.last_checked)} · Last success ${formatTime(source.last_success)} · ${source.last_count ?? 'Unknown'} entries · ${source.last_method || 'Method unknown'}`));
-      if (source.newest_published) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newest_published)));
+      if (source.lastChecked) info.append(el('small', '', `Checked ${formatTime(source.lastChecked)} · Last success ${formatTime(source.lastSuccess)} · ${source.lastCount ?? 'Unknown'} entries · ${source.lastMethod || 'Method unknown'}`));
+      if (source.newestPublished) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newestPublished)));
       const check = el('button', 'check-source', 'Check');
       check.setAttribute('aria-label', `Check ${source.name}`);
       check.title = source.enabled ? 'Check only this source now' : 'Enable the source to check it';
@@ -411,10 +411,10 @@ export class Settings {
     $('source-id').value = source?.id || '';
     $('source-name').value = source?.name || '';
     $('source-url').value = source?.url || '';
-    $('source-feed').value = source?.feed_url || '';
+    $('source-feed').value = source?.feedUrl || '';
     $('source-mode').value = source?.mode || 'auto';
-    $('source-pattern').value = source?.link_pattern || '';
-    $('source-stale-days').value = source?.stale_days || 14;
+    $('source-pattern').value = source?.linkPattern || '';
+    $('source-stale-days').value = source?.staleDays || 14;
     $('source-preview').hidden = true;
     $('source-category').value = source?.category || $('source-categories').options[0]?.value || 'News';
     $('source-enabled').checked = source ? Boolean(source.enabled) : true;
@@ -430,7 +430,7 @@ export class Settings {
     $('schedule-timezone').textContent = `Collects every configured number of hours after the last full collection starts. The server must be running; overdue work catches up after startup. Manual full collections restart the interval.`;
     const runs = overview.runs.map(run => {
       const details = el('details', 'run');
-      details.append(el('summary', '', `${formatTime(run.started_at)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : run.details.scope === 'source' ? ` (${run.details.source} only)` : ''} · ${run.status}`));
+      details.append(el('summary', '', `${formatTime(run.startedAt)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : run.details.scope === 'source' ? ` (${run.details.source} only)` : ''} · ${run.status}`));
       const d = run.details;
       details.append(el('p', '', `${d.added || 0} added · ${d.reviewed || 0} reviewed · ${d.duplicates || 0} duplicates · ${d.filtered || 0} filtered`));
       if (d.note) details.append(el('p', '', d.note));
