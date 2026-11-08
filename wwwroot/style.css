@@ -1,6 +1,6 @@
 /* NewsReview uses the same raised/recessed Windows 95 language in both themes. Colors come from theme.css. */
 :root {
-  font-family: Tahoma, "MS Sans Serif", Arial, sans-serif;
+  font-family: var(--ui-font);
   font-size: 14px;
   /* The least room above the title bar on phones, the same in TaskList, TaskList Stats, NewsReview, and SpendTracker. */
   --ios-top-offset: 20px;

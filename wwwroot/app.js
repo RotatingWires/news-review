@@ -206,7 +206,9 @@ class App {
         menuItem(tab.textContent, { role: 'menuitemradio', checked: tab.dataset.tab === this.view, onClick: () => this.show(tab.dataset.tab) })),
       menuSeparator(), heading,
       ...[['light', 'Light'], ['dark', 'Dark']].map(([value, label]) =>
-        menuItem(label, { role: 'menuitemradio', checked: window.NewsTheme.getPreference() === value, onClick: () => window.NewsTheme.setPreference(value) })));
+        menuItem(label, { role: 'menuitemradio', checked: window.NewsTheme.getPreference() === value, onClick: () => window.NewsTheme.setPreference(value) })),
+      menuSeparator(),
+      menuItem('Use Retro Font', { role: 'menuitemcheckbox', checked: window.NewsTheme.getRetroFont(), onClick: () => window.NewsTheme.setRetroFont(!window.NewsTheme.getRetroFont()) }));
   }
 
   async stopReview() {

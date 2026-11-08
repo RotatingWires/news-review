@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.27
+# NewsReview v1.0.28
 
 A self-hosted news aggregator that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 
@@ -96,3 +96,7 @@ While AI reviews run, **Review Pending** becomes **Stop Review**. Stopping lets 
 Use the thumbs-up/down buttons on any story to save a rating and optional reason. **Settings → Interests → Learned preferences** lets you edit, update, disable, or reset the cached profile. Automatic updates use the 10 most recent ratings once before a review batch; individual reviews receive only the profile. Explicit interests and guidance take priority. Ratings/reasons are included in ZIP backups and are separate from bookmarks.
 
 Opening an article from NewsReview adds **Read** beneath its publisher. This marker is saved in SQLite and included in backups; unopened stories have no extra label.
+
+## Credits
+
+**View → Use Retro Font** uses [W95FA](https://fontsarena.com/w95fa-by-alina-sava/) by Alina Sava, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).
