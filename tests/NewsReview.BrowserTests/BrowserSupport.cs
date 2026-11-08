@@ -66,3 +66,15 @@ public abstract class BrowserTest : IAsyncLifetime
 
     internal JsonArray Stories(Store.StoryQuery? query = null) => Store.Stories(query ?? new())["items"]!.AsArray();
 }
+
+/// <summary>The File / View / Help menu bar and the tab row, like the other apps.</summary>
+static class Navigation
+{
+    public static ILocator Tab(this IPage page, string name) => page.GetByRole(AriaRole.Tab, new() { Name = name, Exact = true });
+
+    public static async Task MenuAsync(this IPage page, string menu, string item)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = menu, Exact = true }).ClickAsync();
+        await page.Locator(".menu-dropdown:not([hidden]) button", new() { HasTextString = item }).ClickAsync();
+    }
+}

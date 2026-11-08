@@ -21,7 +21,7 @@ public class AuthBrowserTests : BrowserTest
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-setup.png") });
         await page.Locator("#loginButton").ClickAsync();
         await Expect(page.Locator("#version")).ToBeVisibleAsync();
-        await page.Locator("#logout").ClickAsync();
+        await page.MenuAsync("File", "Log Out");
         await Expect(page.Locator("#loginWindowTitle")).ToHaveTextAsync("Log In");
         await Expect(page.Locator("#setupTokenGroup")).ToBeHiddenAsync();
         await page.Locator("#password").FillAsync("wrong-password");
@@ -30,7 +30,7 @@ public class AuthBrowserTests : BrowserTest
         await page.Locator("#password").FillAsync("browser-password");
         await page.Locator("#loginButton").ClickAsync();
         await Expect(page.Locator("#version")).ToBeVisibleAsync();
-        await page.Locator("#logout").ClickAsync();
+        await page.MenuAsync("File", "Log Out");
         await Expect(page.Locator("#loginWindowTitle")).ToHaveTextAsync("Log In");
         await page.SetViewportSizeAsync(390, 700);
         await page.EvaluateAsync("localStorage.setItem('newsreview-theme', 'dark')");
@@ -81,7 +81,7 @@ public class ReadMarkerBrowserTests : BrowserTest
         await Expect(Story(3).Locator(".read-label")).ToHaveCountAsync(0);
         await Story(0).Locator(".bookmark").ClickAsync();
         await Expect(Story(0).Locator(".bookmark")).ToHaveAttributeAsync("aria-pressed", "true");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Bookmarks", Exact = true }).ClickAsync();
+        await page.Tab("Bookmarks").ClickAsync();
         await Expect(page.Locator(".read-label")).ToHaveCountAsync(1);
         AssertNoErrors();
     }

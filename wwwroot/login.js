@@ -1,4 +1,3 @@
-try { document.documentElement.dataset.theme = localStorage.getItem('newsreview-theme') || 'light'; } catch {}
 'use strict';
 
 const authForm = document.querySelector('#authForm');

@@ -94,3 +94,29 @@ export function formatTime(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+
+/** Menus like the other apps' File / View / Help bar: one open at a time, closed by any outside click or Escape. */
+export function closeMenus() {
+  document.querySelectorAll('.menu-dropdown').forEach(menu => { menu.hidden = true; });
+  document.querySelectorAll('[aria-haspopup="menu"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+}
+export function toggleMenu(button, menu) {
+  const open = menu.hidden;
+  closeMenus();
+  menu.hidden = !open;
+  button.setAttribute('aria-expanded', String(open));
+}
+export function menuItem(label, { role = 'menuitem', checked = false, onClick }) {
+  const button = el('button');
+  button.type = 'button';
+  button.setAttribute('role', role);
+  if (role !== 'menuitem') button.setAttribute('aria-checked', String(checked));
+  button.append(el('span', 'menu-check'), el('span', 'menu-label', label));
+  button.onclick = () => { closeMenus(); onClick(); };
+  return button;
+}
+export function menuSeparator() {
+  const separator = el('div', 'menu-separator');
+  separator.setAttribute('role', 'separator');
+  return separator;
+}

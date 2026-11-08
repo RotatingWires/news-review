@@ -91,13 +91,13 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator(".story h3").First).ToContainTextAsync("FreePBX");
         var identifiers = Store.Read(db => db.Rows("SELECT headline,id FROM stories")).ToDictionary(r => (string)r["headline"]!, r => r["id"]!.AsLong());
         foreach (var name in new[] { Samples[0].Headline, Samples[2].Headline }) Store.Bookmark(identifiers[name], true);
-        await Button("Bookmarks").ClickAsync();
+        await page.Tab("Bookmarks").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(2);
         await Expect(page.Locator(".story h3").First).ToContainTextAsync("FreePBX");
         await ChooseSort("Published: oldest first");
         await Expect(page.Locator(".story h3").First).ToContainTextAsync("Experimental HTTP");
         foreach (var name in new[] { Samples[0].Headline, Samples[2].Headline }) Store.Bookmark(identifiers[name], false);
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         await ChooseSort("Rank: highest first");
         await Expect(Stories()).ToHaveCountAsync(4);
         await Expect(page.Locator(".story h3").First).ToContainTextAsync("Experimental HTTP");
@@ -125,7 +125,7 @@ public class SmokeBrowserTests : BrowserTest
         var countBox = await Box(page.Locator("#story-count"));
         Assert.True((await Box(page.Locator("#relevance-key"))).Y >= countBox.Y + countBox.Height);
         await Expect(page.Locator(".relevance-indicator").First).ToHaveAttributeAsync("title", "Highly relevant: AI interest score 90/100");
-        await Expect(page.Locator("#feed-title")).ToHaveTextAsync("Daily Feed");
+        await Expect(page.Tab("Daily Feed")).ToHaveAttributeAsync("aria-selected", "true");
         Assert.Equal("14px", await Style(".titlebar-caption", "fontSize"));
         Assert.Equal("14px", await Style("#story-count", "fontSize"));
         await Expect(page.Locator("#results-heading")).ToHaveTextAsync("Today’s Edition");
@@ -159,13 +159,13 @@ public class SmokeBrowserTests : BrowserTest
         await page.Locator("#help-dialog .dialog-body").EvaluateAsync("el => { el.scrollTop = el.scrollHeight; }");
         Assert.Equal(positions, await page.Locator("#help-dialog").EvaluateAsync<double[]>(positionsScript));
         await page.Locator("#help-dialog .dialog-actions button").ClickAsync();
-        await Button("Settings").ClickAsync();
+        await page.Tab("Settings").ClickAsync();
         await Button("Collection & history").ClickAsync();
         await page.Locator("#schedule-interval").FillAsync("3");
         await page.Locator("#collection-form button[type=submit]").ClickAsync();
         await Expect(page.Locator("#status-message")).ToHaveTextAsync("Collection settings saved.");
         Assert.Equal(3, Store.Settings()["collection"]!["interval_hours"]!.AsLong());
-        await Button("Import/Export...").ClickAsync();
+        await page.MenuAsync("File", "Import/Export...");
         var download = await page.RunAndWaitForDownloadAsync(() => page.Locator("#export-backup").ClickAsync());
         var backupPath = host.Directory.File("browser-export.zip");
         await download.SaveAsAsync(backupPath);
@@ -175,7 +175,7 @@ public class SmokeBrowserTests : BrowserTest
         await page.Locator("#restore-backup").ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Restored", new() { Timeout = 15000 });
         await page.Locator("#transfer-dialog .dialog-actions").GetByRole(AriaRole.Button, new() { Name = "OK", Exact = true }).ClickAsync();
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         var bookmarkStates = new List<(string Icon, string Status)>();
         async Task InspectBookmarkRequest(IRoute route)
         {
@@ -189,10 +189,10 @@ public class SmokeBrowserTests : BrowserTest
         Assert.Equal("☆", bookmarkStates.Single().Icon);
         Assert.Contains("Saving bookmark", bookmarkStates.Single().Status);
         Assert.Equal(0, await page.Locator(".read-link").CountAsync());
-        await Button("Bookmarks").ClickAsync();
+        await page.Tab("Bookmarks").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(1);
         Assert.Contains("HTTP", await page.Locator(".story h3").InnerTextAsync());
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
         await page.GetByLabel("Previous day", new() { Exact = true }).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(1);
@@ -272,7 +272,7 @@ public class SmokeBrowserTests : BrowserTest
         await Button("Clear search", exact: false).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
 
-        await Button("Settings").ClickAsync();
+        await page.Tab("Settings").ClickAsync();
         await Button("Interests").ClickAsync();
         await page.WaitForSelectorAsync("#guidance");
         await page.Locator("#guidance").FillAsync("Favor RF projects and protocol changes.");
@@ -401,32 +401,32 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#status-message")).Not.ToContainTextAsync("Could not send POST");
         await Expect(page.Locator("#source-refresh-status")).ToContainTextAsync("No newer collection was recorded");
 
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         await page.WaitForSelectorAsync(".story");
         await page.SetViewportSizeAsync(390, 844);
         await ChooseSort("Published: newest first");
         await Expect(Button("Sort stories")).ToContainTextAsync("Published: newest first");
         await ChooseSort("Rank: highest first");
-        const string chromeScript = "el => [el.querySelector('header').getBoundingClientRect().top, el.querySelector('footer').getBoundingClientRect().bottom]";
+        const string chromeScript = "el => [el.querySelector('.menubar').getBoundingClientRect().top, el.querySelector('footer').getBoundingClientRect().bottom]";
         var chrome = await page.Locator(".window").EvaluateAsync<double[]>(chromeScript);
         await page.Locator("main").EvaluateAsync("el => { el.scrollTop = el.scrollHeight; }");
         Assert.Equal(chrome, await page.Locator(".window").EvaluateAsync<double[]>(chromeScript));
         Assert.True(await page.EvaluateAsync<bool>("scrollY === 0"));
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-mobile.png"), FullPage = true });
         Assert.True(await page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"), "Mobile page overflows horizontally");
-        await Button("Switch color theme", exact: false).ClickAsync();
+        await page.MenuAsync("View", "Dark");
         Assert.Equal("dark", await page.Locator("html").GetAttributeAsync("data-theme"));
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-dark.png"), FullPage = true });
-        await Button("Settings").ClickAsync();
+        await page.Tab("Settings").ClickAsync();
         await Button("Collection & history").ClickAsync();
         var historyCount = Store.Stories(new())["total"]!.AsLong();
-        await Button("Fresh start...").ClickAsync();
+        await page.MenuAsync("File", "Fresh Start...");
         await page.Locator("#reset-history").UncheckAsync();
         await page.Locator("#reset-bookmarks").CheckAsync();
         await page.Locator("#reset-topics").CheckAsync();
         await page.Locator("#clear-history-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         Assert.Equal(historyCount, Store.Stories(new())["total"]!.AsLong());
-        await Button("Fresh start...").ClickAsync();
+        await page.MenuAsync("File", "Fresh Start...");
         await Expect(page.Locator("#reset-history")).ToBeCheckedAsync();
         await Expect(page.Locator("#reset-runs")).ToBeCheckedAsync();
         await Expect(page.Locator("#reset-bookmarks")).Not.ToBeCheckedAsync();
@@ -444,7 +444,7 @@ public class SmokeBrowserTests : BrowserTest
         Assert.Equal(0, Store.Stories(new())["total"]!.AsLong());
         Assert.True(JsonNode.DeepEquals(preferences, Store.Settings()));
         Assert.Equal(3, Store.Sources().Count);
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         await Expect(page.Locator("#empty")).ToBeVisibleAsync();
         AssertNoErrors();
     }

@@ -36,7 +36,7 @@ public class TopicBrowserTests : BrowserTest
         ILocator Button(string name) => page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
         async Task OpenTopics()
         {
-            await Button("Settings").ClickAsync();
+            await page.Tab("Settings").ClickAsync();
             await Button("Topics").ClickAsync();
             await Expect(page.Locator("#panel-topics")).ToBeVisibleAsync();
         }
@@ -82,7 +82,7 @@ public class TopicBrowserTests : BrowserTest
         await Button("Choose default category").ClickAsync();
         Assert.Equal(Topics(), await page.Locator("#source-dialog .editable-dropdown .dropdown-option span:not(.dropdown-check)").AllTextContentsAsync());
         await page.Locator("#source-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
-        await Button("Daily Feed").ClickAsync();
+        await page.Tab("Daily Feed").ClickAsync();
         await Expect(page.Locator(".story")).ToHaveCountAsync(2);
         await page.Locator("#topic-button").ClickAsync();
         await Expect(page.Locator("#topic-options").GetByRole(AriaRole.Checkbox, new() { Name = "Device Engineering", Exact = true })).ToBeCheckedAsync();

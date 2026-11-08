@@ -31,7 +31,7 @@ public class ModelKeyBrowserTests : BrowserTest
         ILocator Button(string name) => page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
         async Task OpenAi()
         {
-            await Button("Settings").ClickAsync();
+            await page.Tab("Settings").ClickAsync();
             await Button("AI").ClickAsync();
         }
         async Task ChooseProvider(string option)

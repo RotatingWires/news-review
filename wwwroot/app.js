@@ -3,7 +3,7 @@ import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
 
-import { $, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus } from './shared.js';
+import { $, el, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus, closeMenus, toggleMenu, menuItem, menuSeparator } from './shared.js';
 
 /** The release from /version.json, like the other apps; the server's version if that file can't be read. */
 async function releaseVersion(fallback) {
@@ -46,26 +46,25 @@ class App {
     document.addEventListener('visibilitychange', resume);
     window.addEventListener('focus', resume);
     window.addEventListener('online', () => { if (this.connectionError) resume(); });
-    try {
-      const saved = localStorage.getItem('newsreview-theme');
-      document.documentElement.dataset.theme = saved || 'light';
-    } catch { /* Storage may be disabled; the default theme remains usable. */ }
-    $('theme').onclick = () => {
-      const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-      document.documentElement.dataset.theme = theme;
-      $('theme').textContent = theme === 'light' ? 'Dark theme' : 'Light theme';
-      try { localStorage.setItem('newsreview-theme', theme); } catch { /* Optional preference. */ }
-    };
-    $('theme').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
     document.querySelectorAll('[data-close]').forEach(button => { button.onclick = () => $(button.dataset.close).close(); });
-    $('daily-nav').onclick = () => this.show('daily');
-    $('bookmarks-nav').onclick = () => this.show('bookmarks');
-    $('settings-nav').onclick = () => this.show('settings');
+    // File / View / Help like the other apps; Daily Feed, Bookmarks, and Settings are tabs below the toolbar.
+    $('file-menu-button').onclick = event => { event.stopPropagation(); toggleMenu($('file-menu-button'), $('file-menu')); };
+    $('view-menu-button').onclick = event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('view-menu-button'), $('view-menu')); };
+    document.addEventListener('click', closeMenus);
+    // Escape closes an open menu first, without also closing a dialog.
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !document.querySelector('.menu-dropdown:not([hidden])')) return;
+      event.preventDefault();
+      closeMenus();
+    }, true);
+    $('refresh-menu-item').onclick = () => { closeMenus(); this.syncView(true); };
+    document.querySelectorAll('.tabs [role="tab"]').forEach(tab => { tab.onclick = () => this.show(tab.dataset.tab); });
     $('dismiss-status').onclick = dismissStatus;
-    $('help-nav').onclick = () => $('help-dialog').showModal();
+    $('help-nav').onclick = () => { closeMenus(); $('help-dialog').showModal(); };
     $('collect').onclick = () => this.collect('collect', $('collect'));
     $('review-pending').onclick = () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('review-pending'));
     $('logout').onclick = async () => {
+      closeMenus();
       try {
         await api('auth/logout', 'POST', {});
         this.authenticated = false;
@@ -116,7 +115,7 @@ class App {
     const pending = this.overview.counts.pending || 0;
     setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
     $('collect').disabled = state.running;
-    $('review-pending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping review...' : 'Stop review' : 'Review pending';
+    $('review-pending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping Review...' : 'Stop Review' : 'Review Pending';
     $('review-pending').classList.toggle('danger', Boolean(state.reviewing));
     $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
     $('review-pending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
@@ -185,11 +184,7 @@ class App {
   async show(view) {
     if (!this.authenticated) return;
     this.view = view;
-    ['daily', 'bookmarks', 'settings'].forEach(name => {
-      const button = $(name + '-nav');
-      button.classList.toggle('active', name === view);
-      if (name === view) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
-    });
+    document.querySelectorAll('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.tab === view)));
     $('settings').hidden = view !== 'settings';
     $('reader').hidden = view === 'settings';
     try {
@@ -197,11 +192,21 @@ class App {
       if (view === 'settings') await this.settings.load();
       else {
         this.feed.page = 1;
-        $('feed-title').textContent = view === 'bookmarks' ? 'Bookmarks' : 'Daily Feed';
-        $('feed-intro').textContent = view === 'bookmarks' ? 'Your saved stories, across every edition.' : 'Stories from your sources, reviewed for your interests.';
         await this.feed.load();
       }
     } catch (error) { notify(error.message, true); }
+  }
+
+  /** View lists the tabs, then the theme, like SpendTracker's View menu. */
+  populateViewMenu() {
+    const heading = el('div', 'menu-heading', 'Theme');
+    heading.setAttribute('role', 'presentation');
+    $('view-menu').replaceChildren(
+      ...[...document.querySelectorAll('.tabs [role="tab"]')].map(tab =>
+        menuItem(tab.textContent, { role: 'menuitemradio', checked: tab.dataset.tab === this.view, onClick: () => this.show(tab.dataset.tab) })),
+      menuSeparator(), heading,
+      ...[['light', 'Light'], ['dark', 'Dark']].map(([value, label]) =>
+        menuItem(label, { role: 'menuitemradio', checked: window.NewsTheme.getPreference() === value, onClick: () => window.NewsTheme.setPreference(value) })));
   }
 
   async stopReview() {
@@ -217,7 +222,7 @@ class App {
     const previousRun = this.overview?.runs[0]?.id || 0;
     await busy(button, async () => {
       try {
-        await api('jobs/start', 'POST', { kind, uncheckedOnly: uncheckedOnly, ...(sourceId ? { sourceId: sourceId } : {}) });
+        await api('jobs/start', 'POST', { kind, uncheckedOnly, ...(sourceId ? { sourceId } : {}) });
         if (kind === 'collect') this.unconfirmedRefresh = null;
         notify(kind !== 'collect' ? 'Reviewing queued stories.' : sourceId ? `Checking ${name} in the background.`
           : uncheckedOnly ? 'Checking new sources in the background.' : 'Collection started in the background.');

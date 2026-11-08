@@ -98,15 +98,8 @@ h3 { font-size: 15px; }
 .title-close::after { content: ""; position: absolute; left: -1px; right: -1px; top: 50%; height: 2px; margin-top: -1px; background: currentColor; transform: rotate(45deg); }
 .title-close::after { transform: rotate(-45deg); }
 .titlebar-caption { justify-self: center; min-width: 0; max-width: min(50vw, 520px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.masthead { border-bottom: 1px solid var(--shadow); padding: 3px 6px; }
-nav { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
-.nav-button { border-color: transparent; box-shadow: none; padding: 4px 12px; }
-.nav-button.active { background: var(--surface-alt); }
-.nav-account { margin-left: auto; display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 main { padding: 16px; flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.titlebar, .masthead, .window > footer { flex-shrink: 0; }
-.collection-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.edition-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.titlebar, .menubar, .toolbar, .tabs, .window > footer { flex-shrink: 0; }
 footer {
   justify-content: space-between;
   /* Inset 5px from the window's sides and bottom, like TaskList's status bar. */
@@ -283,9 +276,6 @@ input.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset
 .sr-only, .skip:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .skip:focus { position: fixed; top: 0; left: 0; background: var(--surface); color: var(--ink); padding: 10px; z-index: 10; }
 [hidden] { display: none !important; }
-@media (hover: hover) and (pointer: fine) {
-  .nav-button:hover { background: var(--title); color: var(--title-text); }
-}
 @media (max-width: 1100px) {
   .story-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-bar .checkbox { margin-left: 0; }
@@ -296,8 +286,6 @@ input.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset
   .window:not(.login-window) { padding-top: max(env(safe-area-inset-top, 0px), var(--ios-top-offset)); }
   main { padding: 10px; }
   .titlebar { margin: 0; }
-  .nav-button { padding: 4px 7px; font-size: 12px; }
-  .edition-header { align-items: start; flex-direction: column; gap: 10px; }
   .browse-bar, #search { width: 100%; max-width: none; }
   .day-controls { width: 100%; }
   #day { flex: 1; width: 130px; }
@@ -351,3 +339,55 @@ input:not([type="checkbox"]), textarea { user-select: text; -webkit-user-select:
 @media (max-width: 650px) {
   .title-version { display: none; }
 }
+
+/* ---------- menu bar, toolbar, and tabs: the same as SpendTracker's ---------- */
+.menubar { padding: 2px 4px; border-bottom: 1px solid var(--shadow); display: flex; align-items: center; }
+.menubar-menus { display: flex; align-items: center; gap: 1px; }
+.menubar-menus > button,
+.menubar-menus > .menu-wrap > button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 4px 10px; }
+.menubar-menus > .menu-wrap > button[aria-expanded="true"] { background: var(--title); color: var(--title-text); }
+@media (hover: hover) and (pointer: fine) {
+  .menubar-menus > button:hover,
+  .menubar-menus > .menu-wrap > button:hover { background: var(--title); color: var(--title-text); }
+}
+.menu-wrap { position: relative; }
+.menu-dropdown {
+  position: absolute; z-index: 50; top: calc(100% + 1px); left: 0; min-width: 165px; width: max-content; max-width: calc(100vw - 20px); padding: 2px;
+  color: var(--ink); background: var(--face);
+  border-top: 2px solid var(--light-edge); border-left: 2px solid var(--light-edge); border-right: 2px solid var(--dark-edge); border-bottom: 2px solid var(--dark-edge);
+  box-shadow: 1px 1px 0 var(--black);
+}
+.menu-dropdown button {
+  width: 100%; display: grid; grid-template-columns: 18px 1fr; gap: 3px; text-align: left;
+  border: 0; box-shadow: none; padding: 4px 8px 4px 4px; color: var(--ink); background: transparent;
+}
+.menu-dropdown button:hover,
+.menu-dropdown button:focus { background: var(--title); color: var(--title-text); outline: none; }
+.menu-dropdown button:disabled,
+.menu-dropdown button:disabled:hover { color: var(--muted); background: transparent; cursor: default; }
+.menu-check { display: grid; place-items: center; min-height: 12px; }
+.menu-dropdown button[role="menuitemradio"][aria-checked="true"] .menu-check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: block; }
+.menu-dropdown button[role="menuitemcheckbox"] .menu-check::before {
+  content: ""; width: 12px; height: 12px; border: 1px solid currentColor; display: grid; place-items: center; font-size: 12px; font-weight: 700; line-height: 1;
+}
+.menu-dropdown button[role="menuitemcheckbox"][aria-checked="true"] .menu-check::before { content: "✓"; }
+.menu-label { white-space: nowrap; }
+.menu-heading { padding: 4px 8px 2px 24px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.menu-separator { height: 0; margin: 3px 2px; border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--light-edge); }
+.toolbar {
+  padding: 6px 7px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  border-top: 1px solid var(--light-edge); border-bottom: 1px solid var(--shadow); min-height: 38px;
+}
+/* The main action: bold, with the extra black frame Windows 95 gives a dialog's default button. */
+button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1px var(--black); margin: 1px; }
+.tabs {
+  display: flex; gap: 2px; padding: 7px 8px 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  border-bottom: 1px solid var(--shadow);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { white-space: nowrap; padding: 5px 11px 6px; position: relative; top: 1px; }
+.tabs button[aria-selected="true"] { padding-top: 7px; margin-top: -2px; border-bottom-color: var(--face); font-weight: 700; z-index: 2; }
+/* Drawn arrows, since Tahoma has no small triangles, like SpendTracker's month arrows. */
+.arrow { display: inline-block; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; vertical-align: middle; }
+.arrow-left { border-right: 6px solid currentColor; }
+.arrow-right { border-left: 6px solid currentColor; }

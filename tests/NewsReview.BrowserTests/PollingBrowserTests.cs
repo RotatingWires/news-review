@@ -48,7 +48,7 @@ public class PollingBrowserTests : BrowserTest
         await Advance(35000);
         Assert.True(Count() == count, "Polling continued after the job finished");
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Settings", Exact = true }).ClickAsync();
+        await page.Tab("Settings").ClickAsync();
         await page.Locator("#guidance").FillAsync("Unsaved editorial guidance");
         collector.Update(("message", "Changed elsewhere"));
         await page.EvaluateAsync("window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange'))");

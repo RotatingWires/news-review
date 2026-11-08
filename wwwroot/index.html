@@ -9,8 +9,9 @@
   <link rel="apple-touch-icon" href="/home-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="NewsReview">
-  <meta name="theme-color" content="#111858">
+  <meta name="theme-color" content="#000080">
   <title>NewsReview</title>
+  <script src="/theme.js"></script>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
@@ -20,31 +21,44 @@
   <a class="skip" href="#main">Skip to stories</a>
   <div class="window">
   <div class="titlebar"><span class="titlebar-name">NewsReview</span><span class="titlebar-caption">Personal news reader</span><span class="title-buttons" aria-hidden="true"><span class="title-minimize"></span><span class="title-maximize"></span><span class="title-close"></span></span></div>
-  <header class="masthead">
-    <nav aria-label="Main navigation">
-      <button id="daily-nav" class="nav-button active" aria-current="page">Daily Feed</button>
-      <button id="bookmarks-nav" class="nav-button">Bookmarks</button>
-      <button id="settings-nav" class="nav-button">Settings</button>
-      <button id="help-nav" class="nav-button">Help</button>
-      <span class="nav-account">
-      <button id="theme" class="nav-button" aria-label="Switch color theme" title="Switch color theme">Dark theme</button>
-      <button id="logout" class="nav-button">Sign out</button>
-      </span>
-    </nav>
-  </header>
+  <nav class="menubar" aria-label="Application menu">
+    <div class="menubar-menus">
+      <div class="menu-wrap">
+        <button id="file-menu-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">File</button>
+        <div id="file-menu" class="menu-dropdown" role="menu" hidden>
+          <button type="button" id="refresh-menu-item" role="menuitem"><span></span><span class="menu-label">Refresh</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" id="transfer-nav" role="menuitem"><span></span><span class="menu-label">Import/Export...</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" id="logout" role="menuitem"><span></span><span class="menu-label">Log Out</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" id="clear-history" role="menuitem"><span></span><span class="menu-label">Fresh Start...</span></button>
+        </div>
+      </div>
+      <div class="menu-wrap">
+        <button id="view-menu-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">View</button>
+        <div id="view-menu" class="menu-dropdown" role="menu" hidden></div>
+      </div>
+      <button id="help-nav" type="button" aria-haspopup="dialog" aria-controls="help-dialog">Help</button>
+    </div>
+  </nav>
+
+  <section class="toolbar" aria-label="Collection">
+    <button id="collect" type="button" class="default-button">Check Sources</button>
+    <button id="review-pending" type="button">Review Pending</button>
+  </section>
+
+  <section class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" aria-selected="true" data-tab="daily" id="daily-nav">Daily Feed</button><button type="button" role="tab" aria-selected="false" data-tab="bookmarks" id="bookmarks-nav">Bookmarks</button><button type="button" role="tab" aria-selected="false" data-tab="settings" id="settings-nav">Settings</button>
+  </section>
 
   <main id="main" tabindex="-1">
     <section id="reader">
-      <div class="edition-header">
-        <div><h1 id="feed-title">Daily Feed</h1><p class="intro" id="feed-intro">Stories from your sources, reviewed for your interests.</p></div>
-        <div class="collection-actions"><button id="review-pending">Review pending</button><button id="collect" class="primary">↻ Check sources</button></div>
-      </div>
-
       <div class="browse-bar">
         <div id="day-controls" class="day-controls">
-          <button id="previous-day" class="icon-button" aria-label="Previous day">←</button>
+          <button id="previous-day" type="button" class="icon-button" aria-label="Previous day"><span class="arrow arrow-left" aria-hidden="true"></span></button>
           <label class="sr-only" for="day">Edition date</label><input type="date" id="day">
-          <button id="next-day" class="icon-button" aria-label="Next day">→</button>
+          <button id="next-day" type="button" class="icon-button" aria-label="Next day"><span class="arrow arrow-right" aria-hidden="true"></span></button>
           <button id="today" class="text-button">Today</button>
         </div>
         <form id="search" role="search"><label class="sr-only" for="query">Search history</label><input type="search" id="query" placeholder="Search headlines, sources, summaries, tags…" maxlength="500"><button type="submit">Search</button></form>
@@ -79,7 +93,6 @@
     </section>
 
     <section id="settings" hidden>
-      <div class="edition-header"><div><h1>Settings</h1><p class="intro">Sources, topics, interests, AI, and collection preferences.</p></div></div>
       <fieldset id="settings-fields" disabled>
       <legend class="sr-only">Reader settings</legend>
       <div class="settings-tabs" role="group" aria-label="Settings section"><button data-tab="interests" class="active">Interests</button><button data-tab="topics">Topics</button><button data-tab="sources">Sources</button><button data-tab="ai">AI</button><button data-tab="collection">Collection & history</button></div>
@@ -157,10 +170,8 @@
           <div class="full"><button class="primary" type="submit">Save</button></div>
         </form>
         <div class="maintenance"><h3>Review queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button id="retry-failed">Reset failed reviews</button><button id="reassess">Reassess history…</button></div></div>
-        <div class="maintenance"><h3>Import/Export</h3><p>Download a ZIP backup or restore a saved NewsReview archive.</p><button id="transfer-nav" type="button">Import/Export...</button></div>
         <h3>Recent runs</h3><div id="run-history"></div>
         <div class="maintenance"><h3>Purge duplicates</h3><p>Remove AI-marked duplicate stories while keeping bookmarks and stories referenced by other saved stories. Compact the database to reclaim unused space.</p><button id="purge-duplicates" class="danger">Purge duplicates...</button></div>
-        <div class="maintenance"><h3>Fresh start</h3><p>Choose which history and preferences to clear. Bookmarked stories can be kept while other history is removed.</p><button id="clear-history" class="danger">Fresh start...</button></div>
       </section>
       </fieldset>
     </section>
@@ -170,7 +181,7 @@
   </div>
 
   <dialog id="source-dialog"><form id="source-form" class="dialog-layout">
-    <div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2><button type="button" data-close="source-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2 id="source-dialog-title">Add a source</h2></div>
     <div class="dialog-body">
       <input type="hidden" id="source-id">
       <label>Name<input id="source-name" maxlength="100" required></label>
@@ -191,22 +202,22 @@
     <div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Save</button></div>
   </form></dialog>
   <dialog id="model-key-remove-dialog"><form id="model-key-remove-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Remove API key</h2><button type="button" data-close="model-key-remove-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Remove API key</h2></div>
     <div class="dialog-body"><p>Remove the saved key for <strong id="model-key-remove-target"></strong>?</p><p>Current model requests finish using the key they already received. Future requests use the updated key configuration.</p><p id="model-key-environment-fallback" hidden>An environment key is also configured. It will be used after the saved key is removed.</p></div>
     <div class="dialog-actions"><button type="button" data-close="model-key-remove-dialog">Cancel</button><button class="danger" type="submit">Remove</button></div>
   </form></dialog>
   <dialog id="topic-remove-dialog"><form id="topic-remove-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Remove topics</h2><button type="button" data-close="topic-remove-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Remove topics</h2></div>
     <div class="dialog-body"><p>Remove these topics from the list and from saved article labels?</p><ul id="topic-remove-names"></ul><p>Articles, summaries, scores, bookmarks, read markers, interests, and source settings are kept. This cannot be undone in the app.</p></div>
     <div class="dialog-actions"><button type="button" data-close="topic-remove-dialog">Cancel</button><button class="danger" type="submit">Remove</button></div>
   </form></dialog>
   <dialog id="confirm-dialog"><div class="dialog-layout">
-    <div class="dialog-heading"><h2>Reassess saved history?</h2><button data-close="confirm-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Reassess saved history?</h2></div>
     <div class="dialog-body"><p>Queue every saved story for review using your current interests and model. Previous summaries stay visible until replaced. Bookmarks and dates are preserved. This can take time on a small computer.</p></div>
     <div class="dialog-actions"><button data-close="confirm-dialog">Cancel</button><button id="confirm-reassess" class="primary">Queue history</button></div>
   </div></dialog>
   <dialog id="purge-duplicates-dialog"><form id="purge-duplicates-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Purge duplicates</h2><button type="button" data-close="purge-duplicates-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Purge duplicates</h2></div>
     <div class="dialog-body">
       <p id="purge-duplicates-count"></p>
       <p>This permanently deletes AI-marked duplicate stories that are not bookmarked or referenced by other stories. Main stories, bookmarks, interests, sources, and collection settings are kept.</p>
@@ -215,7 +226,7 @@
     <div class="dialog-actions"><button type="button" data-close="purge-duplicates-dialog">Cancel</button><button id="confirm-purge-duplicates" class="danger" type="submit">Purge duplicates</button></div>
   </form></dialog>
   <dialog id="clear-history-dialog"><form id="clear-history-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Fresh start</h2><button type="button" data-close="clear-history-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Fresh start</h2></div>
     <div class="dialog-body">
       <p>Only the selected items will be cleared. This cannot be undone in the app. Export a ZIP first if you might want to restore them.</p>
       <fieldset class="reset-options"><legend>Choose what to clear</legend>
@@ -237,17 +248,17 @@
     <div class="dialog-actions"><button type="button" data-close="clear-history-dialog">Cancel</button><button class="danger" type="submit">Reset selected data</button></div>
   </form></dialog>
   <dialog id="feedback-dialog"><form id="feedback-form" class="dialog-layout">
-    <div class="dialog-heading"><h2 id="feedback-title">Article feedback</h2><button type="button" data-close="feedback-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2 id="feedback-title">Article feedback</h2></div>
     <div class="dialog-body"><p id="feedback-headline"></p><label>Reason (optional)<textarea id="feedback-reason" rows="4" maxlength="320" placeholder="What did you like or dislike: the topic, the article, or the summary?"></textarea></label><p class="muted">Feedback refines future relevance reviews. It does not immediately rescore saved stories.</p></div>
     <div class="dialog-actions"><button id="feedback-remove" type="button">Remove feedback</button><button type="button" data-close="feedback-dialog">Cancel</button><button type="submit" class="primary">Save</button></div>
   </form></dialog>
   <dialog id="feedback-reset-dialog"><div class="dialog-layout">
-    <div class="dialog-heading"><h2>Reset feedback?</h2><button data-close="feedback-reset-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Reset feedback?</h2></div>
     <div class="dialog-body"><p>Remove all article ratings, reasons, and the learned preference profile. Written interests, guidance, bookmarks, and stories are kept.</p></div>
     <div class="dialog-actions"><button data-close="feedback-reset-dialog">Cancel</button><button id="feedback-confirm-reset" class="danger">Reset feedback</button></div>
   </div></dialog>
   <dialog id="help-dialog"><div class="dialog-layout">
-    <div class="dialog-heading"><h2>About NewsReview</h2><button data-close="help-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>About NewsReview</h2></div>
     <div class="dialog-body help-content">
       <p>A self-hosted news reader. It collects stories from the feeds and websites you add under Settings → Sources, and your configured AI model filters, scores, summarizes, and tags them by your interests and editorial guidance.</p>
       <p><strong>Tips:</strong> add a homepage, news section, category page, or feed that lists many articles, not a single article, and use Preview stories before saving. Without a model, stories are still collected; Review pending runs the AI stage later. Settings → Collection &amp; history → Import/Export... backs up everything except login credentials and the browser theme. MANUAL.md has the full guide.</p>
@@ -256,7 +267,7 @@
     <div class="dialog-actions"><button data-close="help-dialog">OK</button></div>
   </div></dialog>
   <dialog id="transfer-dialog"><div class="dialog-layout">
-    <div class="dialog-heading"><h2>Import/Export</h2><button data-close="transfer-dialog" aria-label="Close">×</button></div>
+    <div class="dialog-heading"><h2>Import/Export</h2></div>
     <div class="dialog-body">
       <p>Download a complete NewsReview ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, and run history. It includes committed database changes while the app runs. Store it privately; the ZIP is not encrypted.</p>
       <div><button id="export-backup" type="button">Download Export</button></div>

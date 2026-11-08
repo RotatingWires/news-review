@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.26
+# NewsReview v1.0.27
 
 A self-hosted news aggregator that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 
@@ -24,14 +24,14 @@ NewsReview listens on **http://127.0.0.1:8714** unless `--urls` (or `ASPNETCORE_
 
 1. Run your preferred local model server separately, or configure an OpenRouter API key; NewsReview does not install or start a model.
 2. In **Settings → AI**, choose the server type, URL, and model name, then **Test with a sample article** and **Save**. See [Ollama](MANUAL.md#ollama), [LM Studio](MANUAL.md#lm-studio-or-another-compatible-local-server), or [OpenRouter](MANUAL.md#openrouter) for examples.
-3. NewsReview ships without any sources. Add the feeds or news websites you want in **Settings → Sources → Add source**, then click **Check sources**.
+3. NewsReview ships without any sources. Add the feeds or news websites you want in **Settings → Sources → Add source**, then click **Check Sources**.
 4. Describe what you care about in **Settings → Interests**, add article labels in **Settings → Topics**, and adjust **Collection & history** as desired.
 
-You can collect without a model: stories show source excerpts marked **awaiting AI review**. Configure a model later and click **Review pending**. No paid API or cloud model is required.
+You can collect without a model: stories show source excerpts marked **awaiting AI review**. Configure a model later and click **Review Pending**. No paid API or cloud model is required.
 
 Automatic collection initially runs **every 24 hours**. Change **Settings → Collection & history → Collect every (hours)** to any whole-number interval from 1 to 8760, such as 3 hours. Overdue work catches up about 20 seconds after startup. To set up without automatic collection, run `dotnet run --no-scheduler`. Only one process should use a data directory.
 
-Data lives in `./data` (or `--data-dir`); runtime logs use `./logs/console.log`, matching TaskList. Only one log file is kept: it truncates in place when the next entry would exceed 10 MiB. Back up through **Settings → Collection & history → Import/Export...**.
+Data lives in `./data` (or `--data-dir`); runtime logs use `./logs/console.log`, matching TaskList. Only one log file is kept: it truncates in place when the next entry would exceed 10 MiB. Back up through **File → Import/Export...**.
 
 ## Security and privacy
 
@@ -91,7 +91,7 @@ Model HTTP failures include the server's JSON error message, when available, in 
 
 If startup reports **cannot open its database**, check access to the data directory and its SQLite `-wal`/`-shm` files. For a pooled drive such as DrivePool, test a copy of the complete data folder on a regular local disk using `--data-dir`; the app itself can remain on the pool. See [storage troubleshooting](MANUAL.md#database-startup-errors-and-pooled-drives). No automatic database relocation or journal-mode change is performed.
 
-While AI reviews run, **Review pending** becomes **Stop review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Tiles show the article summary without a separate Why it matters section.
+While AI reviews run, **Review Pending** becomes **Stop Review**. Stopping lets the current article finish and leaves the remaining stories queued; it does not disable the collection schedule. Tiles show the article summary without a separate Why it matters section.
 
 Use the thumbs-up/down buttons on any story to save a rating and optional reason. **Settings → Interests → Learned preferences** lets you edit, update, disable, or reset the cached profile. Automatic updates use the 10 most recent ratings once before a review batch; individual reviews receive only the profile. Explicit interests and guidance take priority. Ratings/reasons are included in ZIP backups and are separate from bookmarks.
 
