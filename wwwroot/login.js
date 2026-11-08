@@ -43,10 +43,19 @@ async function request(url, options = {}) {
   throw new Error(message);
 }
 
+/** The release from /version.json, like the other apps; the server's version if that file can't be read. */
+async function releaseVersion(fallback) {
+  try {
+    const response = await fetch('/version.json', { cache: 'no-store', credentials: 'same-origin' });
+    if (response.ok) return (await response.json()).version || fallback;
+  } catch {}
+  return fallback;
+}
+
 async function initialize() {
   try {
     const status = await request('/api/auth/status');
-    titleAppName.replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${status.version}` }));
+    titleAppName.replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${await releaseVersion(status.version)}` }));
     if (status.authenticated) {
       window.location.replace(loginReturnUrl());
       return;

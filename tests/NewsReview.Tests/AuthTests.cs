@@ -171,7 +171,7 @@ public class AuthTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await Send("/api/auth/login", new { password = "wrong" })).StatusCode);
         var limited = await Send("/api/auth/login", new { password = "test-password" });
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
-        Assert.Equal("Too many attempts. Try again in one minute.", (string)(await limited.Content.ReadFromJsonAsync<JsonNode>())!["error"]!);
+        Assert.Equal("", await limited.Content.ReadAsStringAsync());
         Assert.True(new PasswordStore(Path.Combine(host.DataPath, "auth.json")).Verify("test-password", out _));
     }
 

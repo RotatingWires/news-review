@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 namespace NewsReview;
 
 sealed class SetupConflictException() : Exception("A password is already configured.");
-sealed class SetupTokenException() : Exception("Incorrect setup token.");
+sealed class SetupTokenException() : Exception("Invalid setup token.");
 
 /// <summary>
 /// The saved password verifier (data/auth.json) and the console-only first-run setup token.

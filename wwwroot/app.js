@@ -5,6 +5,15 @@ import { Transfer } from './transfer.js';
 
 import { $, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus } from './shared.js';
 
+/** The release from /version.json, like the other apps; the server's version if that file can't be read. */
+async function releaseVersion(fallback) {
+  try {
+    const response = await fetch('/version.json', { cache: 'no-store', credentials: 'same-origin' });
+    if (response.ok) return (await response.json()).version || fallback;
+  } catch {}
+  return fallback;
+}
+
 class App {
   constructor() {
     this.overview = null;
@@ -70,7 +79,6 @@ class App {
     };
     try {
       const session = await api('auth/status');
-      $('logout').hidden = !session.password_required;
       if (!session.authenticated) { location.replace('/login.html'); return; }
       await this.load();
     } catch (error) { notify(error.message, true); setDefaultStatus(error.message); this.poll(); }
@@ -97,10 +105,11 @@ class App {
 
   async refreshOverview() {
     this.overview = await api('overview');
-    $('version').textContent = 'v' + this.overview.version;
+    this.release ??= await releaseVersion(this.overview.version);
+    $('version').textContent = 'v' + this.release;
     // The version is its own span so phones can hide it from the title bar.
-    document.querySelector('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.overview.version}` }));
-    $('help-version').textContent = 'NewsReview v' + this.overview.version;
+    document.querySelector('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.release}` }));
+    $('help-version').textContent = 'NewsReview v' + this.release;
     const state = this.overview.collector;
     document.querySelector('.status-dot').classList.toggle('collecting', state.running);
     document.querySelector('footer').setAttribute('aria-busy', String(state.running));

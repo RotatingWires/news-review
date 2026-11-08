@@ -132,6 +132,7 @@ sealed class Store
         """;
 
     public string Path { get; }
+    public string JournalMode { get; } = "unknown";
     bool initialized;
 
     /// <summary>Called for each opened connection; tests use it to trace and bound real queries.</summary>
@@ -142,7 +143,7 @@ sealed class Store
         Path = System.IO.Path.GetFullPath(path);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         using var db = Open();
-        db.Execute("PRAGMA journal_mode=WAL");
+        JournalMode = Convert.ToString(db.Scalar("PRAGMA journal_mode=WAL"), CultureInfo.InvariantCulture) ?? "unknown";
         var version = db.Long("PRAGMA user_version");
         if (version > SchemaVersion) throw new InvalidOperationException("Database is newer than this app; upgrade the application.");
         // The schema statements are kept identical to earlier releases: ZIP restores compare table layouts exactly.
@@ -246,7 +247,7 @@ sealed class Store
             DataSource = Path,
             Mode = initialized ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate,
             Pooling = false,
-            DefaultTimeout = 10,
+            DefaultTimeout = 5,
         };
         var connection = new SqliteConnection(builder.ToString());
         try
@@ -254,7 +255,7 @@ sealed class Store
             connection.Open();
             var db = new Db(connection);
             db.Execute("PRAGMA foreign_keys=ON");
-            db.Execute("PRAGMA busy_timeout=10000");
+            db.Execute("PRAGMA busy_timeout=5000");
             db.Execute("PRAGMA synchronous=NORMAL");
             Opened?.Invoke(connection);
             return db;

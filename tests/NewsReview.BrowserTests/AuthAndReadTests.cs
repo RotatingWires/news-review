@@ -16,7 +16,7 @@ public class AuthBrowserTests : BrowserTest
         await page.Locator("#password").FillAsync("browser-password");
         await page.Locator("#confirmPassword").FillAsync("browser-password");
         await page.Locator("#loginButton").ClickAsync();
-        await Expect(page.Locator("#loginError")).ToContainTextAsync("Incorrect setup token");
+        await Expect(page.Locator("#loginError")).ToContainTextAsync("Invalid setup token");
         await page.Locator("#setupToken").FillAsync(host.Passwords.SetupToken!);
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-setup.png") });
         await page.Locator("#loginButton").ClickAsync();

@@ -90,9 +90,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddRateLimiter(options =>
 {
+    // An empty 429 like the other apps; the login page words it.
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = (context, cancel) => new ValueTask(
-        Api.Write(context.HttpContext, new JsonObject { ["error"] = "Too many attempts. Try again in one minute." }, 429));
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
@@ -116,7 +115,6 @@ builder.Services.AddResponseCompression(options =>
 
 var app = builder.Build();
 app.UseResponseCompression();
-app.Logger.LogInformation("Sign-in keys: {Location}.", profileKeyRing ? "this Windows profile's ASP.NET key ring" : Path.Combine(DataDirectory(app.Services), "keys"));
 Store store;
 PasswordStore passwords;
 Collector collector;
@@ -132,6 +130,9 @@ catch (Exception error) when (error is StorageUnavailableException or InvalidOpe
     app.Logger.LogError("{Error}", error.Message);
     return 1;
 }
+app.Logger.LogInformation("NewsReview v{Version}, data folder {DataDirectory}.", Transfer.Version, Path.GetDirectoryName(store.Path));
+app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", store.JournalMode);
+app.Logger.LogInformation("Sign-in keys: {Location}.", profileKeyRing ? "this Windows profile's ASP.NET key ring" : Path.Combine(DataDirectory(app.Services), "keys"));
 
 if (passwords.SetupToken is { } setupToken)
 {
@@ -223,8 +224,9 @@ var version = Transfer.Version;
 
 app.MapGet("/api/auth/status", (HttpContext context) => Api.Send(new JsonObject
 {
+    ["version"] = version,
+    ["configured"] = passwords.Configured,
     ["authenticated"] = context.User.Identity?.IsAuthenticated == true && passwords.Configured,
-    ["configured"] = passwords.Configured, ["password_required"] = true, ["version"] = version,
 }));
 app.MapPost("/api/auth/setup", async (HttpContext context) =>
 {
@@ -238,7 +240,7 @@ app.MapPost("/api/auth/setup", async (HttpContext context) =>
 app.MapPost("/api/auth/login", async (HttpContext context) =>
 {
     var data = await Api.Body(context.Request);
-    if (!passwords.Verify(Api.OptionalString(data, "password") ?? "", out var upgraded)) return Api.Send(Api.Error("Incorrect password"), 401);
+    if (!passwords.Verify(Api.OptionalString(data, "password") ?? "", out var upgraded)) return Results.Unauthorized(); // The login page words it, like the other apps.
     if (upgraded) app.Logger.LogInformation("Upgraded the saved password hash to {Iterations} PBKDF2 iterations.", PasswordStore.Iterations);
     await Api.SignIn(context);
     return Api.Send(new JsonObject { ["ok"] = true });
@@ -503,12 +505,21 @@ app.MapPost("/api/requeue", async (HttpRequest request) =>
         Api.Send(new JsonObject { ["count"] = store.Requeue(Validation.Boolean(Json.Get(data, "failed_only", true), "Failed only")) }));
 });
 app.MapFallback("/api/{**path}", () => Api.Send(Api.Error("Not found"), 404));
+// Like the other apps, any other address loads the app when signed in, or the login page with a way back.
+app.MapFallback(async context =>
+{
+    if (context.User.Identity?.IsAuthenticated != true || !passwords.Configured)
+    {
+        context.Response.Redirect("/login.html?returnUrl=" + Uri.EscapeDataString($"{context.Request.Path}{context.Request.QueryString}"));
+        return;
+    }
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.SendFileAsync(Path.Combine(app.Environment.WebRootPath, "index.html"));
+});
 
 if (app.Configuration["NewsReview:Scheduler"] != "false")
     _ = Task.Run(() => collector.Schedule(app.Lifetime.ApplicationStopping));
 app.Lifetime.ApplicationStopping.Register(collector.Stop);
-app.Lifetime.ApplicationStarted.Register(() =>
-    app.Logger.LogInformation("NewsReview {Version} at {Urls} · data: {Directory}", version, string.Join(", ", app.Urls), Path.GetDirectoryName(store.Path)));
 
 app.Run();
 return 0;

@@ -487,6 +487,14 @@ public class CollectionTests : IntegrationBase
 public class WorkflowTests : IntegrationBase
 {
     int AuthorizationCount() { lock (fixture.ModelRequests) return fixture.Authorizations.Count; }
+    /// <summary>Unknown addresses load the app page, like the other apps; the private file itself never comes back.</summary>
+    async Task AssertNotServed(string path, string privateText)
+    {
+        var response = await client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(privateText, body);
+        if (response.IsSuccessStatusCode) Assert.Contains("<title>NewsReview</title>", body);
+    }
     string LastAuthorization() { lock (fixture.ModelRequests) return fixture.Authorizations[^1]; }
     List<string> AuthorizationsSince(int start) { lock (fixture.ModelRequests) return fixture.Authorizations.Skip(start).ToList(); }
     List<(string Path, JsonObject Payload)> RequestsSince(int start)
@@ -708,7 +716,7 @@ public class WorkflowTests : IntegrationBase
         Assert.False((await Request("/api/model-key/remove", "POST", With(scope, "confirmation", "REMOVE MODEL KEY"))).Body!["configured"]!.GetValue<bool>());
         Assert.Equal(200, (await Request("/api/test-model", "POST", config)).Status);
         Assert.Equal("", LastAuthorization());
-        Assert.Equal(404, (await client.GetAsync("/model-credentials.json")).StatusCode switch { var code => (int)code });
+        await AssertNotServed("/model-credentials.json", "fake-replacement-private-key");
         Assert.NotEqual(200, (await Request("/api/model-key")).Status);
     }
 
@@ -872,8 +880,8 @@ public class WorkflowTests : IntegrationBase
         Assert.Equal(409, (await Request("/api/sources", "POST", source)).Status);
         Assert.Equal(400, (await Request("/api/bookmarks/1", "PUT", new { bookmarked = "yes" })).Status);
         Assert.Equal(0, (await Request("/api/stories?query=%27%20OR%201%3D1--")).Body!["total"]!.AsLong());
-        Assert.Equal(404, (int)(await client.GetAsync("/data/newsreview.db")).StatusCode);
-        Assert.Equal(404, (int)(await client.GetAsync("/../Program.cs")).StatusCode);
+        await AssertNotServed("/data/newsreview.db", "SQLite format 3");
+        await AssertNotServed("/../Program.cs", "WebApplication.CreateBuilder");
     }
 
     [Fact]

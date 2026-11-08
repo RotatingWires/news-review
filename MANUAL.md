@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.22
+# NewsReview v1.0.23
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -586,6 +586,16 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.23
+
+- Startup logs the version and data folder, the database settings, and where the sign-in keys are, in the same three lines as the other apps.
+- The login page words wrong-password and too-many-attempts messages itself; setup conflicts say "A password is already configured."
+- Unknown addresses load the app (or the login page) like the other apps; unknown API addresses still return 404.
+- The version comes from `wwwroot/version.json`, like the other apps.
+- `/api/auth/status` no longer includes `password_required`, which was always true.
+- Database busy timeout is 5 seconds, like the other apps.
+- Wrong setup tokens say "Invalid setup token." like the other apps.
 
 ### v1.0.22
 
