@@ -246,7 +246,7 @@ sealed class Store
         {
             DataSource = Path,
             Mode = initialized ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate,
-            Pooling = false,
+            ForeignKeys = true,
             DefaultTimeout = 5,
         };
         var connection = new SqliteConnection(builder.ToString());
@@ -254,7 +254,6 @@ sealed class Store
         {
             connection.Open();
             var db = new Db(connection);
-            db.Execute("PRAGMA foreign_keys=ON");
             db.Execute("PRAGMA busy_timeout=5000");
             db.Execute("PRAGMA synchronous=NORMAL");
             Opened?.Invoke(connection);
