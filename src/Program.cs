@@ -462,7 +462,7 @@ app.MapPut("/api/feedback/story/{id}", async (string id, HttpRequest request) =>
 app.MapPut("/api/feedback/profile", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
-    store.SaveFeedbackProfile(Validation.Text(data["profile"], "Learned preferences", 2400, empty: true),
+    store.SaveFeedbackProfile(Validation.Text(data["profile"], "Learned Preferences", 2400, empty: true),
         enabled: Validation.Boolean(data["enabled"], "Use feedback"), autoUpdate: Validation.Boolean(data["auto_update"], "Automatic profile updates"));
     return Api.Send(new JsonObject { ["ok"] = true });
 });

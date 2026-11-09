@@ -65,7 +65,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
             return false;
         }
         reviewStop = false;
-        Update(("running", true), ("kind", kind), ("reviewing", false), ("review_stop_requested", false), ("message", "Starting…"));
+        Update(("running", true), ("kind", kind), ("reviewing", false), ("review_stop_requested", false), ("message", "Starting..."));
         _ = Task.Run(() => Run(kind, uncheckedOnly, sourceId));
         return true;
     }

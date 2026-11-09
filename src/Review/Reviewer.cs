@@ -104,7 +104,7 @@ sealed class Reviewer(IFetcher fetcher, ILogger<Reviewer> logger)
     public async Task<JsonObject> Review(JsonObject config, JsonObject interests, JsonObject article, IReadOnlyList<JsonObject> candidates,
         IReadOnlyList<string>? topics = null, bool keepLoaded = false, string apiKey = "", CancellationToken cancel = default)
     {
-        if (((string)config["model"]!).Trim().Length == 0) throw new ValidationException("Choose a review model in Settings → AI");
+        if (((string)config["model"]!).Trim().Length == 0) throw new ValidationException("Choose a review model in Settings > AI");
         var allowedTags = topics ?? [(string?)article["category"] is { Length: > 0 } category ? category : "General"];
         var schema = Schema();
         var tagSchema = (JsonObject)schema["properties"]!["tags"]!;
@@ -163,7 +163,7 @@ sealed class Reviewer(IFetcher fetcher, ILogger<Reviewer> logger)
     async Task<(JsonNode? Value, JsonObject Usage)> Generate(JsonObject config, JsonArray messages, JsonObject schema, bool keepLoaded, string apiKey, CancellationToken cancel)
     {
         var model = (string)config["model"]!;
-        if (model.Trim().Length == 0) throw new ValidationException("Choose a review model in Settings → AI");
+        if (model.Trim().Length == 0) throw new ValidationException("Choose a review model in Settings > AI");
         var baseUrl = ((string)config["base_url"]!).TrimEnd('/');
         var provider = (string)config["provider"]!;
         var limit = config["max_output_tokens"]?.AsLong() ?? 2400;

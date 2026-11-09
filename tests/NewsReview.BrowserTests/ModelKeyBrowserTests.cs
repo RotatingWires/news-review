@@ -52,15 +52,15 @@ public class ModelKeyBrowserTests : BrowserTest
         await page.Locator("#model-key-save").ClickAsync();
         await Expect(password).ToHaveValueAsync("");
         await Expect(status).ToHaveTextAsync("Key configured.");
-        await Expect(page.Locator("#model-key-save")).ToHaveTextAsync("Replace key");
+        await Expect(page.Locator("#model-key-save")).ToHaveTextAsync("Replace Key");
         await Expect(page.Locator("#model-key-remove")).ToBeEnabledAsync();
-        await Button("Test with a sample article").ClickAsync();
+        await Button("Test with a Sample Article").ClickAsync();
         await Expect(page.Locator("#model-test-result")).ToContainTextAsync("validation passed");
         Assert.Equal("Bearer " + first, LastAuthorization());
         await password.FillAsync(second);
         await page.Locator("#model-key-save").ClickAsync();
         await Expect(password).ToHaveValueAsync("");
-        await Button("Test with a sample article").ClickAsync();
+        await Button("Test with a Sample Article").ClickAsync();
         await Expect(page.Locator("#model-test-result")).ToContainTextAsync("validation passed");
         Assert.Equal("Bearer " + second, LastAuthorization());
         await page.Locator("#ai-form").GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();

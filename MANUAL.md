@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.33
+# NewsReview v1.0.34
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -29,15 +29,15 @@ dotnet run
 
 Open **http://127.0.0.1:8714**. NewsReview listens on loopback port 8714 unless `--urls` (or `ASPNETCORE_URLS`) chooses another address; see [LAN access](#lan-access-and-authentication).
 
-1. Open **Settings → AI**, choose your server type, and enter the server URL and model name.
-2. Use **Test with a sample article**, then **Save**.
-3. Add your sources in **Settings → Sources → Add source**. A fresh install has none; see [Add or edit a source](#add-or-edit-a-source).
+1. Open **Settings > AI**, choose your server type, and enter the server URL and model name.
+2. Use **Test with a Sample Article**, then **Save**.
+3. Add your sources in **Settings > Sources > Add Source**. A fresh install has none; see [Add or edit a source](#add-or-edit-a-source).
 4. Click **Check Sources**. The collector runs in the background; the page reports progress.
-5. Describe your interests in **Settings → Interests**, add article labels in **Settings → Topics**, and adjust **Collection & history** as desired.
+5. Describe your interests in **Settings > Interests**, add article labels in **Settings > Topics**, and adjust **Collection & History** as desired.
 
 You can collect before setting up a model. Stories display source excerpts labeled **awaiting AI review**, rather than pretending those excerpts are generated summaries. Later, configure the model and click **Review Pending**.
 
-Automatic collection is enabled initially **every 24 hours**, adjustable under **Settings → Collection & history → Collect every (hours)** (1–8760 whole hours). An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
+Automatic collection is enabled initially **every 24 hours**, adjustable under **Settings > Collection & History > Collect every (hours)** (1–8760 whole hours). An overdue run catches up about 20 seconds after startup. To prevent automatic collection while setting up:
 
 ```bash
 dotnet run --no-scheduler
@@ -53,7 +53,7 @@ The application does not install, download, choose, or start a model for you. Ru
 
 Install [Ollama](https://docs.ollama.com/), start it, and download a model that fits your hardware. Use `ollama list` to find its exact installed name.
 
-In **Settings → AI**:
+In **Settings > AI**:
 
 | Field | Value |
 | --- | --- |
@@ -67,7 +67,7 @@ The adapter calls `/api/chat` with streaming disabled, `think: false`, and the r
 
 **Unload Ollama model after a test or review batch** is enabled by default, including for existing installations. Sample tests send `keep_alive: 0` with the chat request so Ollama releases the model after responding, including when NewsReview rejects the answer. Review batches keep it warm between articles (`keep_alive: 5m`) and send an empty `/api/generate` request with `keep_alive: 0` in batch cleanup, including after failed reviews. The model loads again when needed; Ollama itself remains running. Uncheck the option to leave model residency to Ollama/server configuration. This control applies only to native Ollama, not compatible servers. Model tests are blocked while collection/review or maintenance holds the shared job lock, preventing a sample test from unloading an active batch. Other applications using the same model can still affect its residency.
 
-Ollama normally retains a model for five minutes. To release one manually, run `ollama stop <model-name>` on the Ollama host (inside its container if applicable). Check `ollama ps` to see loaded models. Unloading releases model allocations, but the service and operating-system caches can still use some memory. The API behavior is documented in [Ollama’s memory FAQ](https://docs.ollama.com/faq#how-do-i-keep-a-model-loaded-in-memory-or-make-it-unload-immediately).
+Ollama normally retains a model for five minutes. To release one manually, run `ollama stop <model-name>` on the Ollama host (inside its container if applicable). Check `ollama ps` to see loaded models. Unloading releases model allocations, but the service and operating-system caches can still use some memory. The API behavior is documented in [Ollama's memory FAQ](https://docs.ollama.com/faq#how-do-i-keep-a-model-loaded-in-memory-or-make-it-unload-immediately).
 
 **Maximum response tokens** defaults to 2400 (previously a fixed 1200), adjustable from 256 to 8192. A response ending with `length`/`max_tokens` is reported as truncated; increase the limit and allow enough request time on slower hardware. An empty answer is reported separately, including whether the server returned only thinking text. Invalid JSON reports its line/column and finish reason. A single JSON Markdown fence is accepted, but the object still must pass the full schema and duplicate-ID validation; arbitrary text or partial JSON is never treated as a valid review. Schema string lengths now match the stored review limits.
 
@@ -87,11 +87,11 @@ Load a model and start the inference server. Set:
 
 The adapter appends `/chat/completions`, requests JSON output, and validates the returned object. The API prefix belongs in the base URL; the final endpoint does not. See [LM Studio's chat API](https://lmstudio.ai/docs/developer/openai-compat/chat-completions).
 
-If your compatible server requires authentication, save its key in **Settings → AI → API key**. `NEWSREVIEW_MODEL_API_KEY` remains an optional fallback. The backend sends the key as a bearer token; native Ollama does not use it. See [API keys](#api-keys).
+If your compatible server requires authentication, save its key in **Settings > AI > API Key**. `NEWSREVIEW_MODEL_API_KEY` remains an optional fallback. The backend sends the key as a bearer token; native Ollama does not use it. See [API keys](#api-keys).
 
 ### OpenRouter
 
-In **Settings → AI**, set:
+In **Settings > AI**, set:
 
 | Field | Value |
 | --- | --- |
@@ -99,7 +99,7 @@ In **Settings → AI**, set:
 | Server base URL | `https://openrouter.ai/api/v1` |
 | Model name | `anthropic/claude-haiku-5.5` or another supported model ID |
 
-Enter the API key in the API key section and click Save key. Then use Test with a sample article and Save the AI settings. Key updates apply immediately; no environment variable or restart is needed for UI-saved keys. See [API keys](#api-keys) for replacement/removal and the optional environment fallback.
+Enter the API key in the API key section and click Save Key. Then use Test with a Sample Article and Save the AI settings. Key updates apply immediately; no environment variable or restart is needed for UI-saved keys. See [API keys](#api-keys) for replacement/removal and the optional environment fallback.
 
 The OpenRouter server type sends `reasoning: {"enabled": false}` for article reviews, sample tests, and learned-preference updates. It disables thinking instead of merely hiding reasoning text; see [OpenRouter reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). It omits temperature for compatibility with [Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview). Choose a model that supports disabling thinking. Local compatible-server requests retain their existing format, and native Ollama still sends `think: false`.
 
@@ -107,7 +107,7 @@ OpenRouter is a paid cloud service. Requests send article text, interests/guidan
 
 ### API keys
 
-For OpenRouter or an authenticated compatible server, **Settings → AI → API key** provides a masked, write-only entry field. Enter the key and use **Save key**; an existing saved key changes that button to **Replace key**. Saving AI settings separately with an empty key field does not remove a saved key. **Remove key...** opens a Cancel/Remove confirmation. The browser receives only configured/source status, never the stored value. The section is hidden for native Ollama.
+For OpenRouter or an authenticated compatible server, **Settings > AI > API Key** provides a masked, write-only entry field. Enter the key and use **Save Key**; an existing saved key changes that button to **Replace Key**. Saving AI settings separately with an empty key field does not remove a saved key. **Remove Key...** opens a Cancel/Remove confirmation. The browser receives only configured/source status, never the stored value. The section is hidden for native Ollama.
 
 Saved keys belong to the selected provider and normalized server base URL, including its scheme, host, port, and path. A trailing slash or explicit default port does not create a different scope. Changing models on the same provider/server reuses its saved key; changing the provider or server does not. Use a base URL without embedded credentials, query parameters, or fragments. Provider/URL changes clear an unsaved key entry and refresh its configured status.
 
@@ -148,15 +148,15 @@ Notifications and errors appear in the fixed bottom-left status bar. Hover over 
 
 The menu bar works like TaskList, TaskList Stats, and SpendTracker: **File** has Refresh, Import/Export..., Log Out, and Fresh Start...; **View** switches between Daily Feed, Bookmarks, and Settings and chooses the Light or Dark theme; **Help** shows the About box. Daily Feed, Bookmarks, and Settings are also tabs below the toolbar, which holds **Check Sources** and **Review Pending**.
 
-Collection/review messages and their blinking activity light appear only in the footer. Review progress keeps the full article title; the status bar adds an ellipsis when it exceeds the available width, and hovering reveals the full message. **Review Pending** sits beside **Check Sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category suggests the current Settings → Topics list and remains editable for custom values; the daily topic selector retains multi-select checkboxes.
+Collection/review messages and their blinking activity light appear only in the footer. Review progress keeps the full article title; the status bar adds an ellipsis when it exceeds the available width, and hovering reveals the full message. **Review Pending** sits beside **Check Sources**. Bookmark icons stay unchanged while saving; progress appears in the status bar. Custom Win95 dropdowns support arrow keys, Home/End, Enter, Escape, and outside-click dismissal. Default category suggests the current Settings > Topics list and remains editable for custom values; the daily topic selector retains multi-select checkboxes.
 
 The Daily Feed Filter... menu uses the same Win95 arrow and popup styling as other dropdowns, with checkboxes for multiple topics. Story counts sit below the edition heading. Story text remains selectable on both feeds; application chrome and controls do not highlight during text selection. Input and textarea values stay selectable for editing. Titlebar window-control symbols are decorative CSS drawings in equal-size boxes, so minimize, maximize, and close stay aligned regardless of font; TaskList/Stats use the same markup and styles.
 
-Manage article labels in **Settings → Topics**: a text box with one topic per line and **Save**. Names are 1–60 characters (surrounding spaces and blank lines are ignored) and cannot duplicate another topic regardless of capitalization. When saving, lines that did not change anchor the comparison; a line edited in place (between the same unchanged neighbors) renames that topic, so saved stories keep the label under its new name, and a capitalization-only change is also a rename. Moving a line never removes it. A deleted line removes the topic and its saved labels after a **Remove topics** confirmation listing the names; articles are kept. New lines add topics. Unsaved edits survive switching Settings tabs. The list is saved in one transaction (`PUT /api/topics` with the full list, an explicit rename map, and the `DELETE TOPIC` confirmation when topics are removed). AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
+Manage article labels in **Settings > Topics**: a text box with one topic per line and **Save**. Names are 1–60 characters (surrounding spaces and blank lines are ignored) and cannot duplicate another topic regardless of capitalization. When saving, lines that did not change anchor the comparison; a line edited in place (between the same unchanged neighbors) renames that topic, so saved stories keep the label under its new name, and a capitalization-only change is also a rename. Moving a line never removes it. A deleted line removes the topic and its saved labels after a **Remove Topics** confirmation listing the names; articles are kept. New lines add topics. Unsaved edits survive switching Settings tabs. The list is saved in one transaction (`PUT /api/topics` with the full list, an explicit rename map, and the `DELETE TOPIC` confirmation when topics are removed). AI reviews receive only this list as permitted tag values, and response validation discards invented topic names while keeping otherwise valid summaries. Interests and editorial guidance control relevance separately; source categories do not add or rename topics automatically.
 
 On upgrade, the app imports every existing story tag and source category into the initial list without changing stored story labels or other data. This runs only when the owned list is missing, so deleted topics and intentionally empty lists stay that way after restart. Fresh installs start with an empty list; add topics if you want reviewed articles labeled. The feed filter shows the managed list immediately, including newly added topics without matching stories yet.
 
-Adding a topic makes it available to future reviews; existing articles are not automatically reassessed. Renaming updates that label on saved articles in one transaction and preserves other labels, summaries, scores, bookmarks, dates, read markers, and feedback. Deleting requires confirmation and removes only that label from saved articles; articles with no remaining labels are still kept. Topic editing waits until collection/review or restore finishes. To reclassify old articles after adding topics, use Reassess history.
+Adding a topic makes it available to future reviews; existing articles are not automatically reassessed. Renaming updates that label on saved articles in one transaction and preserves other labels, summaries, scores, bookmarks, dates, read markers, and feedback. Deleting requires confirmation and removes only that label from saved articles; articles with no remaining labels are still kept. Topic editing waits until collection/review or restore finishes. To reclassify old articles after adding topics, use Reassess History.
 
 Sources retain their independent Default category. Its suggestions are the current managed topics, refreshed whenever topics are added, renamed, or deleted; a new source starts with the first topic (or News when the list is empty). Renaming or deleting a topic does not change a source's saved category, so edit the source to pick a current topic. Newly collected stories receive it as an initial label only if it matches a managed topic; otherwise they start without a topic until reviewed. Editing a source cannot grow the topic list or restore deleted topics. Reviews may have no topic when none fit. Unknown model-suggested names are discarded, while configured names are matched without case sensitivity, deduplicated, and saved using their exact configured spelling. This keeps otherwise valid summaries and scores without creating topics or spending another model request. Invalid field types and other malformed output still fail validation. If the list is empty, AI review still summarizes and scores stories with an empty tags array. History resets keep the managed list; the existing Fresh start Interest topics option applies only to relevance interests.
 
@@ -172,11 +172,11 @@ The interval scheduler runs independently on the server and still collects with 
 
 ## Mobile home-screen installation
 
-Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s Install/Add to Home Screen action on Android. Both the login and reader pages advertise the NewsReview icon and manifest. Existing home-screen shortcuts may need to be removed and added again to refresh their icon. This is an online reader: the NewsReview server must remain reachable; installing it does not add offline storage.
+Use Safari's Share > Add to Home Screen on iPhone/iPad, or the browser's Install/Add to Home Screen action on Android. Both the login and reader pages advertise the NewsReview icon and manifest. Existing home-screen shortcuts may need to be removed and added again to refresh their icon. This is an online reader: the NewsReview server must remain reachable; installing it does not add offline storage.
 
 ## Reading and searching
 
-- **Sort:** choose Published: newest first / oldest first, or Rank: highest first / lowest first. Rank means the saved AI relevance score (0–100), with highest first as the default. The choice is shared between Daily Feed and Bookmarks and remembered in this browser when storage is available. It applies to the entire matching day, date range, or bookmark set before pagination. Equal ranks use newest publication time first; equal timestamps use a stable story ID order so paging does not reshuffle ties. Undated stories use collection time. Sorting does not call the model or reassess stories, and Clear search / Today keep your chosen sort.
+- **Sort:** choose Published: newest first / oldest first, or Rank: highest first / lowest first. Rank means the saved AI relevance score (0–100), with highest first as the default. The choice is shared between Daily Feed and Bookmarks and remembered in this browser when storage is available. It applies to the entire matching day, date range, or bookmark set before pagination. Equal ranks use newest publication time first; equal timestamps use a stable story ID order so paging does not reshuffle ties. Undated stories use collection time. Sorting does not call the model or reassess stories, and Clear Search / Today keep your chosen sort.
 - **Daily feed:** the selected day shows stories published on that date in your browser timezone. Stories without a publication date use their collection date. This applies to existing history too.
 - **Previous/next:** steps through calendar days, including quiet days. **Today** returns to the current edition and clears filters.
 - **Search:** a keyword searches the currently selected publication day, unless an explicit date range is entered, matching headlines, **source names**, summaries, source excerpts, and tags. Source-name matching uses the name shown on tiles and also works for retained historical sources. `%` and `_` are treated literally. Search is a case-insensitive SQLite `LIKE` search for ordinary ASCII text, not a semantic search engine.
@@ -186,11 +186,11 @@ Use Safari’s Share → Add to Home Screen on iPhone/iPad, or the browser’s I
 - Keywords and time-only filters combine within the selected day. An explicit date range replaces the day picker as the date scope and searches that range; clearing it returns to the selected day. The day picker and previous/next buttons are disabled while an explicit date range is active; Today clears the range and restores daily browsing. Bookmarks continue to search all saved stories unless a date range is supplied. Press Enter or Search to apply them; changed keyword and date/time fields also apply when you click or tab out. Clearing the keyword and leaving the field removes that filter.
 - **Filter...:** choose multiple topic checkboxes in the Topics section. Results match **any** selected topic; select All topics to remove that restriction. It filters the selected day with keywords or time-only searches, or the explicit date range when one is entered. Clicking a tile's tag adds that topic to the current selection.
 - **Bookmarks:** saved stories from all days, with the same search/tag/date filters available. Removing a bookmark does not delete the story.
-- **Relevance:** all four levels start checked in Filter...: highly relevant, somewhat relevant, low relevance, and awaiting review. Uncheck any level to hide it, including bookmarked stories in that level. Levels combine with topics, search, dates, and Include filtered / duplicates on Daily Feed and Bookmarks. Unchecking all levels intentionally shows no stories. Clear search, Today, and previous/next navigation restore all levels.
+- **Relevance:** all four levels start checked in Filter...: highly relevant, somewhat relevant, low relevance, and awaiting review. Uncheck any level to hide it, including bookmarked stories in that level. Levels combine with topics, search, dates, and Include filtered / duplicates on Daily Feed and Bookmarks. Unchecking all levels intentionally shows no stories. Clear Search, Today, and previous/next navigation restore all levels.
 - **Include filtered / duplicates** (inside Filter...): reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
 - **Ordering and pagination:** 48 results per page using your chosen Sort order. Rank sorting compares scores across the entire selected date range, so an older green story can precede a newer yellow one. Publication sorting compares the actual timestamp, including the time within a day. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage. Every color is a token in `wwwroot/theme.css`, defined once per theme with the same names TaskList, TaskList Stats, and SpendTracker use; the other stylesheets contain no color values of their own.
-- **Retro font:** **View → Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
+- **Retro font:** **View > Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
 
 Tiles show the original headline and source, tags, the generated summary when available, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
@@ -202,7 +202,7 @@ Publication-date browsing and time search use the browser's IANA timezone, resol
 
 ### Relevance colors
 
-Each story has a relevance square beside its bookmark: green **75–100**, yellow **40–74**, red **0–39**, or gray **awaiting AI review**. The key sits below the story count on both feeds. Hover over a square for its score; accessible labels include the same information. Scores reflect the interests used during the last successful review, not certainty or factual reliability. Pending/reassessment stories stay gray until reviewed. Changing interests does not rescore the archive automatically; use Reassess history when desired. This display uses stored scores and adds no statistics tracking.
+Each story has a relevance square beside its bookmark: green **75–100**, yellow **40–74**, red **0–39**, or gray **awaiting AI review**. The key sits below the story count on both feeds. Hover over a square for its score; accessible labels include the same information. Scores reflect the interests used during the last successful review, not certainty or factual reliability. Pending/reassessment stories stay gray until reviewed. Changing interests does not rescore the archive automatically; use Reassess History when desired. This display uses stored scores and adds no statistics tracking.
 
 ## Sources
 
@@ -210,7 +210,7 @@ NewsReview does not bundle any sources. A fresh database starts with an empty so
 
 ### Add or edit a source
 
-Open **Settings → Sources → Add source**. Enter its name, website/listing URL, and default category, then choose a collection method:
+Open **Settings > Sources > Add Source**. Enter its name, website/listing URL, and default category, then choose a collection method:
 
 | Method | Behavior |
 | --- | --- |
@@ -218,7 +218,7 @@ Open **Settings → Sources → Add source**. Enter its name, website/listing UR
 | RSS/Atom feed only | Use the specified/discovered feed and report failure rather than switching to page extraction. |
 | Website page | Read the listing page directly; no feed is needed, and any saved feed URL is ignored. |
 
-Click **Preview stories** to see the detected method and up to eight candidate headlines/links without adding anything to history. Save the source, then **Refresh sources**. The source editor also offers **Find RSS/Atom feed** for feed discovery.
+Click **Preview Stories** to see the detected method and up to eight candidate headlines/links without adding anything to history. Save the source, then **Refresh Sources**. The source editor also offers **Find RSS/Atom Feed** for feed discovery.
 
 The collector supports RSS 2.0, common RDF/RSS feeds, and Atom. Feed discovery follows RSS/Atom links advertised in the page's HTML. Website mode extracts structured article lists (JSON-LD), article-card headline links, and heading links. It prefers the main content area where available, excludes navigation/footer/author/category links and external hosts, and removes duplicate URLs. Article-card headline links take precedence over date archives and incidental links inside the card. Website URLs should point to a news/category listing rather than a single article.
 
@@ -244,11 +244,11 @@ If the website cannot be downloaded or parsed, usable feed entries are retained 
 
 ### Collection buttons and new sources
 
-- **Check Sources** in the toolbar and **Refresh sources** in Settings check every enabled source and then review a bounded batch from the pending archive.
-- **Check new sources (N)** in Settings → Sources checks only enabled, active sources whose `last_checked` is empty. It shows the eligible count and is disabled when the count is zero or a job is running.
+- **Check Sources** in the toolbar and **Refresh Sources** in Settings check every enabled source and then review a bounded batch from the pending archive.
+- **Check New Sources (N)** in Settings > Sources checks only enabled, active sources whose `last_checked` is empty. It shows the eligible count and is disabled when the count is zero or a job is running.
 - **Check** on a source row collects only that enabled source, then reviews only its pending stories, up to the usual review limit. It is disabled for disabled sources and while a job runs. Run history marks it **(source name) only**, and like a new-source check it does not restart the scheduled full-collection interval.
-- A successful or failed collection attempt records a check, so failed sources are excluded from Check new sources thereafter. Use Refresh sources to retry them. Disabled sources are skipped by both buttons.
-- Adding a source makes it eligible; Preview stories and Find RSS/Atom feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
+- A successful or failed collection attempt records a check, so failed sources are excluded from Check New Sources thereafter. Use Refresh Sources to retry them. Disabled sources are skipped by both buttons.
+- Adding a source makes it eligible; Preview Stories and Find RSS/Atom Feed do not record collection checks. Editing a checked source does not reset its check history. Fresh start's run/source-check reset makes retained enabled sources eligible again.
 - New-source collection uses the same lookback/per-source limits and URL deduplication as full collection. If a model is configured, it reviews only pending stories from the sources selected for this run, up to the usual review limit; unrelated backlog stays queued. No eligible sources means no downloads or reviews.
 - The job shares the normal collection lock and writes a collection run with `details.scope="unchecked"` and `sourcesChecked`. Run history marks it **new sources only**. It does not restart the scheduled full-collection interval; normal manual full collection still does.
 
@@ -256,7 +256,7 @@ The API equivalent is `POST /api/jobs/start` with JSON `{"kind":"collect","unche
 
 ### Health and refresh results
 
-The Sources tab shows a persistent refresh status while collection/review runs, followed by its recorded result. **Refresh sources** uses the same background job as **Check Sources**: collect candidates, then review a bounded batch if a model is configured. Individual failures remain attached to their sources and in run history; they do not prevent other sources from finishing.
+The Sources tab shows a persistent refresh status while collection/review runs, followed by its recorded result. **Refresh Sources** uses the same background job as **Check Sources**: collect candidates, then review a bounded batch if a model is configured. Individual failures remain attached to their sources and in run history; they do not prevent other sources from finishing.
 
 Each source records its last check, last success, consecutive failures, entry count, actual method, newest reported publication, and last newly inserted story. Status distinguishes **Not checked**, **Healthy**, **Check failed**, **Broken** (three or more consecutive failed checks), and **Disabled**. Stale/inactivity warnings show their detailed red explanation without a redundant Needs attention heading. When the collection note already explains a stale or undated feed, the separate age warning is omitted so the same observation is not listed twice. A successful check resets the failure counter.
 
@@ -266,23 +266,23 @@ Browser-to-app connection failures are separate from publisher/source errors. A 
 
 ### Feed availability
 
-Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Sites behind a Cloudflare browser check ("Just a moment...") open normally in a browser, which runs the check's JavaScript, but refuse NewsReview; the error says so. Look for a feed address the site does not challenge, or disable the source. Availability can vary by host, region, or time, and feed addresses can change. Use **Preview stories** in the source editor to check a feed or website listing without saving anything.
+Some publishers reject automated requests (for example with **HTTP 403**); the error stays visible beside the source after collection. The app does not bypass publisher access controls. Sites behind a Cloudflare browser check ("Just a moment...") open normally in a browser, which runs the check's JavaScript, but refuse NewsReview; the error says so. Look for a feed address the site does not challenge, or disable the source. Availability can vary by host, region, or time, and feed addresses can change. Use **Preview Stories** in the source editor to check a feed or website listing without saving anything.
 
 An individual source failure is recorded next to that source and in run history. Other sources continue.
 
 ## Interests and editorial behavior
 
-**Settings → Interests** contains editable topic rows with **Favor / Normal / Less / Exclude**, freeform editorial guidance, and explicit exclusions. A fresh install starts with no interest topics, short guidance asking for concise factual summaries that favor substantive reporting over rumors and marketing, and exclusions for deals/coupons, sponsored content, and buying guides. Edit all of them to match what you follow.
+**Settings > Interests** contains editable topic rows with **Favor / Normal / Less / Exclude**, freeform editorial guidance, and explicit exclusions. A fresh install starts with no interest topics, short guidance asking for concise factual summaries that favor substantive reporting over rumors and marketing, and exclusions for deals/coupons, sponsored content, and buying guides. Edit all of them to match what you follow.
 
 Saving affects the next job's AI decisions. A currently running job keeps the settings snapshot it started with. A feed's topic dropdown is an immediate view filter and does not call the model.
 
-**Reassess history** queues every saved story for review with the current interests and model. It requires confirmation because it can be a lot of work. Existing summaries remain visible while queued; a successful new review replaces the previous summary and model metadata. Story IDs, publication dates, discovery dates, and bookmarks are preserved. This is an article archive, not a version history of every generated summary.
+**Reassess History** queues every saved story for review with the current interests and model. It requires confirmation because it can be a lot of work. Existing summaries remain visible while queued; a successful new review replaces the previous summary and model metadata. Story IDs, publication dates, discovery dates, and bookmarks are preserved. This is an article archive, not a version history of every generated summary.
 
 Filtered stories stay in the database. Their default view is hidden, so you can inspect the decisions or reassess them later. Source retention remains independent of relevance.
 
 ### Fresh Start: selective reset
 
-Choose **File → Fresh Start...**, which works like TaskList's and SpendTracker's: each option shows what it would clear (counts, plus the size of the pre-restore recovery backups), the database size is shown below the options, and after clearing the database is compacted to free disk space. **Pre-restore recovery backups** deletes the ZIPs in `data/backups` and is checked by default. Choose the categories to clear, and type `RESET SELECTED`. History and run/source-check history are initially checked. Bookmarks, interest topics/ranks, editorial guidance, exclusions, configured sources, AI settings, and collection settings can each be selected separately.
+Choose **File > Fresh Start...**, which works like TaskList's and SpendTracker's: each option shows what it would clear (counts, plus the size of the pre-restore recovery backups), the database size is shown below the options, and after clearing the database is compacted to free disk space. **Pre-restore recovery backups** deletes the ZIPs in `data/backups` and is checked by default. Choose the categories to clear, and type `RESET SELECTED`. History and run/source-check history are initially checked. Bookmarks, interest topics/ranks, editorial guidance, exclusions, configured sources, AI settings, and collection settings can each be selected separately.
 
 Clearing history keeps bookmarked stories unless Bookmarks is also selected. Bookmarks alone removes saved flags without deleting stories. Clearing sources retires the configuration while preserving labels on retained stories; defaults are not reseeded. Resetting AI/collection settings restores their defaults. Unchecked preferences remain intact. The operation is transactional and rejected while collection/review runs.
 
@@ -304,15 +304,15 @@ The model receives article content as untrusted data, has no tools, and is instr
 
 Deduplication is deliberately conservative and approximate. Identical URLs are deterministic duplicates; different URLs require a model decision and can occasionally be missed or grouped incorrectly. The main tile exposes additional coverage links. The **Include filtered / duplicates** option makes those decisions inspectable. No vector database or embedding model is required.
 
-Stored discovery/edition dates are retained for collection history; Daily Feed browsing and date searches use publication dates with collection-date fallback. Undated articles keep a null publication timestamp; the app does not invent one. The feed preserves publication dates as reported, without independently verifying publisher timestamps. Extracted article text can be partial; “article” records the extraction basis, not a guarantee of complete access.
+Stored discovery/edition dates are retained for collection history; Daily Feed browsing and date searches use publication dates with collection-date fallback. Undated articles keep a null publication timestamp; the app does not invent one. The feed preserves publication dates as reported, without independently verifying publisher timestamps. Extracted article text can be partial; "article" records the extraction basis, not a guarantee of complete access.
 
 ### Queue, retries, and scheduling
 
-- **Check Sources / Refresh sources** fetches feeds or website listings and then reviews up to the saved limit.
+- **Check Sources / Refresh Sources** fetches feeds or website listings and then reviews up to the saved limit.
 - **Review Pending** skips feed collection and processes the existing queue. While reviews are running, the button becomes **Stop Review** (also during the AI phase of a full collection). Stop finishes the article already being fetched/reviewed, then stops the batch and leaves unprocessed stories queued. The button shows **Stopping review...** until the in-flight article finishes. Network/model timeouts still apply; this does not forcibly terminate an Ollama process or interrupt its active request.
 - Completed reviews remain saved, the configured model-unload cleanup runs, and the review stop is recorded in run details as a partial run. Click Review Pending again to resume. The collection scheduler stays enabled, so a later scheduled/full run can process pending stories. Review stopping never cancels source collection or disables future automatic work.
 - Manual and scheduled jobs share a lock, so only one collection/review job runs at a time.
-- Each failed review increments an attempt count. Unreadable articles with no usable excerpt are recorded individually and skipped without a model call; they do not increase or reset the consecutive model-failure counter. Later articles continue. After three actual model-review failures without a successful review, the batch stops. After an article reaches three attempts, use **Reset failed reviews** once the underlying issue is fixed. Previously saved topic-validation errors also need Reset failed reviews to retry; old run records are retained.
+- Each failed review increments an attempt count. Unreadable articles with no usable excerpt are recorded individually and skipped without a model call; they do not increase or reset the consecutive model-failure counter. Later articles continue. After three actual model-review failures without a successful review, the batch stops. After an article reaches three attempts, use **Reset Failed Reviews** once the underlying issue is fixed. Previously saved topic-validation errors also need Reset Failed Reviews to retry; old run records are retained.
 - Fresh/unattempted entries are processed first, newest first; older pending entries can wait on busy days. Increase the per-run limit or run additional review batches to catch up.
 - Collection is due when the configured hours have elapsed since the most recent full collection started. Manual full collections restart the interval; review-only and new-source-only jobs do not. With no previous full collection it runs on the next scheduler tick. Existing daily settings become a 24-hour interval; their old hour/minute fields are retained for archive compatibility but no longer control scheduling.
 - There is no wake-from-sleep mechanism. If the service was offline, it checks current feeds when it resumes; it cannot reconstruct stories that have already disappeared from those feeds.
@@ -323,19 +323,19 @@ Opening a story headline with a click, keyboard activation, or middle click adds
 
 ## Article feedback and learned preferences
 
-Each Daily Feed and Bookmarks tile has thumbs-up/down buttons, separate from bookmarking. Click one, optionally explain what you liked or disliked, then Save. You can edit the vote/reason or remove that article’s feedback from the same dialog. Reasons can distinguish the topic from the article’s quality or an incorrect AI summary. Feedback affects future review prompts; it does not instantly change existing scores, summaries, or sorting. Reassess history explicitly if you want older stories reviewed again.
+Each Daily Feed and Bookmarks tile has thumbs-up/down buttons, separate from bookmarking. Click one, optionally explain what you liked or disliked, then Save. You can edit the vote/reason or remove that article's feedback from the same dialog. Reasons can distinguish the topic from the article's quality or an incorrect AI summary. Feedback affects future review prompts; it does not instantly change existing scores, summaries, or sorting. Reassess History explicitly if you want older stories reviewed again.
 
 Ratings, optional reasons, and short article snapshots are saved by URL inside the SQLite interests preferences. Repeatedly saving the same vote/reason is a no-op. Recollected URLs recover their rating; deleting/purging story history does not erase feedback. Up to 10000 ratings are retained, with reasons limited to 320 characters. There is no new runtime dependency or model retraining.
 
-Under **Settings → Interests → Learned preferences**, view/edit the compact profile, enable/disable its use, or control automatic updates. When ratings change, the next batch with pending reviews makes at most one extra model call to rebuild the profile from the **10 most recent ratings** (bounded headline, source, tags, excerpt/summary, and reason). Older ratings stay stored but are not included in that bounded refresh. Unchanged feedback reuses the cached profile. Each normal article review receives only the profile (at most 2400 characters), never the full rating/reason archive. Explicit written interests, guidance, and exclusions take priority; feedback guides relevance rather than supplying article facts.
+Under **Settings > Interests > Learned Preferences**, view/edit the compact profile, enable/disable its use, or control automatic updates. When ratings change, the next batch with pending reviews makes at most one extra model call to rebuild the profile from the **10 most recent ratings** (bounded headline, source, tags, excerpt/summary, and reason). Older ratings stay stored but are not included in that bounded refresh. Unchanged feedback reuses the cached profile. Each normal article review receives only the profile (at most 2400 characters), never the full rating/reason archive. Explicit written interests, guidance, and exclusions take priority; feedback guides relevance rather than supplying article facts.
 
-**Update from feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing AI controls, with warm reuse within a review batch.
+**Update from Feedback** rebuilds it immediately using your configured model; it is blocked while another job runs and requires at least one saved rating. **Save** stores your edited profile and marks it current. Later ratings may replace it if automatic updates remain enabled, so turn automatic updates off to keep a manual profile. Disabling Use learned preferences retains data but removes the profile from model prompts. Failed profile generation keeps the previous profile and lets article reviews continue; run details report the failure. New votes/manual edits arriving during generation prevent a stale generated result from overwriting newer preferences. Model loading/unloading follows the existing AI controls, with warm reuse within a review batch.
 
-**Reset feedback...** confirms before clearing all votes, reasons, and the profile. Fresh start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, the read-marker schema update preserves import support for version-2 ZIP table layouts.
+**Reset Feedback...** confirms before clearing all votes, reasons, and the profile. Fresh Start also has a separate unchecked feedback option. Written interests, guidance, bookmarks, and articles remain unless separately selected. Feedback is included in ZIP exports/restores; older backups without it load with empty feedback defaults. Because it is stored as validated optional fields in existing SQLite settings, the read-marker schema update preserves import support for version-2 ZIP table layouts.
 
 ## Purging duplicate stories
 
-Open **Settings → Collection & history → Purge duplicates**. The confirmation dialog previews the current eligible count; Cancel leaves the archive unchanged. Purging permanently deletes stories marked duplicate by AI review, excluding bookmarks and any story referenced by another saved story. Main stories, other history, preferences, sources, and run history remain intact. It does not guess duplicates from similar headlines or remove unrelated filtered/pending stories. Without AI-marked duplicates there is nothing to purge.
+Open **Settings > Collection & History > Purge Duplicates**. The confirmation dialog previews the current eligible count; Cancel leaves the archive unchanged. Purging permanently deletes stories marked duplicate by AI review, excluding bookmarks and any story referenced by another saved story. Main stories, other history, preferences, sources, and run history remain intact. It does not guess duplicates from similar headlines or remove unrelated filtered/pending stories. Without AI-marked duplicates there is nothing to purge.
 
 The server rechecks eligibility inside a write transaction and refuses purging during collection, review, or restore. It updates the dataset revision so other tabs reload. SQLite VACUUM runs after deletion to shrink the database, which can take time and needs temporary free disk space. If compaction fails, the deletion remains committed and the UI reports the limitation; freed pages remain reusable. Space saved depends on the number and size of eligible stories; existing backup ZIPs and logs are separate and unchanged. Deleted URLs may be collected again while sources still list them. Export a backup before purging if you need a recovery path.
 
@@ -444,7 +444,7 @@ When NewsReview creates a fresh database, it records a pending reminder outside 
 
 ### ZIP import/export in Settings
 
-**File → Import/Export... → Download Backup** downloads `newsreview-backup-YYYYMMDD-HHMMSS.zip` (local time, like the other apps' downloads), a snapshot of the live database including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (`format`, `formatVersion`, `applicationVersion`, `schemaVersion`, `exportedAt`, `sha256`, and per-table `totals`), the same manifest naming TaskList and SpendTracker use. Backups from v1.0.9 and earlier, which spell those keys in snake_case, still restore. It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
+**File > Import/Export... > Download Backup** downloads `newsreview-backup-YYYYMMDD-HHMMSS.zip` (local time, like the other apps' downloads), a snapshot of the live database including committed WAL changes. The ZIP contains exactly `newsreview.db` and `manifest.json` (`format`, `formatVersion`, `applicationVersion`, `schemaVersion`, `exportedAt`, `sha256`, and per-table `totals`), the same manifest naming TaskList and SpendTracker use. Backups from v1.0.9 and earlier, which spell those keys in snake_case, still restore. It includes stories, bookmarks, sources, interests, editorial guidance, exclusions, model/collection settings, and run history. Environment credentials, logs, previous backups, and browser theme are excluded. Backups contain private reading/preferences data and are not encrypted.
 
 **Choose File to Restore...** picks a backup ZIP, then a **Restore Backup** dialog asks for confirmation, like the other apps. This replaces rather than merges the dataset. Uploads are limited to 256 MiB compressed and 1 GiB of database data. The server rejects extra archive members, damaged checksums, unsupported/newer versions, unexpected schema objects, invalid relationships, or invalid configuration. It imports validated rows into its own schema, without executing imported schema SQL. Before replacing data, it writes a recovery ZIP to `data/backups/before-restore-*.zip`; failure to save it aborts the operation. Keep enough free disk space for the current database, upload, extracted database, and recovery ZIP. Restore is blocked while collection/review runs. Interrupted imported runs are marked interrupted.
 
@@ -476,7 +476,7 @@ Before an update, make a backup, pull the code, rebuild (or run `dotnet run`, wh
 
 NewsReview 1.0 replaces the Python implementation with ASP.NET Core and keeps your data. Point it at the same data folder:
 
-1. Download an export ZIP from the old version (**File → Import/Export...**) and keep it as a recovery copy. The Python release cannot restore ZIPs exported by 1.0, so this is your way back.
+1. Download an export ZIP from the old version (**File > Import/Export...**) and keep it as a recovery copy. The Python release cannot restore ZIPs exported by 1.0, so this is your way back.
 2. Stop the old `python3 -m newsreview` process (or its service/scheduled task).
 3. Install the .NET 10 SDK, pull this release, and start it with your old data folder and listening address, for example `dotnet run --urls "http://0.0.0.0:8714" --data-dir C:\path\to\data`. `--host`/`--port` became `--urls`.
 4. Sign in with your existing password. Everyone is signed out once, because the session cookie changed.
@@ -491,12 +491,12 @@ If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the
 
 | Symptom | What to check |
 | --- | --- |
-| Check new sources is disabled | All enabled sources have a recorded check, or a collection/review job is running. Enable a new source or use Refresh sources to retry checked sources. |
+| Check New Sources is disabled | All enabled sources have a recorded check, or a collection/review job is running. Enable a new source or use Refresh Sources to retry checked sources. |
 | Source preview works but no new tiles appear | Preview never saves history. Collect afterward; lookback/per-source limits, known URLs, the selected edition, topics/search, or hidden filtered/duplicate coverage may explain the result. |
 | Stories show excerpts and gray squares | AI is paused, not yet run, or queued for reassessment. Save a model, test it, then use Review Pending. Check Recent runs for failures and retry limits. |
 | Reviews stop with HTTP 400 | The model server rejected the requests. Check the JSON explanation in Recent runs or `logs/console.log`, and the model server console if only the status appears. Confirm provider/model/settings, test with a sample, then retry. Previously recorded generic errors cannot recover a discarded response body. |
 | A visible story does not match a time search | Times use the tile timestamp and browser timezone; dates use the publication day, falling back to collection day. Clear other filters and include filtered/duplicate coverage if necessary. |
-| A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess history to queue the archive explicitly. |
+| A model change did not replace existing summaries/scores | Model/interest changes affect future reviews. Use Reassess History to queue the archive explicitly. |
 | Connection or storage error in the footer | Check the app process, address, logs, and data directory. A deleted running database requires stopping and restarting or restoring a backup; write actions are not replayed automatically. |
 
 ### Database startup errors and pooled drives
@@ -600,6 +600,14 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
+### v1.0.34
+
+- Wording matches the other apps: menu paths are written **File > Import/Export...**, only "..." and straight quotes are used.
+- Buttons, dialog titles and section headings use Title Case like the other apps (**Check Sources**, **Reset Feedback**, **Collection & History**), and dialog titles are no longer questions.
+- The status bar shows **Loading...** until the first status arrives, then **Ready** like the other apps.
+- An expired session shows **Your session has expired.** while going to the login page, like TaskList.
+- "Update NewsReview first" replaces "upgrade the application" for newer databases and backups.
+
 ### v1.0.33
 
 - The View menu has a **Tabs** heading over its tab list, like TaskList's **Tasks** heading.
@@ -625,7 +633,7 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ### v1.0.28
 
-- **View → Use Retro Font**: the whole app, login page and chart labels included, can use W95FA, an open-source recreation of the Windows 95 font bundled with the app (SIL Open Font License, `wwwroot/fonts/OFL.txt`), so it looks the same on Windows, Linux, macOS, Android, and iOS. Off by default; saved per browser.
+- **View > Use Retro Font**: the whole app, login page and chart labels included, can use W95FA, an open-source recreation of the Windows 95 font bundled with the app (SIL Open Font License, `wwwroot/fonts/OFL.txt`), so it looks the same on Windows, Linux, macOS, Android, and iOS. Off by default; saved per browser.
 
 ### v1.0.27
 
@@ -740,7 +748,7 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ### v1.0.4
 
-- Suggest the current Settings → Topics list for a source's Default category instead of a fixed News/Technology/Security/Standards/Hardware/Science list, so a chosen category matches a topic and labels new stories. The list refreshes after adding, renaming, or deleting a topic; custom values can still be typed.
+- Suggest the current Settings > Topics list for a source's Default category instead of a fixed News/Technology/Security/Standards/Hardware/Science list, so a chosen category matches a topic and labels new stories. The list refreshes after adding, renaming, or deleting a topic; custom values can still be typed.
 - Start new sources with the first topic (or News when there are none) instead of always News.
 
 ### v1.0.3
@@ -1031,7 +1039,7 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 ### v0.4.3
 
 - Match the Daily Feed topic control to the shared Win95 dropdown styling, retaining multiple checkboxes and adding keyboard navigation/dismissal.
-- Place story counts below the edition heading and capitalize Daily Feed and Today’s Edition consistently.
+- Place story counts below the edition heading and capitalize Daily Feed and Today's Edition consistently.
 - Keep story content selectable on daily/bookmark feeds while preventing page chrome, settings labels, and bookmark controls from being highlighted; form text stays editable and copyable.
 - Add the decorative titlebar minimize/maximize/close symbols used by TaskList and TaskList Stats.
 - Verify count positioning, menu keyboard controls, text-selection scope, and titlebar symbols in browser QA.

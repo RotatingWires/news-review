@@ -219,7 +219,7 @@ static class Transfer
                     formatVersion != 1 || !Json.IsInteger(manifest["schemaVersion"], out var schema) || schema is not (2 or 3 or Store.SchemaVersion))
                     throw new ValidationException("This is not a supported NewsReview backup format");
                 if (CompareVersions(ParseVersion(manifest["applicationVersion"]), ParseVersion(Version)) > 0)
-                    throw new ValidationException("This backup is from a newer NewsReview version. Update the application first.");
+                    throw new ValidationException("This backup is from a newer NewsReview version. Update NewsReview first.");
                 using var source = archive.GetEntry("newsreview.db")!.Open();
                 using var destination = File.Create(databasePath);
                 var buffer = new byte[65536];

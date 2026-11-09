@@ -21,7 +21,7 @@ public class PurgeBrowserTests : BrowserTest
         var page = await NewPage(390, 844);
         await page.GotoAsync(Root);
         await page.Tab("Settings").ClickAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Collection & history", Exact = true }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Collection & History", Exact = true }).ClickAsync();
         await page.Locator("#purge-duplicates").ClickAsync();
         await Expect(page.Locator("#purge-duplicates-count")).ToHaveTextAsync("1 duplicate story can be removed.");
         await page.Locator("#purge-duplicates-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();

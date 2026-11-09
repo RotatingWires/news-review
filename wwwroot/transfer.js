@@ -7,7 +7,7 @@ async function errorMessage(response) {
   catch { return `NewsReview returned an unexpected response (HTTP ${response.status}). Check the server connection.`; }
 }
 
-/** File → Import/Export...: Download Backup, and Choose File to Restore... confirmed in a second dialog, like the other apps. */
+/** File > Import/Export...: Download Backup, and Choose File to Restore... confirmed in a second dialog, like the other apps. */
 export class Transfer {
   constructor(app) {
     this.app = app;

@@ -100,7 +100,7 @@ export class Settings {
     });
     $('test-model').onclick = () => busy($('test-model'), async () => {
       $('model-test-result').hidden = false;
-      $('model-test-result').textContent = 'Asking your server to review a fictional sample article…';
+      $('model-test-result').textContent = 'Asking your server to review a fictional sample article...';
       try {
         const result = await api('test-model', 'POST', this.aiValues(), Number($('ai-timeout').value) * 1000 + 15000);
         $('model-test-result').textContent = `Connection and output validation passed. Sample summary: ${result.summary}`;
@@ -205,7 +205,7 @@ export class Settings {
     $('preview-source').onclick = () => busy($('preview-source'), async () => {
       $('source-error').textContent = '';
       $('source-preview').hidden = false;
-      $('source-preview').textContent = 'Checking the source…';
+      $('source-preview').textContent = 'Checking the source...';
       try {
         const result = await api('preview-source', 'POST', this.sourceValues(), 120000);
         if (result.feedUrl && !$('source-feed').value) $('source-feed').value = result.feedUrl;
@@ -359,7 +359,7 @@ export class Settings {
       if (sequence !== this.keyStatusSequence) return;
       this.keyStatus = status;
       $('model-key-status').textContent = status.source === 'saved' ? 'Key configured.' : status.source === 'environment' ? 'Key configured from the server environment.' : 'No key configured.';
-      $('model-key-save').textContent = status.saved ? 'Replace key' : 'Save key';
+      $('model-key-save').textContent = status.saved ? 'Replace Key' : 'Save Key';
       $('model-key-remove').disabled = !status.saved;
     } catch (error) {
       if (sequence !== this.keyStatusSequence) return;
@@ -391,7 +391,7 @@ export class Settings {
   syncNewSources() {
     const running = Boolean(this.app.overview?.collector.running);
     const count = this.sources.filter(source => source.enabled && source.lastChecked === null).length;
-    $('check-new-sources').textContent = `Check new sources (${count})`;
+    $('check-new-sources').textContent = `Check New Sources (${count})`;
     $('check-new-sources').disabled = running || count === 0;
     document.querySelectorAll('#source-list .check-source').forEach(button => { button.disabled = running || button.dataset.enabled !== 'true'; });
     $('check-new-sources').title = count ? 'Check only enabled sources with no recorded check' : 'No enabled sources are awaiting their first check';
@@ -432,7 +432,7 @@ export class Settings {
   }
 
   editSource(source = null) {
-    $('source-dialog-title').textContent = source ? 'Edit source' : 'Add a source';
+    $('source-dialog-title').textContent = source ? 'Edit Source' : 'Add a Source';
     $('source-id').value = source?.id || '';
     $('source-name').value = source?.name || '';
     $('source-url').value = source?.url || '';

@@ -146,7 +146,7 @@ export class Feed {
       label.append(checkbox, el('span', 'topic-name', topic));
       return label;
     }));
-    if (!topics.length) $('topic-options').append(el('p', 'muted', 'Add topics in Settings → Topics.'));
+    if (!topics.length) $('topic-options').append(el('p', 'muted', 'Add topics in Settings > Topics.'));
   }
 
   moveDay(offset) {
@@ -187,11 +187,11 @@ export class Feed {
       $('stories').replaceChildren(...result.items.map(story => this.tile(story)));
       $('day-controls').hidden = bookmarked;
       $('clear-search').hidden = !searching && !this.selectedTopics.size && !$('show-hidden').checked && !excludedRelevance.length;
-      $('results-heading').textContent = history ? 'From your history' : bookmarked ? 'Saved stories' : this.editionTitle();
+      $('results-heading').textContent = history ? 'From Your History' : bookmarked ? 'Saved Stories' : this.editionTitle();
       $('story-count').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('empty').hidden = result.total > 0;
       $('empty-title').textContent = bookmarked ? 'No bookmarks yet.' : searching ? 'Nothing matched this search.' : 'No stories in this edition.';
-      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Configure a review model whenever you’re ready.';
+      $('empty-description').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Configure a review model whenever you\'re ready.';
       $('empty-action').hidden = bookmarked || searching;
       $('empty-action').onclick = () => this.app.collect('collect', $('empty-action'));
       $('page-prev').hidden = this.page <= 1;
@@ -201,7 +201,7 @@ export class Feed {
   }
 
   editionTitle() {
-    if ($('day').value === this.app.overview.today) return 'Today’s Edition';
+    if ($('day').value === this.app.overview.today) return "Today's Edition";
     const value = new Date($('day').value + 'T12:00:00Z');
     return Number.isNaN(value.getTime()) ? 'Daily Edition' : value.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   }
@@ -219,7 +219,7 @@ export class Feed {
       if (this.app.view === 'bookmarks' && !next) await this.load();
       else card.replaceWith(this.tile(story));
       notify(next ? 'Saved to bookmarks.' : 'Bookmark removed.');
-    }, story.bookmarked ? 'Removing bookmark…' : 'Saving bookmark…');
+    }, story.bookmarked ? 'Removing bookmark...' : 'Saving bookmark...');
     const tier = story.status !== 'pending' && Number.isInteger(story.score)
       ? RELEVANCE.find(value => story.score >= value.minimum) || UNREVIEWED : UNREVIEWED;
     const relevance = el('span', 'relevance-indicator relevance-' + tier.name);
@@ -256,7 +256,7 @@ export class Feed {
       card.append(el('div', 'basis', story.summary ? 'Queued for reassessment · previous summary' : 'Source excerpt · awaiting AI review'));
     } else if (story.contentBasis === 'excerpt') card.append(el('div', 'basis', 'AI summary · based on source excerpt'));
     const summary = story.summary || story.excerpt;
-    card.append(el('p', 'story-summary', summary ? summary.slice(0, story.summary ? 2400 : 650) + (!story.summary && summary.length > 650 ? '…' : '') : 'No readable excerpt available. Open the original story to read more.'));
+    card.append(el('p', 'story-summary', summary ? summary.slice(0, story.summary ? 2400 : 650) + (!story.summary && summary.length > 650 ? '...' : '') : 'No readable excerpt available. Open the original story to read more.'));
     const tags = el('div', 'tags');
     story.tags.forEach(tag => {
       const button = el('button', 'tag', tag);

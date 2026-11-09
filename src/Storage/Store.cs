@@ -145,7 +145,7 @@ sealed class Store
         using var db = Open();
         JournalMode = Convert.ToString(db.Scalar("PRAGMA journal_mode=WAL"), CultureInfo.InvariantCulture) ?? "unknown";
         var version = db.Long("PRAGMA user_version");
-        if (version > SchemaVersion) throw new InvalidOperationException("Database is newer than this app; upgrade the application.");
+        if (version > SchemaVersion) throw new InvalidOperationException("This database was made by a newer NewsReview version; update NewsReview first.");
         // The schema statements are kept identical to earlier releases: ZIP restores compare table layouts exactly.
         db.Execute("""
             CREATE TABLE IF NOT EXISTS sources (

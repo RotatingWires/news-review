@@ -50,7 +50,7 @@ public class SmokeBrowserTests : BrowserTest
             ai["model"] = "fixture-model";
             Store.ReviewResult(id, review, ai, (JsonObject)Store.Settings()["interests"]!, summary, "article");
         }
-        Store.InsertStory(source, Fixtures.Entry("Yesterday’s protocol update", "https://example.com/yesterday",
+        Store.InsertStory(source, Fixtures.Entry("Yesterday's protocol update", "https://example.com/yesterday",
             yesterday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T12:00:00+00:00", "A source excerpt from the previous day."),
             "Protocols", yesterday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
@@ -116,7 +116,7 @@ public class SmokeBrowserTests : BrowserTest
         await page.Locator("input[name=\"relevance\"][value=\"medium\"]").UncheckAsync();
         await Expect(Stories()).ToHaveCountAsync(0);
         await page.Locator("#topic-button").PressAsync("Escape");
-        await Button("Clear search").ClickAsync();
+        await Button("Clear Search").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
         var indicator = await Box(page.Locator(".relevance-indicator").First);
         var bookmark = await Box(page.Locator(".bookmark").First);
@@ -128,7 +128,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Tab("Daily Feed")).ToHaveAttributeAsync("aria-selected", "true");
         Assert.Equal("14px", await Style(".titlebar-caption", "fontSize"));
         Assert.Equal("14px", await Style("#story-count", "fontSize"));
-        await Expect(page.Locator("#results-heading")).ToHaveTextAsync("Today’s Edition");
+        await Expect(page.Locator("#results-heading")).ToHaveTextAsync("Today's Edition");
         var heading = await Box(page.Locator("#results-heading"));
         countBox = await Box(page.Locator("#story-count"));
         Assert.True(countBox.Y >= heading.Y + heading.Height);
@@ -160,7 +160,7 @@ public class SmokeBrowserTests : BrowserTest
         Assert.Equal(positions, await page.Locator("#help-dialog").EvaluateAsync<double[]>(positionsScript));
         await page.Locator("#help-dialog .dialog-actions button").ClickAsync();
         await page.Tab("Settings").ClickAsync();
-        await Button("Collection & history").ClickAsync();
+        await Button("Collection & History").ClickAsync();
         await page.Locator("#schedule-interval").FillAsync("3");
         await page.Locator("#collection-form button[type=submit]").ClickAsync();
         await Expect(page.Locator("#status-message")).ToHaveTextAsync("Collection settings saved.");
@@ -202,7 +202,7 @@ public class SmokeBrowserTests : BrowserTest
         await page.GetByLabel("Search history").FillAsync("Example News");
         await Button("Search").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
-        await Button("Clear search", exact: false).ClickAsync();
+        await Button("Clear Search", exact: false).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
         await page.GetByLabel("Search history").FillAsync("FreePBX");
         await page.Locator("#results-heading").ClickAsync();
@@ -269,7 +269,7 @@ public class SmokeBrowserTests : BrowserTest
         await range.FillAsync(dateText + ", 12am - 11:59pm");
         await range.PressAsync("Enter");
         await Expect(Stories()).ToHaveCountAsync(5);
-        await Button("Clear search", exact: false).ClickAsync();
+        await Button("Clear Search", exact: false).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
 
         await page.Tab("Settings").ClickAsync();
@@ -280,7 +280,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Interests saved");
         Assert.Equal("Favor RF projects and protocol changes.", (string)Store.Settings()["interests"]!["guidance"]!);
         await Button("Sources").ClickAsync();
-        await Button("+ Add source").ClickAsync();
+        await Button("+ Add Source").ClickAsync();
         Assert.Equal(["Cancel", "Save"], await page.Locator("#source-dialog .dialog-actions button").AllTextContentsAsync());
         var categoryBox = await Box(page.Locator("#source-category"));
         Assert.True(categoryBox.Width <= 225);
@@ -298,24 +298,24 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#source-dialog")).ToBeVisibleAsync();
         await page.GetByLabel("Name", new() { Exact = true }).FillAsync("Fixture source");
         await page.GetByLabel("Website URL", new() { Exact = true }).FillAsync(fixture.Root + "/");
-        await Button("Find RSS/Atom feed", exact: false).ClickAsync();
+        await Button("Find RSS/Atom Feed", exact: false).ClickAsync();
         await Expect(page.Locator("#source-feed")).ToHaveValueAsync(new Regex("/feed$"));
         await page.Locator("#source-feed").FillAsync(fixture.Root + "/stale-feed");
-        await Button("Preview stories").ClickAsync();
+        await Button("Preview Stories").ClickAsync();
         await Expect(page.Locator("#source-preview")).ToContainTextAsync("Website fallback could not be read");
         await page.Locator("#source-url").FillAsync(fixture.Root + "/listing");
-        await Button("Preview stories").ClickAsync();
+        await Button("Preview Stories").ClickAsync();
         await Expect(page.Locator("#source-preview")).ToContainTextAsync("RSS/Atom + website");
         await page.Locator("#source-feed").FillAsync(fixture.Root + "/feed");
         await page.Locator("#source-url").FillAsync(fixture.Root);
         await Button("Save").ClickAsync();
         await Expect(page.Locator(".source-row")).ToHaveCountAsync(2);
-        await Button("+ Add source").ClickAsync();
+        await Button("+ Add Source").ClickAsync();
         await page.GetByLabel("Name", new() { Exact = true }).FillAsync("Website without RSS");
         await page.GetByLabel("Website URL", new() { Exact = true }).FillAsync(fixture.Root + "/listing");
         await Button("Collection method").ClickAsync();
         await page.GetByRole(AriaRole.Option, new() { Name = "Website page — no RSS needed", Exact = true }).ClickAsync();
-        await Button("Preview stories").ClickAsync();
+        await Button("Preview Stories").ClickAsync();
         await Expect(page.Locator("#source-preview")).ToContainTextAsync("Website page");
         await Expect(page.Locator("#source-preview a")).ToHaveCountAsync(2);
         await Button("Save").ClickAsync();
@@ -336,7 +336,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#ai-unload-row")).Not.ToBeVisibleAsync();
         await page.Locator("#ai-url").FillAsync(fixture.Root + "/v1");
         await page.Locator("#ai-model").FillAsync("openrouter-fixture");
-        await Button("Test with a sample article", exact: false).ClickAsync();
+        await Button("Test with a Sample Article", exact: false).ClickAsync();
         await Expect(page.Locator("#model-test-result")).ToContainTextAsync("validation passed");
         (string Path, JsonNode? Payload) last;
         lock (fixture.ModelRequests) last = fixture.ModelRequests[^1];
@@ -346,7 +346,7 @@ public class SmokeBrowserTests : BrowserTest
         await page.GetByRole(AriaRole.Option, new() { Name = "Ollama", Exact = true }).ClickAsync();
         await page.Locator("#ai-url").FillAsync(fixture.Root);
         await page.Locator("#ai-model").FillAsync("fixture");
-        await Button("Test with a sample article", exact: false).ClickAsync();
+        await Button("Test with a Sample Article", exact: false).ClickAsync();
         await Expect(page.Locator("#model-test-result")).ToContainTextAsync("validation passed");
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-ai-settings.png") });
         await page.Locator("#ai-form").GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
@@ -362,10 +362,10 @@ public class SmokeBrowserTests : BrowserTest
         }
         await Button("Sources").ClickAsync();
         await Expect(page.Locator("#check-new-sources")).ToBeEnabledAsync();
-        await Expect(page.Locator("#check-new-sources")).ToHaveTextAsync("Check new sources (2)");
+        await Expect(page.Locator("#check-new-sources")).ToHaveTextAsync("Check New Sources (2)");
         await page.Locator("#check-new-sources").ClickAsync();
         await Expect(page.Locator("#source-refresh-status")).ToContainTextAsync("Last collection: complete", new() { Timeout = 15000 });
-        await Expect(page.Locator("#check-new-sources")).ToHaveTextAsync("Check new sources (0)");
+        await Expect(page.Locator("#check-new-sources")).ToHaveTextAsync("Check New Sources (0)");
         await Expect(page.Locator("#check-new-sources")).ToBeDisabledAsync();
         await Expect(page.Locator(".source-state.healthy")).ToHaveCountAsync(2);
         await Expect(page.Locator(".check-source[data-enabled=false]").First).ToBeDisabledAsync();
@@ -374,7 +374,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(Button("Check Fixture source")).ToBeEnabledAsync();
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-sources.png") });
         await page.RouteAsync("**/api/jobs/start", route => route.AbortAsync("blockedbyclient"));
-        await Button("Refresh sources").ClickAsync();
+        await Button("Refresh Sources").ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Could not send POST /api/jobs/start");
         await Expect(page.Locator("#status-message")).ToContainTextAsync("ERR_BLOCKED_BY_CLIENT");
         await Expect(page.Locator("#dismiss-status")).ToBeVisibleAsync();
@@ -391,7 +391,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#status-message")).Not.ToContainTextAsync("Could not send POST");
         await page.UnrouteAsync("**/api/jobs/start");
         await page.Context.SetOfflineAsync(true);
-        await Button("Refresh sources").ClickAsync();
+        await Button("Refresh Sources").ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Cannot reach the NewsReview server");
         await Expect(page.Locator("#source-refresh-status")).ToContainTextAsync("not confirmed");
         await page.Context.SetOfflineAsync(false);
@@ -418,7 +418,7 @@ public class SmokeBrowserTests : BrowserTest
         Assert.Equal("dark", await page.Locator("html").GetAttributeAsync("data-theme"));
         await page.ScreenshotAsync(new() { Path = Screenshot("newsreview-dark.png"), FullPage = true });
         await page.Tab("Settings").ClickAsync();
-        await Button("Collection & history").ClickAsync();
+        await Button("Collection & History").ClickAsync();
         var historyCount = Store.Stories(new())["total"]!.AsLong();
         await page.MenuAsync("File", "Fresh Start...");
         await page.Locator("#reset-history").UncheckAsync();
@@ -432,13 +432,13 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator("#reset-bookmarks")).Not.ToBeCheckedAsync();
         await Expect(page.Locator("#reset-topics")).Not.ToBeCheckedAsync();
         await page.GetByLabel("Type RESET SELECTED to confirm", new() { Exact = true }).FillAsync("wrong");
-        await Button("Reset selected data").ClickAsync();
+        await Button("Reset Selected Data").ClickAsync();
         Assert.Equal(historyCount, Store.Stories(new())["total"]!.AsLong());
         var preferences = Store.Settings();
         await page.Locator("#reset-bookmarks").CheckAsync();
         lock (apiRequests) apiRequests.Clear();
         await page.GetByLabel("Type RESET SELECTED to confirm", new() { Exact = true }).FillAsync("RESET SELECTED");
-        await Button("Reset selected data").ClickAsync();
+        await Button("Reset Selected Data").ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Fresh Start:");
         lock (apiRequests) Assert.True(apiRequests.Count(r => r == "sources") == 1, "Reset fetched source settings more than once");
         Assert.Equal(0, Store.Stories(new())["total"]!.AsLong());

@@ -7,7 +7,7 @@ export function el(tag, className = '', text = '') {
 }
 let noticeTimer;
 let connectionError = '';
-let defaultStatus = 'Ready.';
+let defaultStatus = 'Loading...';
 let notice = null;
 let dataRevision = null;
 export function revisionHeaders() { return dataRevision ? { 'X-NewsReview-Revision': dataRevision } : {}; }
@@ -63,7 +63,7 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   if (path === 'overview' && response.ok) dataRevision = result.revision;
   if (!response.ok) {
     if (response.status === 401) location.replace('/login.html');
-    const error = new Error(result.error || `Request failed (${response.status})`);
+    const error = new Error(response.status === 401 ? 'Your session has expired.' : result.error || `Request failed (${response.status})`);
     error.status = response.status;
     throw error;
   }
@@ -73,7 +73,7 @@ export async function busy(button, work, progress = null) {
   const text = button.textContent;
   button.disabled = true;
   if (progress) notify(progress);
-  else button.textContent = 'Working…';
+  else button.textContent = 'Working...';
   try { return await work(); }
   catch (error) { notify(error.message, true); }
   finally { button.disabled = false; button.textContent = text; }
