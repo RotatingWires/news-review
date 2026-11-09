@@ -266,6 +266,11 @@
     </div>
     <div class="dialog-actions"><button data-close="help-dialog">OK</button></div>
   </div></dialog>
+  <dialog id="first-run-dialog"><div class="dialog-layout">
+    <div class="dialog-heading"><h2>Restore a Backup Before Starting</h2></div>
+    <div class="dialog-body first-run-body"><p>If you have a NewsReview backup ZIP, restore it before adding sources. Use File &gt; Import/Export... to restore it. Restoring a backup replaces all current data, so anything you set up first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.</p><p id="first-run-error" class="error" role="alert"></p></div>
+    <div class="dialog-actions"><button type="button" id="first-run-continue">Start Fresh</button><button type="button" id="first-run-import">Import/Export...</button></div>
+  </div></dialog>
   <dialog id="transfer-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Import/Export</h2></div>
     <div class="dialog-body transfer-body">

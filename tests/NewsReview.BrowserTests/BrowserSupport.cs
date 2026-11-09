@@ -51,6 +51,9 @@ public abstract class BrowserTest : IAsyncLifetime
                     DataObject = new { setupToken = host.Passwords.SetupToken, password = "correct horse", confirmPassword = "correct horse" },
                 });
             Assert.True(response.Ok, await response.TextAsync());
+            // Answer the first-start backup prompt, so the page goes straight to the app.
+            var acknowledged = await context.APIRequest.PostAsync(Root + "/api/onboarding/acknowledge", new() { DataObject = new { } });
+            Assert.True(acknowledged.Ok, await acknowledged.TextAsync());
         }
         return page;
     }

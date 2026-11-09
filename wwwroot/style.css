@@ -393,3 +393,8 @@ button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1
 .arrow { display: inline-block; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; vertical-align: middle; }
 .arrow-left { border-right: 6px solid currentColor; }
 .arrow-right { border-left: 6px solid currentColor; }
+
+/* The first-start backup prompt, the same box as TaskList's. */
+#first-run-dialog { width: min(460px, calc(100vw - 24px)); font-size: 16px; }
+.first-run-body { line-height: 1.5; }
+.first-run-body p { margin: 0; }

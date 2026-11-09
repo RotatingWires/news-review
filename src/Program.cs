@@ -120,6 +120,7 @@ PasswordStore passwords;
 Collector collector;
 try
 {
+    Onboarding.Initialize(DataDirectory(app.Services), Path.Combine(DataDirectory(app.Services), "newsreview.db"));
     store = app.Services.GetRequiredService<Store>();
     passwords = app.Services.GetRequiredService<PasswordStore>();
     app.Services.GetRequiredService<ModelKeys>();
@@ -348,6 +349,7 @@ app.MapPost("/api/restore", async (HttpContext context) =>
             }
         }
         var result = Transfer.RestoreArchive(store, upload);
+        Onboarding.Acknowledge(DataDirectory(app.Services));
         collector.Update(("message", "Backup restored. Reading history and preferences were reloaded."));
         return Api.Send(result);
     }
@@ -504,6 +506,13 @@ app.MapPost("/api/requeue", async (HttpRequest request) =>
     // The job lock keeps requeue and review decisions from racing.
     return Exclusive("Wait for the current collection to finish", () =>
         Api.Send(new JsonObject { ["count"] = store.Requeue(Validation.Boolean(Json.Get(data, "failed_only", true), "Failed only")) }));
+});
+// The first-start "Restore a Backup Before Starting" prompt, like TaskList's.
+app.MapGet("/api/onboarding", () => Api.Send(new JsonObject { ["import_reminder_pending"] = Onboarding.Pending(DataDirectory(app.Services)) }));
+app.MapPost("/api/onboarding/acknowledge", () =>
+{
+    Onboarding.Acknowledge(DataDirectory(app.Services));
+    return Api.Send(new JsonObject { ["ok"] = true });
 });
 app.MapFallback("/api/{**path}", () => Api.Send(Api.Error("Not found"), 404));
 // Like the other apps, any other address loads the app when signed in, or the login page with a way back.

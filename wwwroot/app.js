@@ -89,6 +89,33 @@ class App {
     if (!$('day').value) $('day').value = this.overview.today;
     await this.feed.load();
     this.poll();
+    await this.showImportReminder();
+  }
+
+  /** "Restore a Backup Before Starting" on a brand-new database, the same box as TaskList's. */
+  async showImportReminder() {
+    try {
+      if (!(await api('onboarding')).importReminderPending) return;
+    } catch { return; }
+    $('first-run-error').textContent = '';
+    const dismiss = async openImport => {
+      const buttons = [$('first-run-import'), $('first-run-continue')];
+      buttons.forEach(button => { button.disabled = true; });
+      try {
+        await api('onboarding/acknowledge', 'POST', {});
+        $('first-run-dialog').close();
+        if (openImport) $('transfer-nav').click();
+      } catch (error) {
+        $('first-run-error').textContent = error.message;
+      } finally {
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    };
+    $('first-run-import').onclick = () => dismiss(true);
+    $('first-run-continue').onclick = () => dismiss(false);
+    $('first-run-dialog').oncancel = event => { event.preventDefault(); dismiss(false); };
+    $('first-run-dialog').showModal();
+    $('first-run-import').focus();
   }
 
   async reloadDataset() {

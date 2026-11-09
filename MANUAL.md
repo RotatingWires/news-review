@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.30
+# NewsReview v1.0.31
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -432,6 +432,14 @@ The template listens on loopback. Change its `--urls` value for direct LAN acces
 
 Build once with `dotnet build` (or `dotnet publish -c Release -o C:\path\to\newsreview`), then create a task that starts `NewsReview.exe` directly with arguments such as `--urls "http://0.0.0.0:8714"`, and set **Start in** to the folder containing `wwwroot` (the checkout, or the publish folder). Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the interval schedule.
 
+## First-run backup reminder
+
+When NewsReview creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
+
+> If you have a NewsReview backup ZIP, restore it before adding sources. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you set up first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
+
+**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
+
 ## Backup, restore, and updates
 
 ### ZIP import/export in Settings
@@ -591,6 +599,10 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.31
+
+- A brand-new database shows **Restore a Backup Before Starting** after the first login, the same box as TaskList's: **Start Fresh** or **Import/Export...**. Updating an existing installation does not show it.
 
 ### v1.0.30
 
