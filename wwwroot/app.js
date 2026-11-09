@@ -228,7 +228,10 @@ class App {
   populateViewMenu() {
     const heading = el('div', 'menu-heading', 'Theme');
     heading.setAttribute('role', 'presentation');
-    $('view-menu').replaceChildren(
+    // A heading over each group, like TaskList's View menu.
+    const tabsHeading = el('div', 'menu-heading', 'Tabs');
+    tabsHeading.setAttribute('role', 'presentation');
+    $('view-menu').replaceChildren(tabsHeading,
       ...[...document.querySelectorAll('.tabs [role="tab"]')].map(tab =>
         menuItem(tab.textContent, { role: 'menuitemradio', checked: tab.dataset.tab === this.view, onClick: () => this.show(tab.dataset.tab) })),
       menuSeparator(), heading,
