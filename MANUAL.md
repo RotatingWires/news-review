@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.43
+# NewsReview v1.0.44
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -625,7 +625,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.0.43**.
+Current release: **v1.0.44**.
+
+### v1.0.44
+
+- The edition day is typed as m/d/yy, like the date ranges in every app, instead of using the browser's date picker; the arrows and Today still move it, and a day that isn't real goes back to the last one shown.
 
 ### v1.0.43
 

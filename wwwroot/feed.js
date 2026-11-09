@@ -1,4 +1,8 @@
-import { $, api, el, externalLink, formatTime, notify, busy } from './shared.js';
+import { $, api, el, externalLink, formatTime, notify, busy, parseTypedDate, typedDate } from './shared.js';
+
+/** The day box holds m/d/yyyy; the code and the server use yyyy-mm-dd. */
+const dayValue = () => parseTypedDate($('day').value);
+const setDay = iso => { $('day').value = typedDate(iso); };
 
 const RELEVANCE = [
   { name: 'high', minimum: 75, label: 'Highly relevant', range: '75–100' },
@@ -46,7 +50,14 @@ export class Feed {
     };
     $('feedbackRemove').onclick = () => this.saveFeedback(0, $('feedbackRemove'));
     $('search').onsubmit = event => { event.preventDefault(); this.reload(); };
-    ['query', 'day', 'period', 'showHidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    ['query', 'period', 'showHidden'].forEach(id => { $(id).onchange = () => this.reload(); });
+    // The day is typed like every app's dates; a day that isn't real says so and goes back to the last one shown.
+    $('day').onchange = () => {
+      const typed = parseTypedDate($('day').value);
+      if (!typed) { notify('Type a day as m/d/yy, for example 11/8/26.', true); setDay(this.shownDay || this.app.overview.today); return; }
+      setDay(typed);
+      this.reload();
+    };
     document.querySelectorAll('input[name="relevance"]').forEach(input => { input.onchange = () => this.reload(); });
     document.querySelectorAll('#topicMenu .filter-option').forEach(row => checkboxRow(row, row.querySelector('input')));
     $('topicButton').onclick = () => this.closeTopics(!$('topicMenu').hidden);
@@ -70,7 +81,7 @@ export class Feed {
     document.addEventListener('focusin', event => { if (!event.target.closest('.topic-filter')) this.closeTopics(true); });
     $('previousDay').onclick = () => this.moveDay(-1);
     $('nextDay').onclick = () => this.moveDay(1);
-    $('today').onclick = () => { this.clearFilters(); $('day').value = app.overview.today; this.reload(); };
+    $('today').onclick = () => { this.clearFilters(); setDay(app.overview.today); this.reload(); };
     $('clearSearch').onclick = () => { this.clearFilters(); this.reload(); };
     $('pagePrev').onclick = () => { this.page--; this.loadSafe(); };
     $('pageNext').onclick = () => { this.page++; this.loadSafe(); };
@@ -151,9 +162,9 @@ export class Feed {
   }
 
   moveDay(offset) {
-    const value = new Date(($('day').value || this.app.overview.today) + 'T12:00:00Z');
+    const value = new Date((dayValue() || this.app.overview.today) + 'T12:00:00Z');
     value.setUTCDate(value.getUTCDate() + offset);
-    $('day').value = value.toISOString().slice(0, 10);
+    setDay(value.toISOString().slice(0, 10));
     this.clearFilters();
     this.reload();
   }
@@ -165,18 +176,19 @@ export class Feed {
 
   async load() {
     const requestId = ++this.requestId;
-    if (!$('day').value) $('day').value = this.app.overview.today;
+    if (!dayValue()) setDay(this.app.overview.today);
+    this.shownDay = dayValue();
     const query = $('query').value.trim(), period = $('period').value.trim();
     const history = period.includes('/');
     const searching = Boolean(query || period);
     ['day', 'previousDay', 'nextDay'].forEach(id => { $(id).disabled = history; });
-    $('day').title = history ? 'The date range controls which days are searched. Clear it to use this picker.' : 'Publication day';
+    $('day').title = history ? 'The date range controls which days are searched. Clear it to type a day here.' : 'Publication day, typed as m/d/yy';
     const bookmarked = this.app.view === 'bookmarks';
     const params = new URLSearchParams({ page: this.page, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('storySort').value });
     if (query) params.set('query', query);
     if (period) params.set('period', period);
     this.selectedTopics.forEach(topic => params.append('tag', topic));
-    if (!bookmarked) params.set('day', $('day').value);
+    if (!bookmarked) params.set('day', dayValue());
     const excludedRelevance = [...document.querySelectorAll('input[name="relevance"]')].filter(input => !input.checked).map(input => input.value);
     excludedRelevance.forEach(value => params.append('excludeRelevance', value));
     if (bookmarked) params.set('bookmarks', '1');
@@ -202,8 +214,8 @@ export class Feed {
   }
 
   editionTitle() {
-    if ($('day').value === this.app.overview.today) return "Today's Edition";
-    const value = new Date($('day').value + 'T12:00:00Z');
+    if (dayValue() === this.app.overview.today) return "Today's Edition";
+    const value = new Date(dayValue() + 'T12:00:00Z');
     return Number.isNaN(value.getTime()) ? 'Daily Edition' : value.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   }
 

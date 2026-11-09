@@ -122,3 +122,21 @@ export function menuSeparator() {
   separator.setAttribute('role', 'separator');
   return separator;
 }
+
+/** Dates are typed as m/d/yy or m/d/yyyy (or yyyy-mm-dd), like the date ranges in every app; returns yyyy-mm-dd, or '' when it is not a real date. */
+export function parseTypedDate(text) {
+  const iso = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/.exec(text);
+  const typed = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\s*$/.exec(text);
+  if (!iso && !typed) return '';
+  const year = iso ? Number(iso[1]) : typed[3] ? Number(typed[3]) + (typed[3].length === 2 ? 2000 : 0) : new Date().getFullYear();
+  const month = Number(iso ? iso[2] : typed[1]), day = Number(iso ? iso[3] : typed[2]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** yyyy-mm-dd as it is typed: m/d/yyyy. */
+export function typedDate(iso) {
+  const [year, month, day] = (iso || '').split('-').map(Number);
+  return year ? `${month}/${day}/${year}` : '';
+}
