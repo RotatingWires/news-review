@@ -23,7 +23,6 @@ class App {
     this.settings = new Settings(this);
     this.transfer = new Transfer(this);
     this.pollTimer = null;
-    this.resumeTimer = null;
     this.syncInFlight = false;
     this.unconfirmedRefresh = null;
     this.connectionError = false;
@@ -37,15 +36,9 @@ class App {
       setConnectionStatus(event.detail.error);
       if (this.connectionError || wasDisconnected) this.poll();
     });
-    const resume = () => {
-      clearTimeout(this.resumeTimer);
-      if (document.hidden) { clearTimeout(this.pollTimer); return; }
-      if (!this.overview && !this.connectionError) return;
-      this.resumeTimer = setTimeout(() => this.syncView(true), 100);
-    };
-    document.addEventListener('visibilitychange', resume);
-    window.addEventListener('focus', resume);
-    window.addEventListener('online', () => { if (this.connectionError) resume(); });
+    // Like the other apps, coming back to the tab does not reload; File > Refresh or a page reload does.
+    // Hidden tabs pause job-progress and reconnect checks; showing the tab again only resumes those.
+    document.addEventListener('visibilitychange', () => this.poll());
     document.querySelectorAll('[data-close]').forEach(button => { button.onclick = () => $(button.dataset.close).close(); });
     // File / View / Help like the other apps; Daily Feed, Bookmarks, and Settings are tabs below the toolbar.
     $('file-menu-button').onclick = event => { event.stopPropagation(); toggleMenu($('file-menu-button'), $('file-menu')); };
@@ -69,7 +62,6 @@ class App {
         await api('auth/logout', 'POST', {});
         this.authenticated = false;
         clearTimeout(this.pollTimer);
-        clearTimeout(this.resumeTimer);
         $('stories').replaceChildren();
         $('settings').hidden = true;
         $('reader').hidden = false;

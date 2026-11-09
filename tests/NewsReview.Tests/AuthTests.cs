@@ -30,7 +30,7 @@ public class AuthTests : IDisposable
         var saved = File.ReadAllText(AuthPath);
         Assert.DoesNotContain("password123", saved);
         Assert.DoesNotContain(token, saved);
-        Assert.Equal(600000, JsonNode.Parse(saved)!["iterations"]!.AsLong());
+        Assert.Equal(600000, JsonNode.Parse(saved)!["Iterations"]!.AsLong());
         if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(AuthPath));
         var loaded = new PasswordStore(AuthPath);
         Assert.True(loaded.Verify("password123", out var upgraded));
@@ -56,7 +56,7 @@ public class AuthTests : IDisposable
         Assert.True(auth.Verify("legacy password", out var upgraded));
         Assert.True(upgraded);
         var after = File.ReadAllText(AuthPath);
-        Assert.Equal(600000, JsonNode.Parse(after)!["iterations"]!.AsLong());
+        Assert.Equal(600000, JsonNode.Parse(after)!["Iterations"]!.AsLong());
         Assert.True(auth.Verify("legacy password", out upgraded));
         Assert.False(upgraded);
         Assert.Equal(after, File.ReadAllText(AuthPath));
@@ -73,8 +73,11 @@ public class AuthTests : IDisposable
     [InlineData("{\"version\": 999}")]
     public void MalformedCredentialsFailClosed(string contents)
     {
+        // Like the other apps: an unreadable auth.json signs nobody in and is left for the owner to fix.
         File.WriteAllText(AuthPath, contents);
-        Assert.Throws<InvalidOperationException>(() => new PasswordStore(AuthPath));
+        var auth = new PasswordStore(AuthPath);
+        Assert.True(auth.Configured);
+        Assert.False(auth.Verify("any password", out _));
         Assert.Equal(contents, File.ReadAllText(AuthPath));
     }
 

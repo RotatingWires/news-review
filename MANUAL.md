@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.34
+# NewsReview v1.0.35
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -164,11 +164,11 @@ The owned topic list is stored in SQLite and included in ZIP backups. Restoring 
 
 ### When the browser refreshes
 
-NewsReview does **not** poll `/api/overview` while idle. Opening the app or changing the main view reads current state. Returning focus to the window or bringing a hidden tab back refreshes the overview and visible feed; paired focus/visibility events are combined into one refresh. Unsaved interest/model/collection forms are preserved unless a reset or restored dataset requires a reload.
+NewsReview does **not** poll `/api/overview` while idle. Opening the app, changing the main view, or **File > Refresh** reads current state. Like TaskList, TaskList Stats, and SpendTracker, returning to the window or tab does not reload. Unsaved interest/model/collection forms are preserved unless a reset or restored dataset requires a reload.
 
-While a visible tab knows a collection/review job is running, it checks progress every **2.5 seconds** and reloads the relevant content when the job finishes. Connection failures retry read requests every **5 seconds** until recovery. Hidden tabs pause these checks; a read already in flight may finish. Checks also pause during ZIP transfer and resume afterward if needed. Idle checks stop again once the job or connection recovery finishes.
+While a visible tab knows a collection/review job is running, it checks progress every **2.5 seconds** and reloads the relevant content when the job finishes. Connection failures retry read requests every **5 seconds** until recovery. Hidden tabs pause these checks and resume them when shown again; a read already in flight may finish. Checks also pause during ZIP transfer and resume afterward if needed. Idle checks stop again once the job or connection recovery finishes.
 
-The interval scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you return to the tab, change the main view, or reload the page. Other-tab bookmark/source changes are picked up on return; there is no continuous background synchronization.
+The interval scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you choose File > Refresh, change the main view, or reload the page. Other-tab bookmark/source changes are picked up the same way; there is no continuous background synchronization.
 
 ## Mobile home-screen installation
 
@@ -388,7 +388,7 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 | `--version` | Print the version and exit |
 | `backup --output FILE [--database FILE]` | Consistent SQLite backup; see [Offline SQLite backup](#offline-sqlite-backup-and-restore) |
 
-`.env.example` documents the variables. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
+`appsettings.json` holds the default listen address (`Urls`) and log level, the same keys in every app; the variables above and `--urls` override it. The app does **not** automatically load `.env` files. Use your shell, service manager, or a private environment file outside the repository. Secrets are not written to SQLite or returned by the settings API.
 
 The JSON API uses camelCase names, like TaskList, TaskList Stats, and SpendTracker (for example `feedUrl` and `uncheckedOnly`); older snake_case names in requests are still accepted.
 
@@ -402,7 +402,7 @@ dotnet run --urls "http://0.0.0.0:8714"
 
 On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
 
-The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. A hash saved with fewer iterations still verifies and is re-hashed once, on the next successful login, by writing a temporary file and renaming it. Credential creation uses an exclusive file write and does not require hard-link support, including on Windows drives. Malformed or interrupted credential files stop startup rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
+The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. A hash saved with fewer iterations still verifies and is re-hashed once, on the next successful login, by writing a temporary file and renaming it. The password code is the same file (`src/PasswordAuth.cs`) in all four apps; files saved by earlier NewsReview releases still verify. A malformed or interrupted `auth.json` signs nobody in rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
@@ -547,8 +547,9 @@ GitHub Actions builds the app and runs `tests/NewsReview.Tests` on every push. A
 NewsReview.csproj         project file and authoritative version
 src/
   Program.cs              startup, options, authentication, security headers, and API routes
+  PasswordAuth.cs         setup token, password file, and sign-in cookie (the same file in all four apps)
   Hosting/
-    Auth.cs               persistent password hashes and first-run setup tokens
+    Auth.cs               keeps the auth.json path and this run's setup token for the endpoints
     SingleFileLogger.cs   single-file logging with in-place 10 MiB truncation (shared with TaskList)
   Storage/
     Store.cs              SQLite schema, queries, queue and settings persistence
@@ -588,6 +589,7 @@ tests/
   NewsReview.Tests/       unit and integration tests
   NewsReview.BrowserTests/ optional Playwright browser checks
 deploy/                   example systemd unit
+appsettings.json          listen address and log level
 ```
 
 ## Maintenance and cleanup
@@ -599,6 +601,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.35
+
+- Sign-in uses `src/PasswordAuth.cs`, the same file as the other apps. Existing passwords keep working and are re-saved in the shared format on the next re-hash; a malformed `auth.json` now signs nobody in instead of stopping startup.
+- New `appsettings.json` with the listen address and log level like the other apps; `.env.example` is removed (the variables are listed in this manual).
+- Like the other apps, switching back to the tab or window no longer reloads; use **File > Refresh**. Job-progress and reconnect checks still resume when a hidden tab is shown.
 
 ### v1.0.34
 

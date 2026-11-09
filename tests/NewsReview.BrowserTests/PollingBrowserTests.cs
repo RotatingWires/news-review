@@ -6,7 +6,7 @@ namespace NewsReview.BrowserTests;
 public class PollingBrowserTests : BrowserTest
 {
     [Fact]
-    public async Task IdleSilenceFocusRefreshProgressUnsavedSettingsAndRecovery()
+    public async Task IdleSilenceRefreshProgressUnsavedSettingsAndRecovery()
     {
         var page = await NewPage();
         await page.Clock.InstallAsync();
@@ -31,7 +31,11 @@ public class PollingBrowserTests : BrowserTest
         collector.Update(("running", true), ("message", "Fixture job started"));
         await Advance(35000);
         Assert.True(Count() == count, "Idle tab kept polling for external jobs");
-        await page.EvaluateAsync("window.dispatchEvent(new Event('focus'))");
+        // Like the other apps, coming back to the tab does not reload; File > Refresh does.
+        await page.EvaluateAsync("window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange'))");
+        await Advance(150);
+        Assert.True(Count() == count, "Returning to the tab reloaded");
+        await page.MenuAsync("File", "Refresh");
         await Advance(150);
         await Expect(page.Locator("footer")).ToHaveAttributeAsync("aria-busy", "true");
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Fixture job started");
@@ -51,13 +55,13 @@ public class PollingBrowserTests : BrowserTest
         await page.Tab("Settings").ClickAsync();
         await page.Locator("#guidance").FillAsync("Unsaved editorial guidance");
         collector.Update(("message", "Changed elsewhere"));
-        await page.EvaluateAsync("window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange'))");
+        await page.MenuAsync("File", "Refresh");
         await Advance(150);
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Changed elsewhere");
         await Expect(page.Locator("#guidance")).ToHaveValueAsync("Unsaved editorial guidance");
 
         await page.Context.SetOfflineAsync(true);
-        await page.EvaluateAsync("window.dispatchEvent(new Event('focus'))");
+        await page.MenuAsync("File", "Refresh");
         await Advance(150);
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Cannot reach");
         count = Count();

@@ -235,15 +235,15 @@ app.MapPost("/api/auth/setup", async (HttpContext context) =>
     try { passwords.Setup(Api.OptionalString(data, "setup_token"), Api.OptionalString(data, "password"), Api.OptionalString(data, "confirm_password")); }
     catch (SetupConflictException error) { return Api.Send(Api.Error(error.Message), 409); }
     catch (SetupTokenException error) { return Api.Send(Api.Error(error.Message), 401); }
-    await Api.SignIn(context);
+    await PasswordAuth.SignInOwner(context);
     return Api.Send(new JsonObject { ["ok"] = true });
 }).RequireRateLimiting("auth");
 app.MapPost("/api/auth/login", async (HttpContext context) =>
 {
     var data = await Api.Body(context.Request);
     if (!passwords.Verify(Api.OptionalString(data, "password") ?? "", out var upgraded)) return Results.Unauthorized(); // The login page words it, like the other apps.
-    if (upgraded) app.Logger.LogInformation("Upgraded the saved password hash to {Iterations} PBKDF2 iterations.", PasswordStore.Iterations);
-    await Api.SignIn(context);
+    if (upgraded) app.Logger.LogInformation("Upgraded the saved password hash to {Iterations} PBKDF2 iterations.", PasswordAuth.Iterations);
+    await PasswordAuth.SignInOwner(context);
     return Api.Send(new JsonObject { ["ok"] = true });
 }).RequireRateLimiting("auth");
 app.MapPost("/api/auth/logout", async (HttpContext context) =>
@@ -612,12 +612,4 @@ static class Api
     {
         ["headline"] = entry.Headline, ["url"] = entry.Url, ["excerpt"] = entry.Excerpt, ["published_at"] = entry.PublishedAt,
     }).ToArray());
-
-    public static async Task SignIn(HttpContext context)
-    {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "owner"), new Claim(ClaimTypes.Name, "Owner")],
-            CookieAuthenticationDefaults.AuthenticationScheme);
-        await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = true, AllowRefresh = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30) });
-    }
 }
