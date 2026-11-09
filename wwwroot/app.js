@@ -20,6 +20,26 @@ document.addEventListener('click', event => {
   if (button && !button.disabled) document.getElementById(button.dataset.close)?.close(button.value || 'cancel');
 });
 
+// Touch screens have no hover, so tapping an underlined label shows its definition, like the other apps.
+const helpTooltip = Object.assign(document.createElement('div'), { className: 'help-tooltip', hidden: true });
+document.body.append(helpTooltip);
+let helpShownFor = null;
+document.addEventListener('click', event => {
+  const target = event.target.closest?.('.has-tooltip[title]');
+  if (!target) {
+    // Tapping label text also clicks the label's own field; that second click keeps the definition showing.
+    if (!helpTooltip.hidden && helpShownFor && event.target.closest?.('label')?.contains(helpShownFor)) return;
+    helpTooltip.hidden = true;
+    return;
+  }
+  helpShownFor = target;
+  helpTooltip.textContent = target.getAttribute('title');
+  helpTooltip.hidden = false;
+  const rect = target.getBoundingClientRect();
+  helpTooltip.style.left = `${Math.max(8, Math.min(window.innerWidth - helpTooltip.offsetWidth - 8, rect.left))}px`;
+  helpTooltip.style.top = `${rect.bottom + 8 + helpTooltip.offsetHeight > window.innerHeight ? rect.top - helpTooltip.offsetHeight - 8 : rect.bottom + 8}px`;
+}, true);
+
 class App {
   constructor() {
     this.overview = null;

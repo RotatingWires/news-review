@@ -104,7 +104,7 @@
         <form id="interests-form">
           <div id="interest-rows" class="interest-rows"></div><button id="add-interest" type="button">+ Add Interest</button>
           <label>Editorial guidance<textarea id="guidance" rows="5" maxlength="6000"></textarea></label>
-          <label>Exclude <span class="muted">One topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
+          <label><span class="has-tooltip" title="Topics you never want to see. The review filters out stories that are mainly about them.">Exclude</span> <span class="muted">One topic per line</span><textarea id="exclusions" rows="3"></textarea></label>
           <button class="primary" type="submit">Save</button>
         </form>
         <div class="maintenance"><h3>Learned Preferences</h3>
@@ -138,12 +138,12 @@
       <section id="panel-ai" class="settings-panel" hidden>
         <h2>Model Connection</h2><p class="muted">Choose a local model server or OpenRouter. Article text goes to the server you configure.</p>
         <form id="ai-form" class="form-grid">
-          <label>Server type<select id="ai-provider"><option value="ollama">Ollama</option><option value="compatible">Compatible chat server (e.g. LM Studio)</option><option value="openrouter">OpenRouter</option></select></label>
-          <label>Server base URL<input id="ai-url" type="url" required></label>
-          <label>Model name<input id="ai-model" placeholder="Exact model name or provider model ID" maxlength="200"></label>
-          <label>Request timeout (seconds)<input id="ai-timeout" type="number" min="10" max="600" required></label>
-          <label>Maximum article characters<input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
-          <label>Maximum response tokens<input id="ai-output" type="number" min="256" max="8192" required></label>
+          <label><span class="has-tooltip" title="Which kind of model server reviews articles: Ollama, a compatible chat server such as LM Studio, or OpenRouter.">Server type</span><select id="ai-provider"><option value="ollama">Ollama</option><option value="compatible">Compatible chat server (e.g. LM Studio)</option><option value="openrouter">OpenRouter</option></select></label>
+          <label><span class="has-tooltip" title="The model server&#x27;s address, such as http://localhost:11434 for Ollama.">Server base URL</span><input id="ai-url" type="url" required></label>
+          <label><span class="has-tooltip" title="The exact model name the server lists, or the provider&#x27;s model ID.">Model name</span><input id="ai-model" placeholder="Exact model name or provider model ID" maxlength="200"></label>
+          <label><span class="has-tooltip" title="How long to wait for the model to answer one article before that review counts as failed.">Request timeout (seconds)</span><input id="ai-timeout" type="number" min="10" max="600" required></label>
+          <label><span class="has-tooltip" title="How much of each article&#x27;s text is sent to the model. Longer articles are cut off here; lower it to send less. Default 12,000.">Maximum article characters</span><input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
+          <label><span class="has-tooltip" title="The longest answer the model may write for one article. Raise it if reviews are reported as truncated. Default 2400.">Maximum response tokens</span><input id="ai-output" type="number" min="256" max="8192" required></label>
           <label id="ai-unload-row" class="checkbox full"><input id="ai-unload" type="checkbox" checked> Unload Ollama model after a test or review batch</label>
           <p id="ai-help" class="callout full"></p>
           <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a Sample Article</button></div>
@@ -165,10 +165,10 @@
         <h2>Automatic Collection</h2><p class="muted" id="schedule-timezone"></p>
         <form id="collection-form" class="form-grid">
           <label class="checkbox full"><input type="checkbox" id="schedule-enabled"> Enable automatic collection</label>
-          <label>Collect every (hours)<input id="schedule-interval" type="number" min="1" max="8760" step="1" required></label>
-          <label>Newest articles per source<input id="items-per-source" type="number" min="1" max="50" required></label>
-          <label>Maximum AI reviews per run<input id="max-reviews" type="number" min="1" max="500" required></label>
-          <label>Collect articles from the last (days)<input id="lookback" type="number" min="1" max="30" required></label>
+          <label><span class="has-tooltip" title="How often NewsReview checks your sources by itself, counted from when the last full collection started.">Collect every (hours)</span><input id="schedule-interval" type="number" min="1" max="8760" step="1" required></label>
+          <label><span class="has-tooltip" title="How many of each source&#x27;s newest articles one check looks at.">Newest articles per source</span><input id="items-per-source" type="number" min="1" max="50" required></label>
+          <label><span class="has-tooltip" title="How many stories are reviewed after each check. The rest stay queued for the next run or Review Pending. Default 40.">Maximum AI reviews per run</span><input id="max-reviews" type="number" min="1" max="500" required></label>
+          <label><span class="has-tooltip" title="Articles published longer ago than this are skipped when collecting.">Collect articles from the last (days)</span><input id="lookback" type="number" min="1" max="30" required></label>
           <div class="full"><button class="primary" type="submit">Save</button></div>
         </form>
         <div class="maintenance"><h3>Review Queue</h3><p class="muted">Failed reviews retry up to three times. Reset them after fixing your model connection. Reassessing history keeps stories, dates, and bookmarks, and queues new summaries.</p><div class="button-row"><button type="button" id="retry-failed">Reset Failed Reviews</button><button type="button" id="reassess">Reassess History...</button></div></div>
@@ -188,15 +188,15 @@
       <input type="hidden" id="source-id">
       <label>Name<input id="source-name" maxlength="100" required></label>
       <label>Website URL<input id="source-url" type="url" required></label>
-      <label>Collection method<select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — website fallback for stale or failed feeds</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
+      <label><span class="has-tooltip" title="How stories are found: Automatic reads the RSS/Atom feed and falls back to the website page when the feed is stale or fails; the other two use only one.">Collection method</span><select id="source-mode" aria-label="Collection method"><option value="auto">Automatic — website fallback for stale or failed feeds</option><option value="feed">RSS/Atom feed only</option><option value="page">Website page — no RSS needed</option></select></label>
       <p class="muted">Automatic also checks the website when the feed is empty or its newest story is older than the warning interval. Website extraction must find readable article links; a blocked or JavaScript-only listing may still need an adapter. RSS/Atom-only mode never checks the website for stale content.</p>
       <div class="button-row"><button id="discover-feed" type="button">Find RSS/Atom Feed</button><button id="preview-source" type="button">Preview Stories</button></div>
-      <label>Feed URL <span class="muted">Optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
-      <label>Article URL contains <span class="muted">Optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
+      <label><span class="has-tooltip" title="The source&#x27;s RSS or Atom feed. Find RSS/Atom Feed fills it in from the website URL.">Feed URL</span> <span class="muted">Optional in Automatic mode; ignored in Website page mode</span><input id="source-feed" type="url"></label>
+      <label><span class="has-tooltip" title="On the website page, only links containing this text count as articles.">Article URL contains</span> <span class="muted">Optional website filter, such as /news/ or /threads/</span><input id="source-pattern" maxlength="200"></label>
       <p class="muted">Use a page listing articles or forum threads. Preview before saving. JavaScript-only or restricted pages may need a custom adapter.</p>
       <output id="source-preview" class="callout" hidden></output>
-      <label>Warn after this many days without activity<input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
-      <label class="source-category-label">Default category<input id="source-category" maxlength="60" required list="source-categories"></label>
+      <label><span class="has-tooltip" title="The source is flagged when it has gone this long without a check, a recent publication, or a new story. Raise it for publishers that post rarely.">Warn after this many days without activity</span><input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
+      <label class="source-category-label"><span class="has-tooltip" title="The topic given to this source&#x27;s stories before the AI review assigns its own.">Default category</span><input id="source-category" maxlength="60" required list="source-categories"></label>
       <datalist id="source-categories"></datalist>
       <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
       <p id="source-error" class="error" role="alert"></p>
