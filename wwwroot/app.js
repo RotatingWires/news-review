@@ -14,6 +14,12 @@ async function releaseVersion(fallback) {
   return fallback;
 }
 
+// Buttons marked data-close="dialogId" close that dialog; the same code in every app.
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-close]');
+  if (button && !button.disabled) document.getElementById(button.dataset.close)?.close(button.value || 'cancel');
+});
+
 class App {
   constructor() {
     this.overview = null;
@@ -39,7 +45,6 @@ class App {
     // Like the other apps, coming back to the tab does not reload; File > Refresh or a page reload does.
     // Hidden tabs pause job-progress and reconnect checks; showing the tab again only resumes those.
     document.addEventListener('visibilitychange', () => this.poll());
-    document.querySelectorAll('[data-close]').forEach(button => { button.onclick = () => $(button.dataset.close).close(); });
     // File / View / Help like the other apps; Daily Feed, Bookmarks, and Settings are tabs below the toolbar.
     $('file-menu-button').onclick = event => { event.stopPropagation(); toggleMenu($('file-menu-button'), $('file-menu')); };
     $('view-menu-button').onclick = event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('view-menu-button'), $('view-menu')); };

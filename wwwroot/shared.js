@@ -1,6 +1,7 @@
 export const $ = id => document.getElementById(id);
 export function el(tag, className = '', text = '') {
   const node = document.createElement(tag);
+  if (tag === 'button') node.type = 'button'; // Every button is typed, like the other apps.
   if (className) node.className = className;
   if (text) node.textContent = text;
   return node;
