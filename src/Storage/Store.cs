@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 
@@ -25,18 +26,25 @@ sealed class Db : IDisposable
         Transaction = null;
     }
 
+    public void Rollback()
+    {
+        Transaction?.Dispose();
+        Transaction = null;
+    }
+
     public void Dispose()
     {
         Transaction?.Dispose();
         Connection.Dispose();
     }
 
-    public SqliteCommand Command(string sql, IReadOnlyList<object?> args)
+    /// <summary>Named parameters ($id, $name), written the same way as in TaskList, TaskList Stats, and SpendTracker.</summary>
+    public SqliteCommand Command(string sql, IEnumerable<(string Name, object? Value)> args)
     {
         var command = Connection.CreateCommand();
         command.Transaction = Transaction;
-        command.CommandText = Positional(sql, args.Count);
-        for (var i = 0; i < args.Count; i++) command.Parameters.AddWithValue("$p" + (i + 1), Value(args[i]));
+        command.CommandText = sql;
+        foreach (var (name, value) in args) command.Parameters.AddWithValue(name, Value(value));
         return command;
     }
 
@@ -48,40 +56,22 @@ sealed class Db : IDisposable
         _ => value,
     };
 
-    /// <summary>Rewrite ? placeholders (outside string literals) as $p1, $p2, ...</summary>
-    static string Positional(string sql, int count)
-    {
-        if (count == 0) return sql;
-        var builder = new StringBuilder(sql.Length + count * 3);
-        var number = 0;
-        char? quote = null;
-        foreach (var c in sql)
-        {
-            if (quote is not null) { if (c == quote) quote = null; builder.Append(c); }
-            else if (c is '\'' or '"') { quote = c; builder.Append(c); }
-            else if (c == '?') builder.Append("$p").Append(++number);
-            else builder.Append(c);
-        }
-        if (number != count) throw new InvalidOperationException($"SQL has {number} parameters but {count} values were supplied");
-        return builder.ToString();
-    }
-
-    public int Execute(string sql, params object?[] args)
+    public int Execute(string sql, params (string Name, object? Value)[] args)
     {
         using var command = Command(sql, args);
         return command.ExecuteNonQuery();
     }
 
-    public object? Scalar(string sql, params object?[] args)
+    public object? Scalar(string sql, params (string Name, object? Value)[] args)
     {
         using var command = Command(sql, args);
         var value = command.ExecuteScalar();
         return value is DBNull ? null : value;
     }
 
-    public long Long(string sql, params object?[] args) => Convert.ToInt64(Scalar(sql, args), CultureInfo.InvariantCulture);
+    public long Long(string sql, params (string Name, object? Value)[] args) => Convert.ToInt64(Scalar(sql, args), CultureInfo.InvariantCulture);
 
-    public List<JsonObject> Rows(string sql, params object?[] args)
+    public List<JsonObject> Rows(string sql, params (string Name, object? Value)[] args)
     {
         using var command = Command(sql, args);
         using var reader = command.ExecuteReader();
@@ -102,9 +92,9 @@ sealed class Db : IDisposable
         return rows;
     }
 
-    public JsonObject? Row(string sql, params object?[] args) => Rows(sql, args).FirstOrDefault();
+    public JsonObject? Row(string sql, params (string Name, object? Value)[] args) => Rows(sql, args).FirstOrDefault();
 
-    public string Setting(string key) => (string)Scalar("SELECT value FROM settings WHERE key=?", key)!;
+    public string Setting(string key) => (string)Scalar("SELECT value FROM settings WHERE key=$key", ("$key", key))!;
 
     public JsonNode? SettingJson(string key) => Json.Load(Setting(key));
 }
@@ -199,9 +189,10 @@ sealed class Store
             ("consecutive_failures", "INTEGER NOT NULL DEFAULT 0"), ("collection_note", "TEXT NOT NULL DEFAULT ''"),
         })
             if (!sourceColumns.Contains(name)) db.Execute($"ALTER TABLE sources ADD COLUMN {name} {definition}");
+        AddRules(db);
         db.Begin();
-        foreach (var (key, value) in Defaults.Settings()) db.Execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", key, value);
-        db.Execute("INSERT OR IGNORE INTO settings VALUES ('data_revision',?)", Json.Dump(NewRevision()));
+        foreach (var (key, value) in Defaults.Settings()) db.Execute("INSERT OR IGNORE INTO settings VALUES ($key, $value)", ("$key", key), ("$value", value));
+        db.Execute("INSERT OR IGNORE INTO settings VALUES ('data_revision',$revision)", ("$revision", Json.Dump(NewRevision())));
         InitializeTopics(db);
         if (version < 2)
             db.Execute("""
@@ -209,10 +200,64 @@ sealed class Store
                     last_success=CASE WHEN last_error IS NULL THEN last_checked ELSE NULL END,
                     consecutive_failures=CASE WHEN last_error IS NULL THEN 0 ELSE 1 END
                 """);
-        db.Execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", PyText.UtcNow());
+        db.Execute("UPDATE runs SET status='interrupted',finished_at=$now WHERE status='running'", ("$now", PyText.UtcNow()));
         db.Commit();
         db.Execute($"PRAGMA user_version={SchemaVersion}");
         initialized = true;
+    }
+
+    /// <summary>CHECK rules like TaskList's and SpendTracker's, matching what backup validation already requires.</summary>
+    static readonly (string Table, string[] Rules)[] TableRules =
+    [
+        ("sources", ["enabled IN (0, 1)", "removed IN (0, 1)", "mode IN ('auto', 'feed', 'page')", "stale_days BETWEEN 1 AND 365", "consecutive_failures >= 0"]),
+        ("stories", ["status IN ('pending', 'reviewed', 'filtered', 'duplicate')", "bookmarked IN (0, 1)", "score BETWEEN 0 AND 100", "attempts >= 0"]),
+        ("runs", ["kind IN ('collect', 'review')", "status IN ('running', 'complete', 'partial', 'failed', 'interrupted')"]),
+    ];
+
+    /// <summary>Set when a table kept no CHECK rules because existing rows break them; the server logs it.</summary>
+    public string? RulesWarning { get; private set; }
+
+    /// <summary>
+    /// SQLite adds CHECK rules only by rebuilding a table, so a table without them is rebuilt once from its own stored
+    /// CREATE statement with the rules appended. Its column layout, which backup restores compare, stays the same.
+    /// </summary>
+    void AddRules(Db db)
+    {
+        var pending = new List<(string Table, string Sql, string[] Rules)>();
+        foreach (var (table, rules) in TableRules)
+        {
+            var sql = (string)db.Scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name=$name", ("$name", table))!;
+            if (sql.Contains("CHECK(", StringComparison.Ordinal)) continue;
+            var broken = db.Long($"SELECT COUNT(*) FROM {table} WHERE NOT ({string.Join(" AND ", rules)})");
+            if (broken > 0) RulesWarning = $"{RulesWarning}{broken} {table} row(s) break the new CHECK rules, so {table} keeps none for now. ";
+            else pending.Add((table, sql, rules));
+        }
+        if (pending.Count == 0) return;
+        db.Execute("PRAGMA foreign_keys=OFF");
+        try
+        {
+            db.Begin();
+            foreach (var (table, sql, rules) in pending)
+            {
+                var indexes = db.Rows("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=$name AND sql IS NOT NULL", ("$name", table))
+                    .Select(row => (string)row["sql"]!).ToList();
+                var close = sql.LastIndexOf(')');
+                var created = Regex.Replace(sql[..close], @"^CREATE TABLE\s+(IF NOT EXISTS\s+)?""?\w+""?", $"CREATE TABLE {table}_rules")
+                    + ",\n    " + string.Join(", ", rules.Select(rule => $"CHECK({rule})")) + sql[close..];
+                db.Execute(created);
+                db.Execute($"INSERT INTO {table}_rules SELECT * FROM {table}");
+                db.Execute($"DROP TABLE {table}");
+                db.Execute($"ALTER TABLE {table}_rules RENAME TO {table}");
+                foreach (var index in indexes) db.Execute(index);
+            }
+            if (db.Rows("PRAGMA foreign_key_check").Count > 0) throw new InvalidOperationException("Adding CHECK rules would break relationships");
+            db.Commit();
+        }
+        finally
+        {
+            db.Rollback();
+            db.Execute("PRAGMA foreign_keys=ON");
+        }
     }
 
     static HashSet<string> Columns(Db db, string table) =>
@@ -225,7 +270,7 @@ sealed class Store
     public static void BackfillStoryTimes(Db db)
     {
         foreach (var row in db.Rows("SELECT id,COALESCE(published_at,discovered_at) AS timestamp FROM stories ORDER BY id"))
-            db.Execute("UPDATE stories SET sort_timestamp=? WHERE id=?", PublicationTime((string)row["timestamp"]!), row["id"]!.AsLong());
+            db.Execute("UPDATE stories SET sort_timestamp=$sortTimestamp WHERE id=$id", ("$sortTimestamp", PublicationTime((string)row["timestamp"]!)), ("$id", row["id"]!.AsLong()));
     }
 
     /// <summary>Import existing labels once, without promoting future source/model output.</summary>
@@ -235,7 +280,7 @@ sealed class Store
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in db.Rows("SELECT category FROM sources")) names.Add((string)row["category"]!);
         foreach (var row in db.Rows("SELECT DISTINCT value FROM stories,json_each(stories.tags)")) names.Add((string)row["value"]!);
-        db.Execute("INSERT INTO settings VALUES ('topics',?)", new JsonArray(PyText.SortFolded(names).Select(n => (JsonNode)n).ToArray()));
+        db.Execute("INSERT INTO settings VALUES ('topics',$topics)", ("$topics", new JsonArray(PyText.SortFolded(names).Select(n => (JsonNode)n).ToArray())));
     }
 
     public Db Open()
@@ -310,7 +355,7 @@ sealed class Store
             var value = node!.DeepClone();
             if (key == "interests" && value is JsonObject interests && !interests.ContainsKey("feedback"))
                 interests["feedback"] = Feedback.State((JsonObject)db.SettingJson("interests")!);
-            db.Execute("UPDATE settings SET value=? WHERE key=?", value, key);
+            db.Execute("UPDATE settings SET value=$value WHERE key=$key", ("$value", value), ("$key", key));
         }
     });
 
@@ -319,20 +364,20 @@ sealed class Store
 
     public long SaveSource(JsonObject data, long? sourceId = null) => Write(db =>
     {
-        object?[] values = [(string)data["name"]!, (string)data["url"]!, (string)data["feed_url"]!, (string)data["category"]!,
-            data["enabled"]!.GetValue<bool>() ? 1L : 0L, (string?)data["mode"] ?? "auto", (string?)data["link_pattern"] ?? "",
-            data["stale_days"]?.AsLong() ?? 14L];
+        (string, object?)[] values = [("$name", (string)data["name"]!), ("$url", (string)data["url"]!), ("$feedUrl", (string)data["feed_url"]!),
+            ("$category", (string)data["category"]!), ("$enabled", data["enabled"]!.GetValue<bool>() ? 1L : 0L), ("$mode", (string?)data["mode"] ?? "auto"),
+            ("$linkPattern", (string?)data["link_pattern"] ?? ""), ("$staleDays", data["stale_days"]?.AsLong() ?? 14L)];
         if (sourceId is null)
         {
-            if (db.Scalar("SELECT id FROM sources WHERE url=? AND removed=1", (string)data["url"]!) is long retired) sourceId = retired;
+            if (db.Scalar("SELECT id FROM sources WHERE url=$url AND removed=1", ("$url", (string)data["url"]!)) is long retired) sourceId = retired;
             else
             {
-                db.Execute("INSERT INTO sources(name,url,feed_url,category,enabled,mode,link_pattern,stale_days) VALUES (?,?,?,?,?,?,?,?)", values);
+                db.Execute("INSERT INTO sources(name,url,feed_url,category,enabled,mode,link_pattern,stale_days) VALUES ($name,$url,$feedUrl,$category,$enabled,$mode,$linkPattern,$staleDays)", values);
                 return db.Long("SELECT last_insert_rowid()");
             }
         }
-        if (db.Execute("UPDATE sources SET name=?,url=?,feed_url=?,category=?,enabled=?,mode=?,link_pattern=?,stale_days=?,removed=0 WHERE id=?", [.. values, sourceId]) == 0)
-            throw new ValidationException("Source not found");
+        if (db.Execute("UPDATE sources SET name=$name,url=$url,feed_url=$feedUrl,category=$category,enabled=$enabled,mode=$mode,link_pattern=$linkPattern,stale_days=$staleDays,removed=0 WHERE id=$id", [.. values, ("$id", sourceId)]) == 0)
+            throw new NotFoundException("Source not found");
         return sourceId.Value;
     });
 
@@ -341,12 +386,13 @@ sealed class Store
     {
         var now = PyText.UtcNow();
         db.Execute("""
-            UPDATE sources SET last_checked=?,first_checked=COALESCE(first_checked,?),last_error=?,
-                feed_url=COALESCE(?,feed_url),consecutive_failures=CASE WHEN ? IS NULL THEN 0 ELSE consecutive_failures+1 END,
-                last_success=CASE WHEN ? IS NULL THEN ? ELSE last_success END,last_count=?,
-                newest_published=CASE WHEN ? IS NULL THEN ? ELSE newest_published END,
-                last_new_story=CASE WHEN ?>0 THEN ? ELSE last_new_story END,last_method=COALESCE(?,last_method),collection_note=? WHERE id=?
-            """, now, now, error, feedUrl, error, error, now, count, error, newest, added, now, method, note, sourceId);
+            UPDATE sources SET last_checked=$now,first_checked=COALESCE(first_checked,$now),last_error=$error,
+                feed_url=COALESCE($feedUrl,feed_url),consecutive_failures=CASE WHEN $error IS NULL THEN 0 ELSE consecutive_failures+1 END,
+                last_success=CASE WHEN $error IS NULL THEN $now ELSE last_success END,last_count=$count,
+                newest_published=CASE WHEN $error IS NULL THEN $newest ELSE newest_published END,
+                last_new_story=CASE WHEN $added>0 THEN $now ELSE last_new_story END,last_method=COALESCE($method,last_method),collection_note=$note WHERE id=$id
+            """, ("$now", now), ("$error", error), ("$feedUrl", feedUrl), ("$count", count), ("$newest", newest), ("$added", added),
+            ("$method", method), ("$note", note), ("$id", sourceId));
     });
 
     public bool InsertStory(long sourceId, Entry item, string category, string day) => Write(db =>
@@ -357,9 +403,10 @@ sealed class Store
         return db.Execute("""
             INSERT OR IGNORE INTO stories
                 (source_id,headline,url,excerpt,published_at,discovered_at,day,tags,sort_timestamp)
-                VALUES (?,?,?,?,?,?,?,?,?)
-            """, sourceId, item.Headline, item.Url, item.Excerpt, item.PublishedAt, discovered, day, new JsonArray(tags),
-            PublicationTime(item.PublishedAt ?? discovered)) > 0;
+                VALUES ($sourceId,$headline,$url,$excerpt,$publishedAt,$discoveredAt,$day,$tags,$sortTimestamp)
+            """, ("$sourceId", sourceId), ("$headline", item.Headline), ("$url", item.Url), ("$excerpt", item.Excerpt),
+            ("$publishedAt", item.PublishedAt), ("$discoveredAt", discovered), ("$day", day), ("$tags", new JsonArray(tags)),
+            ("$sortTimestamp", PublicationTime(item.PublishedAt ?? discovered))) > 0;
     });
 
     static JsonObject Story(JsonObject row)
@@ -407,13 +454,14 @@ sealed class Store
             zone = Zones.Find(q.TimeZone);
         }
         var clauses = new List<string> { "1=1" };
-        var args = new List<object?>();
+        var args = new List<(string Name, object? Value)>();
         if (!q.ShowHidden) clauses.Add("(s.status NOT IN ('filtered','duplicate') OR s.bookmarked=1)");
         foreach (var (value, following) in new[] { (q.Day, false), (q.Day, true), (q.Start, false), (q.End, true) })
         {
             if (value.Length == 0) continue;
-            clauses.Add("s.sort_timestamp" + (following ? "<?" : ">=?"));
-            args.Add(CalendarBoundary(value, zone, following));
+            var name = "$boundary" + args.Count;
+            clauses.Add("s.sort_timestamp" + (following ? "<" : ">=") + name);
+            args.Add((name, CalendarBoundary(value, zone, following)));
         }
         var excluded = q.ExcludedRelevance.Distinct().ToList();
         if (excluded.Any(value => value is not ("high" or "medium" or "low" or "pending"))) throw new ValidationException("Invalid relevance filter");
@@ -423,27 +471,26 @@ sealed class Store
                 CASE WHEN s.status='pending' OR typeof(s.score)!='integer' OR s.score<0 THEN 'pending'
                     WHEN s.score>=75 THEN 'high' WHEN s.score>=40 THEN 'medium' ELSE 'low' END
                 """;
-            clauses.Add($"({bucket}) NOT IN ({string.Join(',', excluded.Select(_ => "?"))})");
-            args.AddRange(excluded);
+            clauses.Add($"({bucket}) NOT IN ({string.Join(',', excluded.Select((_, i) => "$relevance" + i))})");
+            args.AddRange(excluded.Select((value, i) => ("$relevance" + i, (object?)value)));
         }
         var tags = q.Tags.Distinct().ToList();
         if (tags.Count > 0)
         {
-            clauses.Add($"EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value IN ({string.Join(',', tags.Select(_ => "?"))}))");
-            args.AddRange(tags);
+            clauses.Add($"EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value IN ({string.Join(',', tags.Select((_, i) => "$tag" + i))}))");
+            args.AddRange(tags.Select((tag, i) => ("$tag" + i, (object?)tag)));
         }
         if (q.TimeStart is { } timeStart && q.TimeEnd is { } timeEnd)
         {
             const string minutes = "newsreview_clock(s.sort_timestamp)";
-            clauses.Add(timeStart <= timeEnd ? $"({minutes}>=? AND {minutes}<=?)" : $"({minutes}>=? OR {minutes}<=?)");
-            args.Add(timeStart);
-            args.Add(timeEnd);
+            clauses.Add(timeStart <= timeEnd ? $"({minutes}>=$timeStart AND {minutes}<=$timeEnd)" : $"({minutes}>=$timeStart OR {minutes}<=$timeEnd)");
+            args.Add(("$timeStart", timeStart));
+            args.Add(("$timeEnd", timeEnd));
         }
         if (q.Query.Length > 0)
         {
-            clauses.Add("""(s.headline LIKE ? ESCAPE '\' OR s.summary LIKE ? ESCAPE '\' OR s.excerpt LIKE ? ESCAPE '\' OR s.tags LIKE ? ESCAPE '\' OR EXISTS (SELECT 1 FROM sources search_source WHERE search_source.id=s.source_id AND search_source.name LIKE ? ESCAPE '\'))""");
-            var pattern = "%" + q.Query.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-            for (var i = 0; i < 5; i++) args.Add(pattern);
+            clauses.Add("""(s.headline LIKE $pattern ESCAPE '\' OR s.summary LIKE $pattern ESCAPE '\' OR s.excerpt LIKE $pattern ESCAPE '\' OR s.tags LIKE $pattern ESCAPE '\' OR EXISTS (SELECT 1 FROM sources search_source WHERE search_source.id=s.source_id AND search_source.name LIKE $pattern ESCAPE '\'))""");
+            args.Add(("$pattern", "%" + q.Query.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%"));
         }
         if (q.Bookmarks) clauses.Add("s.bookmarked=1");
         var where = string.Join(" AND ", clauses);
@@ -463,12 +510,12 @@ sealed class Store
             var rows = db.Rows($"""
                 WITH page AS MATERIALIZED (
                     SELECT s.id FROM stories s WHERE {where}
-                    ORDER BY {order} LIMIT 48 OFFSET ?)
+                    ORDER BY {order} LIMIT 48 OFFSET $offset)
                     SELECT {FeedColumns},src.name AS source_name,src.category AS source_category,
                     (SELECT COUNT(*) FROM stories d WHERE d.duplicate_of=s.id) AS related_count
                     FROM page JOIN stories s ON s.id=page.id LEFT JOIN sources src ON src.id=s.source_id
                     ORDER BY {order}
-                """, [.. args, (q.Page - 1) * 48]);
+                """, [.. args, ("$offset", (q.Page - 1) * 48)]);
             var interests = (JsonObject)db.SettingJson("interests")!;
             var ratings = (interests["feedback"] as JsonObject)?["ratings"] as JsonObject;
             var items = new JsonArray();
@@ -486,27 +533,27 @@ sealed class Store
 
     public JsonArray Related(long storyId) => Read(db => new JsonArray(db.Rows("""
         SELECT s.id,s.headline,s.url,src.name AS source_name
-            FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE s.duplicate_of=?
-        """, storyId).Select(row => (JsonNode)row).ToArray()));
+            FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE s.duplicate_of=$id
+        """, ("$id", storyId)).Select(row => (JsonNode)row).ToArray()));
 
     public void Bookmark(long storyId, bool value) => Write(db =>
     {
-        if (db.Execute("UPDATE stories SET bookmarked=? WHERE id=?", value, storyId) == 0) throw new ValidationException("Story not found");
+        if (db.Execute("UPDATE stories SET bookmarked=$bookmarked WHERE id=$id", ("$bookmarked", value), ("$id", storyId)) == 0) throw new NotFoundException("Story not found");
     });
 
     public string MarkRead(long storyId) => Write(db =>
     {
-        if (db.Execute("UPDATE stories SET read_at=COALESCE(read_at,?) WHERE id=?", PyText.UtcNow(), storyId) == 0)
-            throw new ValidationException("Story not found");
-        return (string)db.Scalar("SELECT read_at FROM stories WHERE id=?", storyId)!;
+        if (db.Execute("UPDATE stories SET read_at=COALESCE(read_at,$now) WHERE id=$id", ("$now", PyText.UtcNow()), ("$id", storyId)) == 0)
+            throw new NotFoundException("Story not found");
+        return (string)db.Scalar("SELECT read_at FROM stories WHERE id=$id", ("$id", storyId))!;
     });
 
     public JsonObject FeedbackState() => Feedback.State((JsonObject)Settings()["interests"]!);
 
     public void RateStory(long storyId, long vote, string reason) => Write(db =>
     {
-        var story = db.Row("SELECT s.*,src.name AS source_name FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE s.id=?", storyId)
-            ?? throw new ValidationException("Story not found");
+        var story = db.Row("SELECT s.*,src.name AS source_name FROM stories s LEFT JOIN sources src ON src.id=s.source_id WHERE s.id=$id", ("$id", storyId))
+            ?? throw new NotFoundException("Story not found");
         var interests = (JsonObject)db.SettingJson("interests")!;
         var value = Feedback.State(interests);
         var ratings = (JsonObject)value["ratings"]!;
@@ -535,7 +582,7 @@ sealed class Store
         }
         Feedback.Validate(value);
         interests["feedback"] = value;
-        db.Execute("UPDATE settings SET value=? WHERE key='interests'", interests);
+        db.Execute("UPDATE settings SET value=$value WHERE key='interests'", ("$value", interests));
     });
 
     public bool SaveFeedbackProfile(string profile, long? revision = null, bool? enabled = null, bool? autoUpdate = null) => Write(db =>
@@ -550,7 +597,7 @@ sealed class Store
         if (enabled is not null) value["enabled"] = enabled;
         if (autoUpdate is not null) value["auto_update"] = autoUpdate;
         interests["feedback"] = Feedback.Validate(value);
-        db.Execute("UPDATE settings SET value=? WHERE key='interests'", interests);
+        db.Execute("UPDATE settings SET value=$value WHERE key='interests'", ("$value", interests));
         return true;
     });
 
@@ -581,19 +628,19 @@ sealed class Store
         long updated = 0;
         if (mapping.Count > 0)
         {
-            var rows = db.Rows($"SELECT id,tags FROM stories WHERE EXISTS (SELECT 1 FROM json_each(stories.tags) WHERE value IN ({string.Join(',', mapping.Keys.Select(_ => "?"))}))",
-                [.. mapping.Keys]);
+            var rows = db.Rows($"SELECT id,tags FROM stories WHERE EXISTS (SELECT 1 FROM json_each(stories.tags) WHERE value IN ({string.Join(',', mapping.Keys.Select((_, i) => "$topic" + i))}))",
+                [.. mapping.Keys.Select((topic, i) => ("$topic" + i, (object?)topic))]);
             foreach (var row in rows)
             {
                 var tags = ((JsonArray)Json.Load((string)row["tags"]!)!).Select(t => (string)t!)
                     .Select(value => mapping.TryGetValue(value, out var target) ? target : value).OfType<string>().Distinct()
                     .Select(t => (JsonNode)t).ToArray();
-                db.Execute("UPDATE stories SET tags=? WHERE id=?", new JsonArray(tags), row["id"]!.AsLong());
+                db.Execute("UPDATE stories SET tags=$tags WHERE id=$id", ("$tags", new JsonArray(tags)), ("$id", row["id"]!.AsLong()));
             }
             updated = rows.Count;
         }
         var sorted = new JsonArray(PyText.SortFolded(topics).Select(n => (JsonNode)n).ToArray());
-        db.Execute("UPDATE settings SET value=? WHERE key='topics'", sorted);
+        db.Execute("UPDATE settings SET value=$value WHERE key='topics'", ("$value", sorted));
         return new JsonObject
         {
             ["topics"] = sorted.DeepClone(), ["updated_stories"] = updated,
@@ -623,13 +670,13 @@ sealed class Store
     public List<JsonObject> Pending(long limit, IReadOnlyList<long>? sourceIds = null)
     {
         if (sourceIds is { Count: 0 }) return [];
-        var scope = sourceIds is null ? "" : " AND s.source_id IN (" + string.Join(',', sourceIds.Select(_ => "?")) + ")";
+        var scope = sourceIds is null ? "" : " AND s.source_id IN (" + string.Join(',', sourceIds.Select((_, i) => "$source" + i)) + ")";
         return Read(db => db.Rows("""
             SELECT s.*,src.category FROM stories s
                 LEFT JOIN sources src ON s.source_id=src.id WHERE s.status='pending' AND s.attempts<3
             """ + scope + """
-                 ORDER BY s.attempts,s.discovered_at DESC,s.id LIMIT ?
-            """, [.. (sourceIds ?? []).Cast<object?>(), limit]));
+                 ORDER BY s.attempts,s.discovered_at DESC,s.id LIMIT $limit
+            """, [.. (sourceIds ?? []).Select((id, i) => ("$source" + i, (object?)id)), ("$limit", limit)]));
     }
 
     public List<JsonObject> Recent() => Read(db => db.Rows("""
@@ -640,17 +687,19 @@ sealed class Store
     public void ReviewResult(long storyId, JsonObject result, JsonObject config, JsonObject interests, string text, string basis) => Write(db =>
     {
         db.Execute("""
-            UPDATE stories SET summary=?,why_it_matters=?,tags=?,status=?,score=?,milestone=?,
-                duplicate_of=?,review_error=NULL,attempts=attempts+1,reviewed_at=?,provider=?,model=?,
-                interests_snapshot=?,article_text=?,content_basis=?,input_tokens=?,output_tokens=? WHERE id=?
-            """, (string)result["summary"]!, "", result["tags"], (string)result["status"]!, result["score"]!.AsLong(),
-            (string)result["milestone"]!, result["duplicate_of"]?.AsLong(), PyText.UtcNow(), (string)config["provider"]!,
-            (string)config["model"]!, interests, text, basis, result["input_tokens"]?.AsLong(), result["output_tokens"]?.AsLong(), storyId);
+            UPDATE stories SET summary=$summary,why_it_matters='',tags=$tags,status=$status,score=$score,milestone=$milestone,
+                duplicate_of=$duplicateOf,review_error=NULL,attempts=attempts+1,reviewed_at=$now,provider=$provider,model=$model,
+                interests_snapshot=$interests,article_text=$text,content_basis=$basis,input_tokens=$inputTokens,output_tokens=$outputTokens WHERE id=$id
+            """, ("$summary", (string)result["summary"]!), ("$tags", result["tags"]), ("$status", (string)result["status"]!),
+            ("$score", result["score"]!.AsLong()), ("$milestone", (string)result["milestone"]!), ("$duplicateOf", result["duplicate_of"]?.AsLong()),
+            ("$now", PyText.UtcNow()), ("$provider", (string)config["provider"]!), ("$model", (string)config["model"]!), ("$interests", interests),
+            ("$text", text), ("$basis", basis), ("$inputTokens", result["input_tokens"]?.AsLong()), ("$outputTokens", result["output_tokens"]?.AsLong()),
+            ("$id", storyId));
     });
 
     public void ReviewFailed(long storyId, string error, string text, string basis) => Write(db =>
     {
-        db.Execute("UPDATE stories SET review_error=?,attempts=attempts+1,article_text=?,content_basis=? WHERE id=?", error, text, basis, storyId);
+        db.Execute("UPDATE stories SET review_error=$error,attempts=attempts+1,article_text=$text,content_basis=$basis WHERE id=$id", ("$error", error), ("$text", text), ("$basis", basis), ("$id", storyId));
     });
 
     public long Requeue(bool failedOnly) => Write(db =>
@@ -663,8 +712,8 @@ sealed class Store
         var identifiers = Write(db =>
         {
             var ids = db.Rows($"SELECT s.id FROM stories s WHERE {PurgeableDuplicates}").Select(row => row["id"]!.AsLong()).ToList();
-            foreach (var id in ids) db.Execute("DELETE FROM stories WHERE id=?", id);
-            if (ids.Count > 0) db.Execute("UPDATE settings SET value=? WHERE key='data_revision'", Json.Dump(NewRevision()));
+            foreach (var id in ids) db.Execute("DELETE FROM stories WHERE id=$id", ("$id", id));
+            if (ids.Count > 0) db.Execute("UPDATE settings SET value=$value WHERE key='data_revision'", ("$value", Json.Dump(NewRevision())));
             return ids;
         });
         var result = new JsonObject { ["deleted"] = identifiers.Count, ["compacted"] = false };
@@ -741,27 +790,27 @@ sealed class Store
             if (Selected("topics")) interests["topics"] = new JsonArray();
             if (Selected("guidance")) interests["guidance"] = "";
             if (Selected("exclusions")) interests["exclusions"] = new JsonArray();
-            db.Execute("UPDATE settings SET value=? WHERE key='interests'", interests);
+            db.Execute("UPDATE settings SET value=$value WHERE key='interests'", ("$value", interests));
             var defaults = Defaults.Settings();
             foreach (var key in new[] { "ai", "collection" })
-                if (Selected(key)) db.Execute("UPDATE settings SET value=? WHERE key=?", defaults[key], key);
+                if (Selected(key)) db.Execute("UPDATE settings SET value=$value WHERE key=$key", ("$value", defaults[key]), ("$key", key));
             if (Selected("sources")) db.Execute("UPDATE sources SET removed=1,enabled=0");
             if (Selected("history") || Selected("runs"))
-                db.Execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", Json.Dump(PyText.UtcNow()));
-            db.Execute("UPDATE settings SET value=? WHERE key='data_revision'", Json.Dump(NewRevision()));
+                db.Execute("INSERT INTO settings(key,value) VALUES ('history_cleared_at',$now) ON CONFLICT(key) DO UPDATE SET value=excluded.value", ("$now", Json.Dump(PyText.UtcNow())));
+            db.Execute("UPDATE settings SET value=$value WHERE key='data_revision'", ("$value", Json.Dump(NewRevision())));
             return result;
         });
     }
 
     public long StartRun(string kind, JsonObject details) => Write(db =>
     {
-        db.Execute("INSERT INTO runs(kind,started_at,status,details) VALUES (?,?,'running',?)", kind, PyText.UtcNow(), details);
+        db.Execute("INSERT INTO runs(kind,started_at,status,details) VALUES ($kind,$now,'running',$details)", ("$kind", kind), ("$now", PyText.UtcNow()), ("$details", details));
         return db.Long("SELECT last_insert_rowid()");
     });
 
     public void FinishRun(long runId, string status, JsonObject details) => Write(db =>
     {
-        db.Execute("UPDATE runs SET finished_at=?,status=?,details=? WHERE id=?", PyText.UtcNow(), status, details, runId);
+        db.Execute("UPDATE runs SET finished_at=$now,status=$status,details=$details WHERE id=$id", ("$now", PyText.UtcNow()), ("$status", status), ("$details", details), ("$id", runId));
     });
 
     /// <summary>The newest full-collection start and the last history reset, which anchor the interval schedule.</summary>

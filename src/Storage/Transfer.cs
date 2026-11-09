@@ -299,20 +299,20 @@ static class Transfer
                 var names = string.Join(',', columns.Select(column => '"' + column + '"'));
                 var selected = string.Join(',', columns.Select(column => importedColumns.Contains(column)
                     ? '"' + column + '"' : (column == "sort_timestamp" ? "0" : "NULL") + " AS \"" + column + '"'));
-                var placeholders = string.Join(',', columns.Select(_ => "?"));
+                var placeholders = string.Join(',', columns.Select((_, i) => "$column" + i));
                 using var command = imported.Command($"SELECT {selected} FROM {table}", []);
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
-                    var values = new object?[reader.FieldCount];
-                    for (var i = 0; i < values.Length; i++) values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                    var values = new (string, object?)[reader.FieldCount];
+                    for (var i = 0; i < values.Length; i++) values[i] = ("$column" + i, reader.IsDBNull(i) ? null : reader.GetValue(i));
                     live.Execute($"INSERT INTO {table}({names}) VALUES ({placeholders})", values);
                 }
             }
             if (schemaVersion < 4) Store.BackfillStoryTimes(live);
             Store.InitializeTopics(live);
-            live.Execute("INSERT INTO settings(key,value) VALUES ('data_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", Json.Dump(Store.NewRevision()));
-            live.Execute("UPDATE runs SET status='interrupted',finished_at=? WHERE status='running'", PyText.Format(DateTimeOffset.UtcNow));
+            live.Execute("INSERT INTO settings(key,value) VALUES ('data_revision',$revision) ON CONFLICT(key) DO UPDATE SET value=excluded.value", ("$revision", Json.Dump(Store.NewRevision())));
+            live.Execute("UPDATE runs SET status='interrupted',finished_at=$now WHERE status='running'", ("$now", PyText.Format(DateTimeOffset.UtcNow)));
             if (live.Rows("PRAGMA foreign_key_check").Count > 0) throw new ValidationException("Restored relationships are invalid; changes were rolled back");
             live.Commit();
             return new JsonObject { ["restored"] = true, ["totals"] = totals, ["recoveryBackup"] = name };

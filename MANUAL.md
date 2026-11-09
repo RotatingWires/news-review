@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.35
+# NewsReview v1.0.36
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -601,6 +601,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.36
+
+- SQL uses named parameters (`$id`, `$name`) like the other apps instead of `?` placeholders.
+- The database has CHECK rules like TaskList's and SpendTracker's (source flags, mode and inactivity days, story status, relevance score, bookmark, attempts, and run kind/status). They are added once on startup without changing the table layout backups compare; if older rows break a rule, that table keeps none and the log says why.
+- Success replies match the other apps: changes with nothing to return answer **204 No Content**, sign-in and setup answer `{ authenticated: true }`, and a missing story or source answers **404** instead of 400.
 
 ### v1.0.35
 

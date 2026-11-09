@@ -66,7 +66,7 @@ static class Fixtures
     public static Entry Entry(string headline, string url, string? published = null, string excerpt = "Details") =>
         new() { Headline = headline, Url = url, Excerpt = excerpt, PublishedAt = published };
 
-    public static void Sql(Store store, string sql, params object?[] args) => store.Write(db => { db.Execute(sql, args); });
+    public static void Sql(Store store, string sql, params (string Name, object? Value)[] args) => store.Write(db => { db.Execute(sql, args); });
 
     public static Collector Collector(Store store, IFetcher? fetcher = null, Func<string, string?>? environment = null)
     {

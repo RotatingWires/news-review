@@ -47,7 +47,8 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
       headers: { ...(method === 'GET' ? {} : revisionHeaders()), ...(data === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
-    result = await response.json();
+    // 204 No Content answers changes with nothing to return, like the other apps.
+    result = response.status === 204 ? {} : await response.json();
   } catch (cause) {
     const message = response ? `NewsReview returned an unreadable response (HTTP ${response.status}). Check that this URL reaches the NewsReview server.`
       : `Cannot reach the NewsReview server at ${location.host}${cause.name === 'AbortError' ? ' (request timed out)' : ''}. Check that it is running and the address/port are correct. Collection may still be running; reconnect to confirm its status.`;

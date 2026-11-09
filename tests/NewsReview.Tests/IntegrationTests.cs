@@ -83,7 +83,7 @@ public class ApiTests : IntegrationBase
         foreach (var (name, time, score) in new[] { ("older-high", "08:00:00", 95), ("newer-low", "17:00:00", 20) })
         {
             store.InsertStory(EnabledSource(), Fixtures.Entry(name, "https://example.com/" + name, "2026-10-31T" + time + "+00:00"), "Technology", "2026-10-31");
-            Fixtures.Sql(store, "UPDATE stories SET score=?,bookmarked=1 WHERE headline=?", score, name);
+            Fixtures.Sql(store, "UPDATE stories SET score=$score,bookmarked=1 WHERE headline=$headline", ("$score", score), ("$headline", name));
         }
         foreach (var (sort, first) in new[] { ("rank", "older-high"), ("rank_asc", "newer-low"), ("published", "newer-low"), ("published_asc", "older-high") })
         {
@@ -105,16 +105,16 @@ public class ApiTests : IntegrationBase
         foreach (var name in new[] { "main", "delete", "bookmark", "parent", "child", "pending", "filtered" })
         {
             store.InsertStory(EnabledSource(), Fixtures.Entry(name, "https://example.com/purge/" + name, null, ""), "Security", "2026-10-21");
-            ids[name] = store.Read(db => db.Long("SELECT id FROM stories WHERE headline=?", name));
+            ids[name] = store.Read(db => db.Long("SELECT id FROM stories WHERE headline=$headline", ("$headline", name)));
         }
         store.Write(db =>
         {
             foreach (var name in new[] { "delete", "bookmark", "parent", "child" })
-                db.Execute("UPDATE stories SET status='duplicate', duplicate_of=? WHERE id=?", ids["main"], ids[name]);
-            db.Execute("UPDATE stories SET bookmarked=1 WHERE id IN (?,?)", ids["bookmark"], ids["child"]);
-            db.Execute("UPDATE stories SET duplicate_of=? WHERE id=?", ids["parent"], ids["child"]);
-            db.Execute("UPDATE stories SET status='filtered' WHERE id=?", ids["filtered"]);
-            db.Execute("UPDATE stories SET article_text=? WHERE id=?", string.Concat(Enumerable.Repeat("Redundant article text ", 30000)), ids["delete"]);
+                db.Execute("UPDATE stories SET status='duplicate', duplicate_of=$duplicateOf WHERE id=$id", ("$duplicateOf", ids["main"]), ("$id", ids[name]));
+            db.Execute("UPDATE stories SET bookmarked=1 WHERE id IN ($bookmark,$child)", ("$bookmark", ids["bookmark"]), ("$child", ids["child"]));
+            db.Execute("UPDATE stories SET duplicate_of=$duplicateOf WHERE id=$id", ("$duplicateOf", ids["parent"]), ("$id", ids["child"]));
+            db.Execute("UPDATE stories SET status='filtered' WHERE id=$id", ("$id", ids["filtered"]));
+            db.Execute("UPDATE stories SET article_text=$articleText WHERE id=$id", ("$articleText", string.Concat(Enumerable.Repeat("Redundant article text ", 30000))), ("$id", ids["delete"]));
         });
         var settings = store.Settings();
         var revision = (string)store.Overview()["revision"]!;
@@ -332,7 +332,7 @@ public class CollectionTests : IntegrationBase
         store.SaveSettings(new JsonObject { ["ai"] = ModelConfig() });
         Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { kind = "review", source_id = targetId })).Status);
         Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = "one" })).Status);
-        Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = 999999 })).Status);
+        Assert.Equal(404, (await Request("/api/jobs/start", "POST", new { source_id = 999999 })).Status);
         Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { source_id = disabledId })).Status);
         Assert.Equal(400, (await Request("/api/jobs/start", "POST", new { unchecked_only = true, source_id = targetId })).Status);
         Assert.Equal(202, (await Request("/api/jobs/start", "POST", new { source_id = targetId })).Status);
@@ -613,14 +613,14 @@ public class WorkflowTests : IntegrationBase
     {
         store.SaveSettings(new JsonObject { ["ai"] = ModelConfig() });
         store.InsertStory(EnabledSource(), Fixtures.Entry("An SDR hardware project", Root + "/rated", null, "Practical radio hardware details."), "Radio", "2026-10-25");
-        var id = store.Read(db => db.Long("SELECT id FROM stories WHERE url=?", Root + "/rated"));
-        Fixtures.Sql(store, "UPDATE stories SET status='reviewed' WHERE id=?", id);
+        var id = store.Read(db => db.Long("SELECT id FROM stories WHERE url=$url", ("$url", Root + "/rated")));
+        Fixtures.Sql(store, "UPDATE stories SET status='reviewed' WHERE id=$id", ("$id", id));
         var path = "/api/feedback/story/" + id;
         Assert.Equal(400, (await Request(path, "PUT", new { vote = true })).Status);
         Assert.Equal(400, (await Request(path, "PUT", new { vote = 1, reason = new string('x', 1001) })).Status);
         Assert.Equal(401, (await Anonymous(path, "PUT", new { vote = 1 })).Status);
         Assert.Equal(403, (await Request(path, "PUT", new { vote = 1 }, new() { ["Origin"] = "https://other.example" })).Status);
-        Assert.Equal(200, (await Request(path, "PUT", new { vote = 1, reason = "I like cheap practical hardware projects" })).Status);
+        Assert.Equal(204, (await Request(path, "PUT", new { vote = 1, reason = "I like cheap practical hardware projects" })).Status);
         Assert.Equal(1, (await Request("/api/feedback")).Body!["count"]!.AsLong());
         InsertStories("Experimental protocol", Root + "/review-feedback-", 2, "A substantive experimental technical feature is available for testing.");
         var start = RequestCount();
@@ -645,7 +645,7 @@ public class WorkflowTests : IntegrationBase
         chats = RequestsSince(start).Where(r => r.Path == "/api/chat").Select(r => r.Payload).ToList();
         Assert.NotEmpty(chats);
         Assert.All(chats, payload => Assert.False(((string)payload["messages"]![0]!["content"]!).StartsWith("Summarize article ratings")));
-        Assert.Equal(200, (await Request("/api/feedback/profile", "PUT", new { profile = "Manual profile", enabled = true, auto_update = false })).Status);
+        Assert.Equal(204, (await Request("/api/feedback/profile", "PUT", new { profile = "Manual profile", enabled = true, auto_update = false })).Status);
         Assert.Equal("Manual profile", (string)(await Request("/api/feedback")).Body!["profile"]!);
     }
 
@@ -679,7 +679,7 @@ public class WorkflowTests : IntegrationBase
         store.Bookmark(story["id"]!.AsLong(), true);
         store.Requeue(false);
         Assert.Equal((string)result["read_at"]!, (string)new Store(store.Path).Stories(new())["items"]![0]!["read_at"]!);
-        Assert.Equal(400, (await Request("/api/read/99999999", "POST", new { })).Status);
+        Assert.Equal(404, (await Request("/api/read/99999999", "POST", new { })).Status);
     }
 
     [Fact]
@@ -744,7 +744,7 @@ public class WorkflowTests : IntegrationBase
         var config = ModelConfig("openrouter", "key-error");
         const string secret = "fake-private-key-that-must-stay-out-of-reading-data";
         Assert.Equal(200, (await Request("/api/model-key", "PUT", With(config, "key", secret))).Status);
-        Assert.Equal(200, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = config.DeepClone() })).Status);
+        Assert.Equal(204, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = config.DeepClone() })).Status);
         Assert.Equal(400, (await Request("/api/test-model", "POST", config)).Status);
         store.InsertStory(EnabledSource(), Fixtures.Entry("A useful update", Root + "/article", null, "Source details."), "Standards", "2026-10-28");
         await Collect("review");
@@ -798,7 +798,7 @@ public class WorkflowTests : IntegrationBase
     public async Task OpenRouterDisablesThinkingForSamplesProfilesAndArticleReviews()
     {
         var config = ModelConfig("openrouter", "openrouter-fixture");
-        Assert.Equal(200, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = config.DeepClone() })).Status);
+        Assert.Equal(204, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = config.DeepClone() })).Status);
         Assert.Equal(200, (await Request("/api/model-key", "PUT", With(config, "key", "fake-openrouter-generation-key"))).Status);
         var authorizationStart = AuthorizationCount();
         var requestStart = RequestCount();
@@ -865,14 +865,14 @@ public class WorkflowTests : IntegrationBase
         Assert.Equal(1, result!["total"]!.AsLong());
         Assert.False(((JsonObject)result["items"]![0]!).ContainsKey("article_text"));
         var storyId = result["items"]![0]!["id"]!.AsLong();
-        Assert.Equal(200, (await Request($"/api/bookmarks/{storyId}", "PUT", new { bookmarked = true })).Status);
+        Assert.Equal(204, (await Request($"/api/bookmarks/{storyId}", "PUT", new { bookmarked = true })).Status);
         Assert.Equal(1, (await Request("/api/stories?bookmarks=1")).Body!["total"]!.AsLong());
         Assert.Equal(400, (await Request("/api/stories?start=2026-10-16&end=2026-10-01")).Status);
-        Assert.Equal(200, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = ModelConfig() })).Status);
+        Assert.Equal(204, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = ModelConfig() })).Status);
         Assert.Equal("fixture", (string)(await Request("/api/settings")).Body!["ai"]!["model"]!);
         Assert.Equal("fixture", (string)store.Settings()["ai"]!["model"]!);
         var interests = With((JsonObject)store.Settings()["interests"]!, "guidance", "Favor radio projects.");
-        Assert.Equal(200, (await Request("/api/settings", "PUT", new JsonObject { ["interests"] = interests })).Status);
+        Assert.Equal(204, (await Request("/api/settings", "PUT", new JsonObject { ["interests"] = interests })).Status);
         Assert.Equal("Favor radio projects.", (string)store.Settings()["interests"]!["guidance"]!);
         Assert.Equal(200, (await Request("/api/test-model", "POST", ModelConfig())).Status);
         var source = new { name = "New source", url = Root + "/new", feed_url = Root + "/feed", category = "Radio", enabled = true };

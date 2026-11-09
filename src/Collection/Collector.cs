@@ -55,7 +55,7 @@ sealed class Collector(Store store, SourceFetcher sources, Reviewer reviewer, Mo
         store.Settings();
         if (sourceId is not null)
         {
-            var source = store.Sources().Cast<JsonObject>().FirstOrDefault(s => s["id"]!.AsLong() == sourceId) ?? throw new ValidationException("Source not found");
+            var source = store.Sources().Cast<JsonObject>().FirstOrDefault(s => s["id"]!.AsLong() == sourceId) ?? throw new NotFoundException("Source not found");
             if (source["enabled"]!.AsLong() == 0) throw new ValidationException("Enable the source before checking it");
         }
         if (!jobLock.Wait(0)) return false;

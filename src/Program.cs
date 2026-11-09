@@ -133,6 +133,7 @@ catch (Exception error) when (error is StorageUnavailableException or InvalidOpe
 }
 app.Logger.LogInformation("NewsReview v{Version}, data folder {DataDirectory}.", Transfer.Version, Path.GetDirectoryName(store.Path));
 app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", store.JournalMode);
+if (store.RulesWarning is { } rulesWarning) app.Logger.LogWarning("{Warning}", rulesWarning.Trim());
 app.Logger.LogInformation("Sign-in keys: {Location}.", profileKeyRing ? "this Windows profile's ASP.NET key ring" : Path.Combine(DataDirectory(app.Services), "keys"));
 
 if (passwords.SetupToken is { } setupToken)
@@ -210,6 +211,7 @@ app.Use(async (context, next) =>
         await next();
     }
     catch (StorageUnavailableException error) { await Api.Write(context, new JsonObject { ["error"] = error.Message, ["code"] = "storage_unavailable" }, 503); }
+    catch (NotFoundException error) { await Api.Write(context, Api.Error(error.Message), 404); }
     catch (ValidationException error) { await Api.Write(context, Api.Error(PyText.Truncate(error.Message, 500)), 400); }
     catch (SqliteException error) when (error.SqliteErrorCode == 19) { await Api.Write(context, Api.Error("That source URL is already in your list"), 409); }
     catch (Exception error) when (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested)
@@ -236,7 +238,7 @@ app.MapPost("/api/auth/setup", async (HttpContext context) =>
     catch (SetupConflictException error) { return Api.Send(Api.Error(error.Message), 409); }
     catch (SetupTokenException error) { return Api.Send(Api.Error(error.Message), 401); }
     await PasswordAuth.SignInOwner(context);
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Api.Send(new JsonObject { ["authenticated"] = true });
 }).RequireRateLimiting("auth");
 app.MapPost("/api/auth/login", async (HttpContext context) =>
 {
@@ -244,13 +246,13 @@ app.MapPost("/api/auth/login", async (HttpContext context) =>
     if (!passwords.Verify(Api.OptionalString(data, "password") ?? "", out var upgraded)) return Results.Unauthorized(); // The login page words it, like the other apps.
     if (upgraded) app.Logger.LogInformation("Upgraded the saved password hash to {Iterations} PBKDF2 iterations.", PasswordAuth.Iterations);
     await PasswordAuth.SignInOwner(context);
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Api.Send(new JsonObject { ["authenticated"] = true });
 }).RequireRateLimiting("auth");
 app.MapPost("/api/auth/logout", async (HttpContext context) =>
 {
     await Api.Body(context.Request);
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 
 app.MapGet("/api/stories", (HttpRequest request, CancellationToken cancellation) =>
@@ -457,14 +459,14 @@ app.MapPut("/api/feedback/story/{id}", async (string id, HttpRequest request) =>
     var vote = Validation.Integer(data["vote"], "Vote", -1, 1);
     var reason = Validation.Text(Json.Get(data, "reason", ""), "Feedback reason", 320, empty: true);
     store.RateStory(Api.ParseInteger(id), vote, reason);
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 app.MapPut("/api/feedback/profile", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
     store.SaveFeedbackProfile(Validation.Text(data["profile"], "Learned Preferences", 2400, empty: true),
         enabled: Validation.Boolean(data["enabled"], "Use feedback"), autoUpdate: Validation.Boolean(data["auto_update"], "Automatic profile updates"));
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 app.MapPost("/api/feedback/rebuild", async (HttpRequest request) =>
 {
@@ -483,12 +485,12 @@ app.MapPut("/api/bookmarks/{id}", async (string id, HttpRequest request) =>
 {
     var data = await Api.Body(request);
     store.Bookmark(Api.ParseInteger(id), Validation.Boolean(data["bookmarked"], "Bookmarked"));
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 app.MapPut("/api/settings", async (HttpRequest request) =>
 {
     store.SaveSettings(Validation.Settings(await Api.Body(request), store.Settings()));
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 app.MapPost("/api/sources", async (HttpRequest request) =>
     Api.Send(new JsonObject { ["id"] = store.SaveSource(Validation.Source(await Api.Body(request))) }, 201));
@@ -543,7 +545,7 @@ app.MapGet("/api/onboarding", () => Api.Send(new JsonObject { ["import_reminder_
 app.MapPost("/api/onboarding/acknowledge", () =>
 {
     Onboarding.Acknowledge(DataDirectory(app.Services));
-    return Api.Send(new JsonObject { ["ok"] = true });
+    return Results.NoContent();
 });
 app.MapFallback("/api/{**path}", () => Api.Send(Api.Error("Not found"), 404));
 // Like the other apps, any other address loads the app when signed in, or the login page with a way back.

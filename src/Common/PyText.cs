@@ -165,3 +165,6 @@ static class Zones
 
 /// <summary>An input or data problem reported to the client as HTTP 400.</summary>
 class ValidationException(string message) : Exception(message);
+
+/// <summary>A story or source that does not exist; answered with 404 like TaskList and SpendTracker.</summary>
+sealed class NotFoundException(string message) : ValidationException(message);

@@ -15,7 +15,7 @@ public class PurgeBrowserTests : BrowserTest
         Store.Write(db =>
         {
             var main = db.Long("SELECT id FROM stories WHERE headline='Main'");
-            db.Execute("UPDATE stories SET status='duplicate',duplicate_of=? WHERE headline!='Main'", main);
+            db.Execute("UPDATE stories SET status='duplicate',duplicate_of=$duplicateOf WHERE headline!='Main'", ("$duplicateOf", main));
             db.Execute("UPDATE stories SET bookmarked=1 WHERE headline='Saved duplicate'");
         });
         var page = await NewPage(390, 844);

@@ -96,7 +96,7 @@ public class FeedbackTests : IDisposable
         {
             var url = $"https://example.com/feedback-{number}";
             store.InsertStory(source, Fixtures.Entry(number.ToString(), url, null, new string('x', 1000)), "Radio", "2026-10-25");
-            var id = store.Read(db => db.Long("SELECT id FROM stories WHERE url=?", url));
+            var id = store.Read(db => db.Long("SELECT id FROM stories WHERE url=$url", ("$url", url)));
             store.RateStory(id, 1, new string('r', 320));
         }
         var selected = Feedback.Examples(store.FeedbackState());

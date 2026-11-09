@@ -114,7 +114,7 @@ public class SourceTests : IDisposable
     public void ExistingSourcesAndLegacyMarkersSurviveRestartWithoutReseeding()
     {
         Fixtures.Sql(store, "INSERT INTO settings VALUES ('sources_seeded','true'),('source_additions_048','true')");
-        Fixtures.Sql(store, "UPDATE sources SET removed=1,enabled=0 WHERE id=?", sourceId);
+        Fixtures.Sql(store, "UPDATE sources SET removed=1,enabled=0 WHERE id=$id", ("$id", sourceId));
         var kept = store.SaveSource(new JsonObject
         {
             ["name"] = "Kept source", ["url"] = "https://example.org/", ["feed_url"] = "", ["category"] = "Custom", ["enabled"] = false,

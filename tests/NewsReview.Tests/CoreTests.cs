@@ -166,6 +166,36 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
+    public void CheckRulesRejectBadValuesAndBrokenRowsKeepTheOldTable()
+    {
+        Insert();
+        Assert.Contains("CHECK(status IN", store.Read(db => (string)db.Scalar("SELECT sql FROM sqlite_master WHERE name='stories'")!));
+        Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => Fixtures.Sql(store, "UPDATE stories SET status='bogus'"));
+        Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => Fixtures.Sql(store, "UPDATE sources SET stale_days=0"));
+        Assert.Null(store.RulesWarning);
+        Assert.Single(store.Sources());
+
+        // An older database whose rows break a rule still opens; only that table goes without rules.
+        var path = directory.File("legacy.db");
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE runs (
+                    id INTEGER PRIMARY KEY, kind TEXT NOT NULL, started_at TEXT NOT NULL,
+                    finished_at TEXT, status TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}');
+                INSERT INTO runs(kind,started_at,status) VALUES ('mystery','2026-01-01T00:00:00+00:00','complete');
+                """;
+            command.ExecuteNonQuery();
+        }
+        var legacy = new Store(path);
+        Assert.Contains("1 runs row(s)", legacy.RulesWarning);
+        Assert.DoesNotContain("CHECK(", legacy.Read(db => (string)db.Scalar("SELECT sql FROM sqlite_master WHERE name='runs'")!));
+        Assert.Contains("CHECK(", legacy.Read(db => (string)db.Scalar("SELECT sql FROM sqlite_master WHERE name='stories'")!));
+    }
+
+    [Fact]
     public void NoBundledSourcesAndPersistentFirstRunDefaults()
     {
         var fresh = new Store(directory.File("fresh.db"));
@@ -190,7 +220,7 @@ public class StoreTests : IDisposable
         foreach (var score in new[] { 0, 39, 40, 74, 75, 100 })
         {
             Insert($"Score {score}", $"https://example.com/score/{score}");
-            Fixtures.Sql(store, "UPDATE stories SET status='reviewed',score=? WHERE headline=?", score, $"Score {score}");
+            Fixtures.Sql(store, "UPDATE stories SET status='reviewed',score=$score WHERE headline=$headline", ("$score", score), ("$headline", $"Score {score}"));
         }
         Insert("Pending", "https://example.com/pending");
         Assert.Equal(5, Total(new() { ExcludedRelevance = ["high"] }));
@@ -304,7 +334,7 @@ public class StoreTests : IDisposable
         store.SaveSettings(new JsonObject { ["collection"] = config.DeepClone() });
         var now = new DateTimeOffset(2026, 10, 15, 23, 0, 0, TimeSpan.Zero);
         var runId = store.StartRun("collect", new JsonObject());
-        Fixtures.Sql(store, "UPDATE runs SET started_at=? WHERE id=?", PyText.FormatSeconds(now), runId);
+        Fixtures.Sql(store, "UPDATE runs SET started_at=$startedAt WHERE id=$id", ("$startedAt", PyText.FormatSeconds(now)), ("$id", runId));
         store.FinishRun(runId, "failed", new JsonObject());
         var collector = Fixtures.Collector(new Store(store.Path));
         Assert.False(collector.ScheduleDue(now + TimeSpan.FromMinutes(179)));
@@ -333,7 +363,7 @@ public class StoreTests : IDisposable
         store.FinishRun(runId, "complete", new JsonObject());
         Assert.True(collector.ScheduleDue(now)); // Review-only runs do not satisfy the collection schedule.
         runId = store.StartRun("collect", new JsonObject());
-        Fixtures.Sql(store, "UPDATE runs SET started_at=? WHERE id=?", PyText.FormatSeconds(now), runId);
+        Fixtures.Sql(store, "UPDATE runs SET started_at=$startedAt WHERE id=$id", ("$startedAt", PyText.FormatSeconds(now)), ("$id", runId));
         store.FinishRun(runId, "partial", new JsonObject());
         Assert.False(collector.ScheduleDue(now)); // An attempted run must not repeat every 20 seconds.
         Assert.True(collector.ScheduleDue(now.AddDays(1)));

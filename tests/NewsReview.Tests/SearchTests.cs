@@ -58,7 +58,7 @@ public class ArchiveTests : IDisposable
         var local = Zones.FromLocal(new DateTime(2026, 10, 15, hour, 30, 0), TimeZoneInfo.Local).ToUniversalTime();
         store.Write(db =>
         {
-            db.Execute("UPDATE stories SET discovered_at=? WHERE url=?", PyText.FormatSeconds(local), $"https://example.com/{number}");
+            db.Execute("UPDATE stories SET discovered_at=$discoveredAt WHERE url=$url", ("$discoveredAt", PyText.FormatSeconds(local)), ("$url", $"https://example.com/{number}"));
             Store.BackfillStoryTimes(db);
         });
     }
@@ -85,7 +85,7 @@ public class ArchiveTests : IDisposable
         store.Write(db =>
         {
             for (var i = 0; i < publications.Length; i++)
-                db.Execute("UPDATE stories SET published_at=? WHERE url=?", publications[i], $"https://example.com/{i + 1}");
+                db.Execute("UPDATE stories SET published_at=$publishedAt WHERE url=$url", ("$publishedAt", publications[i]), ("$url", $"https://example.com/{i + 1}"));
             db.Execute("UPDATE stories SET discovered_at='2026-10-15T15:00:00+00:00' WHERE url='https://example.com/5'");
             Store.BackfillStoryTimes(db);
         });
@@ -110,7 +110,7 @@ public class ArchiveTests : IDisposable
         Assert.Equal(1, Total(new() { Query = "100%", Tags = ["Radio"] }));
         Assert.Equal(0, Total(new() { Query = "100_" })); // SQL wildcards remain literal.
         Assert.Equal(0, Total(new() { Query = "Example", Start = "2000-01-01", End = "2000-01-02" }));
-        Fixtures.Sql(store, "UPDATE sources SET removed=1,enabled=0 WHERE id=?", source);
+        Fixtures.Sql(store, "UPDATE sources SET removed=1,enabled=0 WHERE id=$id", ("$id", source));
         Assert.Equal(2, Total(new() { Query = "Example" })); // Archived source names stay searchable.
     }
 

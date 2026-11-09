@@ -21,7 +21,7 @@ public class FeedQueryTests : IDisposable
     void Insert(string name, string published, int score = 50)
     {
         store.InsertStory(source, Fixtures.Entry(name, "https://example.com/" + name, published, "Source details"), "Technology", "2026-10-31");
-        Fixtures.Sql(store, "UPDATE stories SET status='reviewed',score=?,bookmarked=1 WHERE headline=?", score, name);
+        Fixtures.Sql(store, "UPDATE stories SET status='reviewed',score=$score,bookmarked=1 WHERE headline=$headline", ("$score", score), ("$headline", name));
     }
 
     List<string> Names(Store.StoryQuery query) => store.Stories(query)["items"]!.AsArray().Select(r => (string)r!["headline"]!).ToList();
@@ -94,9 +94,7 @@ public class FeedQueryTests : IDisposable
             for (var number = 0; number < 6000; number++)
             {
                 var stamp = number < 60 ? "2026-10-31T12:00:00+00:00" : "2025-01-01T12:00:00+00:00";
-                db.Execute("INSERT INTO stories(headline,url,published_at,discovered_at,day,sort_timestamp,article_text,interests_snapshot) VALUES (?,?,?,?,'2026-10-31',?,?,?)",
-                    $"Story {number}", $"https://example.com/{number}", stamp, stamp, Store.PublicationTime(stamp),
-                    string.Concat(Enumerable.Repeat("Article body ", 200)), string.Concat(Enumerable.Repeat("Private snapshot ", 100)));
+                db.Execute("INSERT INTO stories(headline,url,published_at,discovered_at,day,sort_timestamp,article_text,interests_snapshot) VALUES ($headline,$url,$publishedAt,$discoveredAt,'2026-10-31',$sortTimestamp,$articleText,$interestsSnapshot)", ("$headline", $"Story {number}"), ("$url", $"https://example.com/{number}"), ("$publishedAt", stamp), ("$discoveredAt", stamp), ("$sortTimestamp", Store.PublicationTime(stamp)), ("$articleText", string.Concat(Enumerable.Repeat("Article body ", 200))), ("$interestsSnapshot", string.Concat(Enumerable.Repeat("Private snapshot ", 100))));
             }
         });
         var statements = new List<string>();
@@ -142,10 +140,8 @@ public class FeedQueryTests : IDisposable
             var stamp = "2025-01-01T12:00:00+00:00";
             db.Execute("""
                 INSERT INTO stories(source_id,headline,url,published_at,discovered_at,day,sort_timestamp,summary,tags,status,article_text,interests_snapshot)
-                    VALUES (?,?,?,?,?,'2025-01-01',?,?,?,'reviewed',?,?)
-                """, source, $"Story {number}", $"https://example.com/{number}", stamp, stamp, Store.PublicationTime(stamp),
-                number % 100 == 0 ? "KDE Plasma release" : "Other news", number % 2 == 0 ? "[\"Linux\"]" : "[\"AI\"]",
-                string.Concat(Enumerable.Repeat("Article body ", 200)), string.Concat(Enumerable.Repeat("Private snapshot ", 100)));
+                    VALUES ($sourceId,$headline,$url,$publishedAt,$discoveredAt,'2025-01-01',$sortTimestamp,$summary,$tags,'reviewed',$articleText,$interestsSnapshot)
+                """, ("$sourceId", source), ("$headline", $"Story {number}"), ("$url", $"https://example.com/{number}"), ("$publishedAt", stamp), ("$discoveredAt", stamp), ("$sortTimestamp", Store.PublicationTime(stamp)), ("$summary", number % 100 == 0 ? "KDE Plasma release" : "Other news"), ("$tags", number % 2 == 0 ? "[\"Linux\"]" : "[\"AI\"]"), ("$articleText", string.Concat(Enumerable.Repeat("Article body ", 200))), ("$interestsSnapshot", string.Concat(Enumerable.Repeat("Private snapshot ", 100))));
         }
     });
 
@@ -229,8 +225,7 @@ public class FeedQueryTests : IDisposable
             db.Execute("DROP INDEX stories_search");
             db.Execute("ALTER TABLE stories DROP COLUMN sort_timestamp");
             for (var number = 0; number < 1005; number++)
-                db.Execute("INSERT INTO stories(headline,url,published_at,discovered_at,day) VALUES (?,?,?,?, '2026-10-31')",
-                    $"Story {number}", $"https://example.com/{number}", number < 700 ? "2026-10-31T12:00:00+00:00" : null, "2026-10-31T13:00:00.123456+00:00");
+                db.Execute("INSERT INTO stories(headline,url,published_at,discovered_at,day) VALUES ($headline,$url,$publishedAt,$discoveredAt, '2026-10-31')", ("$headline", $"Story {number}"), ("$url", $"https://example.com/{number}"), ("$publishedAt", number < 700 ? "2026-10-31T12:00:00+00:00" : null), ("$discoveredAt", "2026-10-31T13:00:00.123456+00:00"));
             db.Execute("UPDATE stories SET published_at='bad date' WHERE id=1005");
         });
         store.Read(db => db.Execute("PRAGMA user_version=3"));
@@ -244,8 +239,8 @@ public class FeedQueryTests : IDisposable
         var upgraded = new Store(store.Path);
         upgraded.Read(db =>
         {
-            Assert.Equal(700, db.Long("SELECT COUNT(*) FROM stories WHERE sort_timestamp=?", Store.PublicationTime("2026-10-31T12:00:00+00:00")));
-            Assert.Equal(305, db.Long("SELECT COUNT(*) FROM stories WHERE sort_timestamp=?", Store.PublicationTime("2026-10-31T13:00:00.123456+00:00")));
+            Assert.Equal(700, db.Long("SELECT COUNT(*) FROM stories WHERE sort_timestamp=$sortTimestamp", ("$sortTimestamp", Store.PublicationTime("2026-10-31T12:00:00+00:00"))));
+            Assert.Equal(305, db.Long("SELECT COUNT(*) FROM stories WHERE sort_timestamp=$sortTimestamp", ("$sortTimestamp", Store.PublicationTime("2026-10-31T13:00:00.123456+00:00"))));
             return 0;
         });
     }

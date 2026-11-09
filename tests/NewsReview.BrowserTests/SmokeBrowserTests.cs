@@ -39,7 +39,7 @@ public class SmokeBrowserTests : BrowserTest
             foreach (var name in tags)
                 if (!Store.Topics().Any(t => (string)t! == name)) Fixtures.ChangeTopic(Store, "add", name);
             Store.InsertStory(source, Fixtures.Entry(headline, $"https://example.com/{index}", null, summary), category, today);
-            var id = Store.Read(db => db.Long("SELECT id FROM stories WHERE url=?", $"https://example.com/{index}"));
+            var id = Store.Read(db => db.Long("SELECT id FROM stories WHERE url=$url", ("$url", $"https://example.com/{index}")));
             var review = Reviewer.ValidateReview(Fixtures.Review(r =>
             {
                 r["summary"] = summary;
@@ -260,7 +260,7 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(page.Locator(".story h3")).ToContainTextAsync("Experimental HTTP method");
         Store.Write(db =>
         {
-            db.Execute("UPDATE stories SET published_at=NULL, discovered_at=? WHERE url != 'https://example.com/yesterday'", today + "T12:00:00+00:00");
+            db.Execute("UPDATE stories SET published_at=NULL, discovered_at=$discoveredAt WHERE url != 'https://example.com/yesterday'", ("$discoveredAt", today + "T12:00:00+00:00"));
             Store.BackfillStoryTimes(db);
         });
         await range.FillAsync(dateText);
