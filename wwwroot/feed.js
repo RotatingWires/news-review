@@ -215,7 +215,7 @@ export class Feed {
     bookmark.setAttribute('aria-label', `${story.bookmarked ? 'Remove bookmark:' : 'Bookmark:'} ${story.headline}`);
     bookmark.onclick = () => busy(bookmark, async () => {
       const next = !story.bookmarked;
-      await api('bookmarks/' + story.id, 'PUT', { bookmarked: next });
+      await api('bookmarks/' + story.id, 'PATCH', { bookmarked: next });
       story.bookmarked = next;
       if (this.app.view === 'bookmarks' && !next) await this.load();
       else card.replaceWith(this.tile(story));

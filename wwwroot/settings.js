@@ -93,7 +93,7 @@ export class Settings {
       $('modelKeyRemoveDialog').querySelector('[data-close]').focus();
     };
     $('modelKeyRemoveForm').onsubmit = event => this.submit(event, async () => {
-      await api('model-key/remove', 'POST', { ...this.removingKeyConfig, confirmation: 'REMOVE MODEL KEY' });
+      await api('model-key', 'DELETE', { ...this.removingKeyConfig, confirmation: 'REMOVE MODEL KEY' });
       $('modelKeyRemoveDialog').close();
       await this.refreshKeyStatus();
       notify('Saved API key removed. Future requests use the updated key configuration.');
@@ -155,7 +155,7 @@ export class Settings {
     $('purgeDuplicatesForm').onsubmit = async event => {
       event.preventDefault();
       await busy(event.submitter, async () => {
-        const result = await api('maintenance/duplicates/purge', 'POST', { confirmation: 'PURGE DUPLICATES' }, 120000);
+        const result = await api('maintenance/duplicates', 'DELETE', { confirmation: 'PURGE DUPLICATES' }, 120000);
         $('purgeDuplicatesDialog').close();
         await this.app.reloadDataset();
         notify(result.warning || `${result.deleted} duplicate ${result.deleted === 1 ? 'story' : 'stories'} removed.${result.compacted ? ' Database compacted.' : ''} Bookmarks and preferences were kept.`, Boolean(result.warning));
@@ -220,7 +220,7 @@ export class Settings {
       const id = $('sourceId').value;
       const source = this.sourceValues();
       try {
-        await api(id ? 'sources/' + id : 'sources', id ? 'PUT' : 'POST', source);
+        await api(id ? 'sources/' + id : 'sources', id ? 'PATCH' : 'POST', source);
         $('sourceDialog').close();
         await this.refreshSources();
         notify('Source saved.');
@@ -422,7 +422,7 @@ export class Settings {
       const toggle = el('button', '', source.enabled ? 'Disable' : 'Enable');
       toggle.setAttribute('aria-label', `${source.enabled ? 'Disable' : 'Enable'} ${source.name}`);
       toggle.onclick = () => busy(toggle, async () => {
-        await api('sources/' + source.id, 'PUT', { ...source, enabled: !source.enabled });
+        await api('sources/' + source.id, 'PATCH', { ...source, enabled: !source.enabled });
         await this.refreshSources();
       });
       row.append(info, check, edit, toggle);

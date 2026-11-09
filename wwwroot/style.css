@@ -308,6 +308,10 @@ input.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset
   pointer-events: none;
 }
 
+/* Number boxes look like the other apps' text boxes: no spinner arrows, but still a number keypad on phones. */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* A dropdown that would be cut off inside a dialog floats over the page (dropdown.js); a long one scrolls. */
 .floating-menu { overflow-y: auto; }
 

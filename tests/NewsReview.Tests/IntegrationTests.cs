@@ -120,14 +120,14 @@ public class ApiTests : IntegrationBase
         var revision = (string)store.Overview()["revision"]!;
         var beforePages = store.Read(db => db.Long("PRAGMA page_count"));
         Assert.Equal(1, (await Request("/api/maintenance/duplicates")).Body!["count"]!.AsLong());
-        const string path = "/api/maintenance/duplicates/purge";
-        Assert.Equal(400, (await Request(path, "POST", new { })).Status);
+        const string path = "/api/maintenance/duplicates";
+        Assert.Equal(400, (await Request(path, "DELETE", new { })).Status);
         var data = new { confirmation = "PURGE DUPLICATES" };
         Assert.True(collector.TryAcquire());
-        try { Assert.Equal(409, (await Request(path, "POST", data)).Status); }
+        try { Assert.Equal(409, (await Request(path, "DELETE", data)).Status); }
         finally { collector.Release(); }
-        Assert.Equal(403, (await Request(path, "POST", data, new() { ["Origin"] = "https://evil.example" })).Status);
-        var (status, result) = await Request(path, "POST", data);
+        Assert.Equal(403, (await Request(path, "DELETE", data, new() { ["Origin"] = "https://evil.example" })).Status);
+        var (status, result) = await Request(path, "DELETE", data);
         Assert.Equal(200, status);
         Assert.True(JsonNode.DeepEquals(new JsonObject { ["deleted"] = 1, ["compacted"] = true }, result));
         Assert.True(JsonNode.DeepEquals(settings, store.Settings()));
@@ -141,7 +141,7 @@ public class ApiTests : IntegrationBase
             return 0;
         });
         Assert.Equal(0, (await Request("/api/maintenance/duplicates")).Body!["count"]!.AsLong());
-        Assert.Equal(0, (await Request(path, "POST", data)).Body!["deleted"]!.AsLong());
+        Assert.Equal(0, (await Request(path, "DELETE", data)).Body!["deleted"]!.AsLong());
         Assert.Equal(401, (await Anonymous(path, "POST", data)).Status);
     }
 
@@ -712,8 +712,8 @@ public class WorkflowTests : IntegrationBase
         Assert.False((await Request("/api/model-key/status", "POST", With(scope, "base_url", Root + "/other"))).Body!["configured"]!.GetValue<bool>());
         Assert.Equal(200, (await Request("/api/test-model", "POST", With(config, "provider", "compatible"))).Status);
         Assert.Equal("", LastAuthorization());
-        Assert.Equal(400, (await Request("/api/model-key/remove", "POST", scope)).Status);
-        Assert.False((await Request("/api/model-key/remove", "POST", With(scope, "confirmation", "REMOVE MODEL KEY"))).Body!["configured"]!.GetValue<bool>());
+        Assert.Equal(400, (await Request("/api/model-key", "DELETE", scope)).Status);
+        Assert.False((await Request("/api/model-key", "DELETE", With(scope, "confirmation", "REMOVE MODEL KEY"))).Body!["configured"]!.GetValue<bool>());
         Assert.Equal(200, (await Request("/api/test-model", "POST", config)).Status);
         Assert.Equal("", LastAuthorization());
         await AssertNotServed("/model-credentials.json", "fake-replacement-private-key");
@@ -733,7 +733,7 @@ public class WorkflowTests : IntegrationBase
         await Request("/api/model-key", "PUT", With(config, "key", "fake-saved-key"));
         Assert.Equal(200, (await Request("/api/test-model", "POST", config)).Status);
         Assert.Equal("Bearer fake-saved-key", LastAuthorization());
-        Assert.Equal("environment", (string)(await Request("/api/model-key/remove", "POST", With(config, "confirmation", "REMOVE MODEL KEY"))).Body!["source"]!);
+        Assert.Equal("environment", (string)(await Request("/api/model-key", "DELETE", With(config, "confirmation", "REMOVE MODEL KEY"))).Body!["source"]!);
         Assert.Equal(200, (await Request("/api/test-model", "POST", config)).Status);
         Assert.Equal("Bearer fake-environment-key", LastAuthorization());
     }
@@ -865,7 +865,7 @@ public class WorkflowTests : IntegrationBase
         Assert.Equal(1, result!["total"]!.AsLong());
         Assert.False(((JsonObject)result["items"]![0]!).ContainsKey("article_text"));
         var storyId = result["items"]![0]!["id"]!.AsLong();
-        Assert.Equal(204, (await Request($"/api/bookmarks/{storyId}", "PUT", new { bookmarked = true })).Status);
+        Assert.Equal(204, (await Request($"/api/bookmarks/{storyId}", "PATCH", new { bookmarked = true })).Status);
         Assert.Equal(1, (await Request("/api/stories?bookmarks=1")).Body!["total"]!.AsLong());
         Assert.Equal(400, (await Request("/api/stories?start=2026-10-16&end=2026-10-01")).Status);
         Assert.Equal(204, (await Request("/api/settings", "PUT", new JsonObject { ["ai"] = ModelConfig() })).Status);
@@ -878,7 +878,7 @@ public class WorkflowTests : IntegrationBase
         var source = new { name = "New source", url = Root + "/new", feed_url = Root + "/feed", category = "Radio", enabled = true };
         Assert.Equal(201, (await Request("/api/sources", "POST", source)).Status);
         Assert.Equal(409, (await Request("/api/sources", "POST", source)).Status);
-        Assert.Equal(400, (await Request("/api/bookmarks/1", "PUT", new { bookmarked = "yes" })).Status);
+        Assert.Equal(400, (await Request("/api/bookmarks/1", "PATCH", new { bookmarked = "yes" })).Status);
         Assert.Equal(0, (await Request("/api/stories?query=%27%20OR%201%3D1--")).Body!["total"]!.AsLong());
         await AssertNotServed("/data/newsreview.db", "SQLite format 3");
         await AssertNotServed("/../Program.cs", "WebApplication.CreateBuilder");

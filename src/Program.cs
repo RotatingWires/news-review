@@ -323,7 +323,7 @@ app.MapGet("/api/feedback", () =>
 app.MapGet("/api/settings", () => Api.Send(store.Settings()));
 app.MapGet("/api/topics", () => Api.Send(store.Topics()));
 app.MapGet("/api/sources", () => Api.Send(store.Sources()));
-app.MapGet("/api/related/{id}", (string id) => Api.Send(store.Related(Api.ParseInteger(id))));
+app.MapGet("/api/related/{id:long}", (long id) => Api.Send(store.Related(id)));
 
 app.MapPost("/api/restore", async (HttpContext context) =>
 {
@@ -383,7 +383,7 @@ app.MapPut("/api/model-key", async (HttpRequest request) =>
     var data = await Api.Body(request);
     return Api.Send(collector.ModelKeys.Save(data, Json.Get(data, "key")));
 });
-app.MapPost("/api/model-key/remove", async (HttpRequest request) =>
+app.MapDelete("/api/model-key", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
     if (!Api.Confirmed(data, "REMOVE MODEL KEY")) throw new ValidationException("Confirm removing the saved API key before continuing");
@@ -401,7 +401,7 @@ app.MapPut("/api/topics", async (HttpRequest request) =>
     return Exclusive("Wait for collection/review or restore to finish before editing topics",
         () => Api.Send(store.SaveTopics(topics, renames, removalConfirmed)));
 });
-app.MapPost("/api/maintenance/duplicates/purge", async (HttpRequest request) =>
+app.MapDelete("/api/maintenance/duplicates", async (HttpRequest request) =>
 {
     if (!Api.Confirmed(await Api.Body(request), "PURGE DUPLICATES")) throw new ValidationException("Confirm duplicate purging before continuing");
     return Exclusive("Wait for collection/review or restore to finish before purging duplicates", () => Api.Send(store.PurgeDuplicates()));
@@ -448,17 +448,17 @@ app.MapPost("/api/fresh-start", async (HttpRequest request) =>
         return Api.Send(result);
     });
 });
-app.MapPost("/api/read/{id}", async (string id, HttpRequest request) =>
+app.MapPost("/api/read/{id:long}", async (long id, HttpRequest request) =>
 {
     await Api.Body(request);
-    return Api.Send(new JsonObject { ["read_at"] = store.MarkRead(Api.ParseInteger(id)) });
+    return Api.Send(new JsonObject { ["read_at"] = store.MarkRead(id) });
 });
-app.MapPut("/api/feedback/story/{id}", async (string id, HttpRequest request) =>
+app.MapPut("/api/feedback/story/{id:long}", async (long id, HttpRequest request) =>
 {
     var data = await Api.Body(request);
     var vote = Validation.Integer(data["vote"], "Vote", -1, 1);
     var reason = Validation.Text(Json.Get(data, "reason", ""), "Feedback reason", 320, empty: true);
-    store.RateStory(Api.ParseInteger(id), vote, reason);
+    store.RateStory(id, vote, reason);
     return Results.NoContent();
 });
 app.MapPut("/api/feedback/profile", async (HttpRequest request) =>
@@ -481,10 +481,10 @@ app.MapPost("/api/feedback/rebuild", async (HttpRequest request) =>
         return Api.Send(new JsonObject { ["ok"] = saved, ["error"] = saved ? null : "Feedback changed during profile generation. Please update again." }, saved ? 200 : 409);
     });
 });
-app.MapPut("/api/bookmarks/{id}", async (string id, HttpRequest request) =>
+app.MapPatch("/api/bookmarks/{id:long}", async (long id, HttpRequest request) =>
 {
     var data = await Api.Body(request);
-    store.Bookmark(Api.ParseInteger(id), Validation.Boolean(data["bookmarked"], "Bookmarked"));
+    store.Bookmark(id, Validation.Boolean(data["bookmarked"], "Bookmarked"));
     return Results.NoContent();
 });
 app.MapPut("/api/settings", async (HttpRequest request) =>
@@ -494,8 +494,8 @@ app.MapPut("/api/settings", async (HttpRequest request) =>
 });
 app.MapPost("/api/sources", async (HttpRequest request) =>
     Api.Send(new JsonObject { ["id"] = store.SaveSource(Validation.Source(await Api.Body(request))) }, 201));
-app.MapPut("/api/sources/{id}", async (string id, HttpRequest request) =>
-    Api.Send(new JsonObject { ["id"] = store.SaveSource(Validation.Source(await Api.Body(request)), Api.ParseInteger(id)) }));
+app.MapPatch("/api/sources/{id:long}", async (long id, HttpRequest request) =>
+    Api.Send(new JsonObject { ["id"] = store.SaveSource(Validation.Source(await Api.Body(request)), id) }));
 app.MapPost("/api/discover", async (HttpContext context) =>
 {
     var url = Validation.Url((await Api.Body(context.Request))["url"]);
