@@ -1,5 +1,3 @@
-'use strict';
-
 /* The login page: setup token, password creation, and sign-in. */
 const authForm = document.querySelector('#authForm');
 const password = document.querySelector('#password');
