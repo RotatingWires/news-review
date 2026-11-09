@@ -297,7 +297,7 @@ app.MapGet("/api/backup", () =>
         throw;
     }
     var stream = new FileStream(output, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.DeleteOnClose);
-    return Results.Stream(stream, "application/zip", "newsreview-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".zip");
+    return Results.Stream(stream, "application/zip", "newsreview-backup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".zip");
 });
 app.MapGet("/api/overview", () =>
 {

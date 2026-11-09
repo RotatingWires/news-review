@@ -7,33 +7,45 @@ async function errorMessage(response) {
   catch { return `NewsReview returned an unexpected response (HTTP ${response.status}). Check the server connection.`; }
 }
 
+/** File → Import/Export...: Download Backup, and Choose File to Restore... confirmed in a second dialog, like the other apps. */
 export class Transfer {
   constructor(app) {
     this.app = app;
     this.busy = false;
+    this.file = null;
     $('transfer-nav').onclick = () => {
       if (!app.authenticated) return;
-      $('backup-file').value = '';
-      $('confirm-restore').checked = false;
-      $('backup-file-info').textContent = 'Maximum ZIP size: 256 MiB. Maximum database size: 1 GiB.';
       this.sync();
       $('transfer-dialog').showModal();
     };
-    $('choose-backup').onclick = () => $('backup-file').click();
+    $('choose-backup').onclick = () => {
+      $('backup-file').value = '';
+      $('backup-file').click();
+    };
     $('backup-file').onchange = () => {
       const file = $('backup-file').files[0];
-      $('confirm-restore').checked = false;
-      $('backup-file-info').textContent = file ? `${file.name} (${(file.size / 1048576).toFixed(2)} MiB)` : 'Choose a NewsReview export ZIP.';
-      this.sync();
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.zip') || file.size > MAX_UPLOAD) {
+        notify('Choose a NewsReview backup ZIP no larger than 256 MiB.', true);
+        return;
+      }
+      this.file = file;
+      $('transfer-dialog').close();
+      $('restore-file-name').textContent = file.name;
+      $('restore-dialog').showModal();
     };
-    $('confirm-restore').onchange = () => this.sync();
+    $('restore-form').onsubmit = event => {
+      event.preventDefault();
+      $('restore-dialog').close();
+      this.restore(this.file);
+    };
     $('export-backup').onclick = () => this.export();
-    $('restore-backup').onclick = () => this.restore();
     $('transfer-dialog').addEventListener('cancel', event => { if (this.busy) event.preventDefault(); });
   }
 
+  /** Restoring waits for a running collection to finish. */
   sync() {
-    $('restore-backup').disabled = this.busy || this.app.overview?.collector.running || !$('backup-file').files.length || !$('confirm-restore').checked;
+    $('choose-backup').disabled = this.busy || Boolean(this.app.overview?.collector.running);
   }
 
   lock(value) {
@@ -58,19 +70,14 @@ export class Transfer {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      notify('Export download started.');
+      notify('Backup download started.');
     } catch (error) {
-      notify(`Export error: ${error.message}`, true);
+      notify(`Backup error: ${error.message}`, true);
     } finally { this.lock(false); }
   }
 
-  async restore() {
-    const file = $('backup-file').files[0];
-    if (this.busy || !file || !$('confirm-restore').checked) return;
-    if (!file.name.toLowerCase().endsWith('.zip') || file.size > MAX_UPLOAD) {
-      notify('Choose a NewsReview ZIP no larger than 256 MiB.', true);
-      return;
-    }
+  async restore(file) {
+    if (this.busy || !file) return;
     this.lock(true);
     notify('Validating the ZIP and restoring data. A recovery backup is saved first...');
     let restored = false;
@@ -83,12 +90,14 @@ export class Transfer {
       restored = true;
       await this.app.reloadDataset();
       notify(`Restored ${result.totals.stories} stories and ${result.totals.sources} source records. Recovery backup: data/backups/${result.recoveryBackup}`);
-      $('confirm-restore').checked = false;
     } catch (error) {
       let message = restored ? `Backup restored, but the display could not be refreshed: ${error.message}` : `Restore could not be confirmed: ${error.message}`;
       try { await this.app.reloadDataset(); message += ' Current server data has been reloaded.'; }
       catch { $('stories').replaceChildren(); message += ' Could not reload server data; reconnect before continuing.'; }
       notify(message, true);
-    } finally { this.lock(false); }
+    } finally {
+      this.file = null;
+      this.lock(false);
+    }
   }
 }

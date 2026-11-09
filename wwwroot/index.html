@@ -268,17 +268,19 @@
   </div></dialog>
   <dialog id="transfer-dialog"><div class="dialog-layout">
     <div class="dialog-heading"><h2>Import/Export</h2></div>
-    <div class="dialog-body">
-      <p>Download a complete NewsReview ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, and run history. It includes committed database changes while the app runs. Store it privately; the ZIP is not encrypted.</p>
-      <div><button id="export-backup" type="button">Download Export</button></div>
-      <p>Choose a NewsReview export ZIP. Restoring replaces the current dataset rather than merging it. The server validates it and saves a private recovery ZIP before changing anything. Your login password and browser theme are not replaced.</p>
-      <div><button id="choose-backup" type="button">Choose File to Import...</button></div>
+    <div class="dialog-body transfer-body">
+      <p>Download Backup saves a ZIP with stories, bookmarks, sources, interests, guidance, AI/collection settings, feedback, and run history, including committed changes while the app runs. It contains the SQLite database and a backup manifest, but never your password or saved model keys.</p>
+      <button id="export-backup" type="button">Download Backup</button>
+      <p>Restore a NewsReview backup ZIP to replace all current data after confirmation. It does not merge. The current data is saved on the server in data/backups first. Maximum ZIP size: 256 MiB; maximum database size: 1 GiB.</p>
+      <button id="choose-backup" type="button">Choose File to Restore...</button>
       <input id="backup-file" type="file" accept=".zip,application/zip" hidden>
-      <p id="backup-file-info" class="muted">Maximum ZIP size: 256 MiB. Maximum database size: 1 GiB.</p>
-      <label class="checkbox"><input type="checkbox" id="confirm-restore"> I understand that restoring replaces all current NewsReview data and preferences.</label>
-      <div><button id="restore-backup" class="danger" disabled>Restore backup</button></div>
     </div>
     <div class="dialog-actions"><button data-close="transfer-dialog">OK</button></div>
   </div></dialog>
+  <dialog id="restore-dialog"><form id="restore-form" class="dialog-layout">
+    <div class="dialog-heading"><h2>Restore Backup</h2></div>
+    <div class="dialog-body"><p>Replace all current NewsReview data with <strong id="restore-file-name"></strong>?</p><p>Stories, bookmarks, sources, interests, guidance, AI/collection settings, feedback, and run history are replaced, not merged. The server saves a recovery ZIP in data/backups first. Your login password and saved model keys are kept.</p></div>
+    <div class="dialog-actions"><button type="button" data-close="restore-dialog">Cancel</button><button class="danger" type="submit">Restore</button></div>
+  </form></dialog>
 </body>
 </html>

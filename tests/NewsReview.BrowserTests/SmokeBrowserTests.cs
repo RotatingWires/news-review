@@ -171,10 +171,10 @@ public class SmokeBrowserTests : BrowserTest
         await download.SaveAsAsync(backupPath);
         var chooser = await page.RunAndWaitForFileChooserAsync(() => page.Locator("#choose-backup").ClickAsync());
         await chooser.SetFilesAsync(backupPath);
-        await page.Locator("#confirm-restore").CheckAsync();
-        await page.Locator("#restore-backup").ClickAsync();
+        // Like the other apps, choosing the file closes Import/Export and asks for confirmation, Cancel first.
+        await Expect(page.Locator("#restore-dialog .dialog-actions button")).ToHaveTextAsync(new[] { "Cancel", "Restore" });
+        await page.Locator("#restore-dialog").GetByRole(AriaRole.Button, new() { Name = "Restore", Exact = true }).ClickAsync();
         await Expect(page.Locator("#status-message")).ToContainTextAsync("Restored", new() { Timeout = 15000 });
-        await page.Locator("#transfer-dialog .dialog-actions").GetByRole(AriaRole.Button, new() { Name = "OK", Exact = true }).ClickAsync();
         await page.Tab("Daily Feed").ClickAsync();
         var bookmarkStates = new List<(string Icon, string Status)>();
         async Task InspectBookmarkRequest(IRoute route)
