@@ -171,7 +171,7 @@ export class Settings {
       // Counts and the database size, like TaskList's and SpendTracker's Fresh Start.
       try {
         const summary = await api('fresh-start');
-        const plural = (count, one, many = one + 's') => `${count} ${count === 1 ? one : many}`;
+        const plural = (count, one, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
         const counts = {
           history: plural(summary.history, 'story', 'stories'), bookmarks: plural(summary.bookmarks, 'bookmark'),
           runs: plural(summary.runs, 'run'), topics: plural(summary.topics, 'topic'), feedback: plural(summary.feedback, 'rating'),
@@ -220,7 +220,7 @@ export class Settings {
       const id = $('#sourceId').value;
       const source = this.sourceValues();
       try {
-        await api(id ? 'sources/' + id : 'sources', id ? 'PATCH' : 'POST', source);
+        await api(id ? `sources/${id}` : 'sources', id ? 'PATCH' : 'POST', source);
         $('#sourceDialog').close();
         await this.refreshSources();
         notify('Source saved.');
@@ -407,10 +407,10 @@ export class Settings {
       info.append(title, el('small', '', `${source.category} · ${source.mode === 'page' ? 'Website page' : source.feedUrl || 'Automatic feed / website discovery'}`));
       const status = source.health.status;
       const statusLabel = { healthy: 'Healthy', unchecked: 'Not checked', disabled: 'Disabled', broken: 'Broken', error: 'Check failed' }[status];
-      if (statusLabel) info.append(el('span', 'source-state ' + status, statusLabel));
+      if (statusLabel) info.append(el('span', `source-state ${status}`, statusLabel));
       source.health.warnings.forEach(warning => info.append(el('small', 'source-warning', warning)));
       if (source.lastChecked) info.append(el('small', '', `Checked ${formatTime(source.lastChecked)} · Last success ${formatTime(source.lastSuccess)} · ${source.lastCount ?? 'Unknown'} entries · ${source.lastMethod || 'Method unknown'}`));
-      if (source.newestPublished) info.append(el('small', '', 'Newest reported publication: ' + formatTime(source.newestPublished)));
+      if (source.newestPublished) info.append(el('small', '', `Newest reported publication: ${formatTime(source.newestPublished)}`));
       const check = el('button', 'check-source', 'Check');
       check.setAttribute('aria-label', `Check ${source.name}`);
       check.title = source.enabled ? 'Check only this source now' : 'Enable the source to check it';
@@ -422,7 +422,7 @@ export class Settings {
       const toggle = el('button', '', source.enabled ? 'Disable' : 'Enable');
       toggle.setAttribute('aria-label', `${source.enabled ? 'Disable' : 'Enable'} ${source.name}`);
       toggle.addEventListener('click', () => busy(toggle, async () => {
-        await api('sources/' + source.id, 'PATCH', { ...source, enabled: !source.enabled });
+        await api(`sources/${source.id}`, 'PATCH', { ...source, enabled: !source.enabled });
         await this.refreshSources();
       }));
       row.append(info, check, edit, toggle);

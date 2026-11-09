@@ -39,7 +39,7 @@ export class Feed {
     key.append(el('span', 'relevance-key-heading', 'Relevance:'));
     [...RELEVANCE, UNREVIEWED].forEach(tier => {
       const item = el('span', 'relevance-key-item');
-      const swatch = el('span', 'relevance-swatch relevance-' + tier.name);
+      const swatch = el('span', `relevance-swatch relevance-${tier.name}`);
       swatch.setAttribute('aria-hidden', 'true');
       item.append(swatch, document.createTextNode(tier.label + (tier.range ? ` (${tier.range})` : '')));
       key.append(item);
@@ -96,7 +96,7 @@ export class Feed {
       if (story.readAt || saving) return;
       saving = true;
       try {
-        const result = await api('read/' + story.id, 'POST', {});
+        const result = await api(`read/${story.id}`, 'POST', {});
         story.readAt = result.readAt;
         onRead();
       } catch (error) { notify(error.message, true); }
@@ -120,7 +120,7 @@ export class Feed {
 
   async saveFeedback(vote, button) {
     await busy(button, async () => {
-      await api('feedback/story/' + this.feedbackStory.id, 'PUT', { vote, reason: vote ? $('#feedbackReason').value : '' });
+      await api(`feedback/story/${this.feedbackStory.id}`, 'PUT', { vote, reason: vote ? $('#feedbackReason').value : '' });
       $('#feedbackDialog').close();
       await this.load();
       notify(vote ? 'Feedback saved. Learned preferences update before the next review batch.' : 'Article feedback removed.');
@@ -163,7 +163,7 @@ export class Feed {
   }
 
   moveDay(offset) {
-    const value = new Date((dayValue() || this.app.overview.today) + 'T12:00:00Z');
+    const value = new Date(`${dayValue() || this.app.overview.today}T12:00:00Z`);
     value.setUTCDate(value.getUTCDate() + offset);
     setDay(value.toISOString().slice(0, 10));
     this.clearFilters();
@@ -196,7 +196,7 @@ export class Feed {
     if ($('#showHidden').checked) params.set('hidden', '1');
     $('#stories').setAttribute('aria-busy', 'true');
     try {
-      const result = await api('stories?' + params);
+      const result = await api(`stories?${params}`);
       if (requestId !== this.requestId) return;
       $('#stories').replaceChildren(...result.items.map(story => this.tile(story)));
       $('#dayControls').hidden = bookmarked;
@@ -215,7 +215,7 @@ export class Feed {
 
   editionTitle() {
     if (dayValue() === this.app.overview.today) return "Today's Edition";
-    const value = new Date(dayValue() + 'T12:00:00Z');
+    const value = new Date(`${dayValue()}T12:00:00Z`);
     return Number.isNaN(value.getTime()) ? 'Daily Edition' : value.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   }
 
@@ -227,7 +227,7 @@ export class Feed {
     bookmark.setAttribute('aria-label', `${story.bookmarked ? 'Remove bookmark:' : 'Bookmark:'} ${story.headline}`);
     bookmark.addEventListener('click', () => busy(bookmark, async () => {
       const next = !story.bookmarked;
-      await api('bookmarks/' + story.id, 'PATCH', { bookmarked: next });
+      await api(`bookmarks/${story.id}`, 'PATCH', { bookmarked: next });
       story.bookmarked = next;
       if (this.app.view === 'bookmarks' && !next) await this.load();
       else card.replaceWith(this.tile(story));
@@ -235,7 +235,7 @@ export class Feed {
     }, story.bookmarked ? 'Removing bookmark...' : 'Saving bookmark...'));
     const tier = story.status !== 'pending' && Number.isInteger(story.score)
       ? RELEVANCE.find(value => story.score >= value.minimum) || UNREVIEWED : UNREVIEWED;
-    const relevance = el('span', 'relevance-indicator relevance-' + tier.name);
+    const relevance = el('span', `relevance-indicator relevance-${tier.name}`);
     const description = tier === UNREVIEWED ? 'Awaiting AI review; no current relevance score'
       : `${tier.label}: AI interest score ${story.score}/100`;
     relevance.title = description;
@@ -298,7 +298,7 @@ export class Feed {
         if (!related.open || loaded) return;
         loaded = true;
         try {
-          const links = await api('related/' + story.id);
+          const links = await api(`related/${story.id}`);
           links.forEach(item => related.append(this.articleLink({ ...item, headline: `${item.sourceName}: ${item.headline}` })));
         } catch (error) { loaded = false; notify(error.message, true); }
       });

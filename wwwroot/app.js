@@ -151,10 +151,10 @@ class App {
   async refreshOverview() {
     this.overview = await api('overview');
     this.release ??= await releaseVersion(this.overview.version);
-    $('#version').textContent = 'v' + this.release;
+    $('#version').textContent = `v${this.release}`;
     // The version is its own span so phones can hide it from the title bar.
     $('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.release}` }));
-    $('#helpVersion').textContent = 'NewsReview v' + this.release;
+    $('#helpVersion').textContent = `NewsReview v${this.release}`;
     const state = this.overview.collector;
     $('.status-dot').classList.toggle('collecting', state.running);
     $('footer').setAttribute('aria-busy', String(state.running));
@@ -176,7 +176,7 @@ class App {
       : state.message;
     if (this.unconfirmedRefresh !== null) {
       if (state.running || (last && last.id > this.unconfirmedRefresh)) this.unconfirmedRefresh = null;
-      else refreshStatus = 'No newer collection was recorded. Press Refresh sources to retry. ' + refreshStatus;
+      else refreshStatus = `No newer collection was recorded. Press Refresh Sources to retry. ${refreshStatus}`;
     }
     $('#sourceRefreshStatus').textContent = refreshStatus;
     this.settings.renderRuns();

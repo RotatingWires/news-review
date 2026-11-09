@@ -26,7 +26,7 @@ function build(field) {
   const source = combo ? field.list : field;
   const label = field.getAttribute('aria-label') || field.closest('label')?.firstChild.textContent.trim() || 'Choose option';
   if (!field.hasAttribute('aria-label')) field.setAttribute('aria-label', label);
-  const wrapper = el('span', 'custom-dropdown' + (combo ? ' editable-dropdown' : ''));
+  const wrapper = el('span', `custom-dropdown${combo ? ' editable-dropdown' : ''}`);
   const trigger = el('button', 'dropdown-trigger');
   trigger.type = 'button';
   trigger.setAttribute('aria-label', combo ? 'Choose default category' : label);

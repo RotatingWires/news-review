@@ -45,7 +45,7 @@ export async function api(path, method = 'GET', data, timeoutMs = 30000) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response, result;
   try {
-    response = await fetch('/api/' + path, {
+    response = await fetch(`/api/${path}`, {
       method, credentials: 'same-origin', signal: controller.signal,
       headers: { ...(method === 'GET' ? {} : revisionHeaders()), ...(data === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: data === undefined ? undefined : JSON.stringify(data),
