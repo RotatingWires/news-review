@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.39
+# NewsReview v1.0.40
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -601,6 +601,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.40
+
+- Dropdowns and menus share one file, `dropdown.js`, the same in every app: Arrow Down/Up move through a menu (Arrow Down on a closed dropdown opens it), Home and End jump to the first and last item, and Escape closes it and returns to its button without closing the dialog under it. A dropdown that would be cut off inside a dialog floats over the page and opens upward when there is more room there, like SpendTracker's.
+- Every check box is the Windows 95 kind (Filter..., Settings, and the source dialog used the browser's).
 
 ### v1.0.39
 

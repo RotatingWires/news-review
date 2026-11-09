@@ -135,6 +135,7 @@ export class Feed {
       const label = el('div', 'checkbox topic-row');
       const checkbox = el('input');
       checkbox.type = 'checkbox';
+      checkbox.className = 'retro-check';
       checkbox.setAttribute('aria-label', topic);
       checkbox.checked = this.selectedTopics.has(topic);
       checkbox.onchange = () => {

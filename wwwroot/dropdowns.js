@@ -86,21 +86,14 @@ function build(field) {
     sync();
   };
   trigger.onclick = event => { event.preventDefault(); opened?.trigger === trigger ? closeMenu() : open(); };
-  wrapper.onkeydown = event => {
-    if (event.key === 'Escape' && opened?.trigger === trigger) {
-      event.preventDefault(); event.stopPropagation(); closeMenu(true); return;
-    }
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || (combo && event.target === field && event.key !== 'ArrowDown')) return;
+  // Arrow keys, Home, End, and Escape come from dropdown.js, shared with the other apps. An editable field opens its
+  // list with Arrow Down too.
+  if (combo) field.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowDown' || opened?.trigger === trigger) return;
     event.preventDefault();
-    if (opened?.trigger !== trigger) open();
-    const items = [...menu.children];
-    let index = items.indexOf(document.activeElement);
-    if (event.key === 'Home') index = 0;
-    else if (event.key === 'End') index = items.length - 1;
-    else if (index < 0) index = Math.max(0, items.findIndex(item => item.dataset.value === field.value));
-    else index = (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
-    items[index]?.focus();
-  };
+    open();
+    menu.querySelector('.dropdown-option')?.focus();
+  });
   field.addEventListener('change', sync);
   field.addEventListener('input', sync);
   controls.set(field, () => { render(); sync(); });

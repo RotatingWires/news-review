@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" href="/icons/touch-180.png">
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
+  <script src="/dropdown.js"></script>
   <script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -69,12 +70,12 @@
         <div class="topic-filter custom-dropdown">
           <button type="button" id="topic-button" class="dropdown-trigger" aria-expanded="false" aria-controls="topic-menu" aria-haspopup="true"><span id="topic-label" class="dropdown-label">Filter...</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button>
           <div id="topic-menu" class="dropdown-menu" role="group" aria-label="Story filters" hidden>
-            <label class="checkbox filter-option"><input type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
+            <label class="checkbox filter-option"><input class="retro-check" type="checkbox" id="show-hidden"> Include filtered / duplicates</label>
             <fieldset class="filter-group"><legend>Relevance</legend>
-              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="high" checked> Highly relevant (75–100)</label>
-              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="medium" checked> Somewhat relevant (40–74)</label>
-              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="low" checked> Low relevance (0–39)</label>
-              <label class="checkbox filter-option"><input type="checkbox" name="relevance" value="pending" checked> Awaiting review</label>
+              <label class="checkbox filter-option"><input class="retro-check" type="checkbox" name="relevance" value="high" checked> Highly relevant (75–100)</label>
+              <label class="checkbox filter-option"><input class="retro-check" type="checkbox" name="relevance" value="medium" checked> Somewhat relevant (40–74)</label>
+              <label class="checkbox filter-option"><input class="retro-check" type="checkbox" name="relevance" value="low" checked> Low relevance (0–39)</label>
+              <label class="checkbox filter-option"><input class="retro-check" type="checkbox" name="relevance" value="pending" checked> Awaiting review</label>
             </fieldset>
             <fieldset class="filter-group"><legend>Topics (match any selected)</legend><button id="topic-all" type="button">All topics</button><div id="topic-options"></div></fieldset>
           </div>
@@ -110,8 +111,8 @@
         <div class="maintenance"><h3>Learned Preferences</h3>
           <p class="muted">Thumbs up/down and optional reasons help refine future relevance scores. Your written interests and guidance take priority. Automatic updates use the 10 most recent ratings once before a review batch, not every article.</p>
           <form id="feedback-profile-form">
-            <label class="checkbox"><input id="feedback-enabled" type="checkbox" checked> Use learned preferences in reviews</label>
-            <label class="checkbox"><input id="feedback-auto" type="checkbox" checked> Update the profile automatically when feedback changes</label>
+            <label class="checkbox"><input class="retro-check" id="feedback-enabled" type="checkbox" checked> Use learned preferences in reviews</label>
+            <label class="checkbox"><input class="retro-check" id="feedback-auto" type="checkbox" checked> Update the profile automatically when feedback changes</label>
             <label>Preference profile<textarea id="feedback-profile" rows="5" maxlength="2400"></textarea></label>
             <p id="feedback-profile-status" class="muted"></p>
             <div class="button-row"><button type="submit" class="primary">Save</button><button id="feedback-rebuild" type="button">Update from Feedback</button><button id="feedback-reset" type="button" class="danger">Reset Feedback...</button></div>
@@ -144,7 +145,7 @@
           <label><span class="has-tooltip" title="How long to wait for the model to answer one article before that review counts as failed.">Request timeout (seconds)</span><input id="ai-timeout" type="number" min="10" max="600" required></label>
           <label><span class="has-tooltip" title="How much of each article&#x27;s text is sent to the model. Longer articles are cut off here; lower it to send less. Default 12,000.">Maximum article characters</span><input id="ai-input" type="number" min="2000" max="40000" step="1000" required></label>
           <label><span class="has-tooltip" title="The longest answer the model may write for one article. Raise it if reviews are reported as truncated. Default 2400.">Maximum response tokens</span><input id="ai-output" type="number" min="256" max="8192" required></label>
-          <label id="ai-unload-row" class="checkbox full"><input id="ai-unload" type="checkbox" checked> Unload Ollama model after a test or review batch</label>
+          <label id="ai-unload-row" class="checkbox full"><input class="retro-check" id="ai-unload" type="checkbox" checked> Unload Ollama model after a test or review batch</label>
           <p id="ai-help" class="callout full"></p>
           <div class="button-row full"><button class="primary" type="submit">Save</button><button id="test-model" type="button">Test with a Sample Article</button></div>
           <output id="model-test-result" class="callout full" hidden></output>
@@ -164,7 +165,7 @@
       <section id="panel-collection" class="settings-panel" hidden>
         <h2>Automatic Collection</h2><p class="muted" id="schedule-timezone"></p>
         <form id="collection-form" class="form-grid">
-          <label class="checkbox full"><input type="checkbox" id="schedule-enabled"> Enable automatic collection</label>
+          <label class="checkbox full"><input class="retro-check" type="checkbox" id="schedule-enabled"> Enable automatic collection</label>
           <label><span class="has-tooltip" title="How often NewsReview checks your sources by itself, counted from when the last full collection started.">Collect every (hours)</span><input id="schedule-interval" type="number" min="1" max="8760" step="1" required></label>
           <label><span class="has-tooltip" title="How many of each source&#x27;s newest articles one check looks at.">Newest articles per source</span><input id="items-per-source" type="number" min="1" max="50" required></label>
           <label><span class="has-tooltip" title="How many stories are reviewed after each check. The rest stay queued for the next run or Review Pending. Default 40.">Maximum AI reviews per run</span><input id="max-reviews" type="number" min="1" max="500" required></label>
@@ -198,7 +199,7 @@
       <label><span class="has-tooltip" title="The source is flagged when it has gone this long without a check, a recent publication, or a new story. Raise it for publishers that post rarely.">Warn after this many days without activity</span><input id="source-stale-days" type="number" min="1" max="365" value="14" required></label>
       <label class="source-category-label"><span class="has-tooltip" title="The topic given to this source&#x27;s stories before the AI review assigns its own.">Default category</span><input id="source-category" maxlength="60" required list="source-categories"></label>
       <datalist id="source-categories"></datalist>
-      <label class="checkbox"><input type="checkbox" id="source-enabled" checked> Enabled</label>
+      <label class="checkbox"><input class="retro-check" type="checkbox" id="source-enabled" checked> Enabled</label>
       <p id="source-error" class="error" role="alert"></p>
     </div>
     <div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Save</button></div>
