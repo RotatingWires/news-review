@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.36
+# NewsReview v1.0.37
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -584,7 +584,7 @@ wwwroot/
   settings.js             interests, topics, sources, AI and scheduling controls
   transfer.js             browser ZIP download/upload and restore confirmation
   dropdowns.js            shared Win95 single-select and editable category menus
-  icon.svg                application icon
+  icons/                  favicon.svg, favicon.ico, and touch-180/192/512.png, the same names in every app
 tests/
   NewsReview.Tests/       unit and integration tests
   NewsReview.BrowserTests/ optional Playwright browser checks
@@ -601,6 +601,12 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.37
+
+- The login and main pages share one set of page tags, the same in every app: a description, the iPhone home-screen and status-bar settings, the manifest, and icons.
+- Icons live in `/icons/` with the same names in every app: `favicon.svg`, `favicon.ico`, and `touch-180/192/512.png`. The manifest has an app ID, scope, and description.
+- The window and home-screen colors are navy and gray (#000080 / #c0c0c0) like the other apps; the icons moved from the site root to `/icons/`.
 
 ### v1.0.36
 
