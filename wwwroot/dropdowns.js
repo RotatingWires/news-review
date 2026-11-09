@@ -38,7 +38,7 @@ function build(field) {
   if (!combo) trigger.append(text);
   trigger.append(arrow);
   const menu = el('span', 'dropdown-menu');
-  menu.id = 'dropdown-' + ++serial;
+  menu.id = 'dropdown' + ++serial;
   menu.hidden = true;
   menu.setAttribute('role', 'listbox');
   menu.setAttribute('aria-label', label);
@@ -102,7 +102,7 @@ function build(field) {
 }
 
 export function syncDropdowns(root = document) {
-  root.querySelectorAll('select, #source-category').forEach(field => {
+  root.querySelectorAll('select, #sourceCategory').forEach(field => {
     if (!controls.has(field)) build(field);
     else controls.get(field)();
   });

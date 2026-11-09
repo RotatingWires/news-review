@@ -50,124 +50,124 @@ export class Settings {
     this.sources = [];
     this.keyStatusSequence = 0;
     document.querySelectorAll('[data-tab]').forEach(button => { button.onclick = () => this.tab(button.dataset.tab); });
-    $('topics-form').onsubmit = event => this.submit(event, () => this.saveTopics());
-    $('topic-remove-form').onsubmit = event => this.submit(event, async () => {
-      $('topic-remove-dialog').close();
+    $('topicsForm').onsubmit = event => this.submit(event, () => this.saveTopics());
+    $('topicRemoveForm').onsubmit = event => this.submit(event, async () => {
+      $('topicRemoveDialog').close();
       await this.saveTopics(true);
     });
-    $('add-interest').onclick = () => this.interestRow({ name: '', preference: 'favor' });
-    $('interests-form').onsubmit = event => this.submit(event, async () => {
-      const topics = [...$('interest-rows').children].map(row => ({ name: row.querySelector('input').value.trim(), preference: row.querySelector('select').value }));
+    $('addInterest').onclick = () => this.interestRow({ name: '', preference: 'favor' });
+    $('interestsForm').onsubmit = event => this.submit(event, async () => {
+      const topics = [...$('interestRows').children].map(row => ({ name: row.querySelector('input').value.trim(), preference: row.querySelector('select').value }));
       const interests = { topics, guidance: $('guidance').value, exclusions: $('exclusions').value.split('\n').map(x => x.trim()).filter(Boolean) };
       await api('settings', 'PUT', { interests });
       this.values.interests = interests;
       notify('Interests saved. Future reviews will use these preferences.');
     });
-    $('ai-form').onsubmit = event => this.submit(event, async () => {
+    $('aiForm').onsubmit = event => this.submit(event, async () => {
       const ai = this.aiValues();
       await api('settings', 'PUT', { ai });
       this.values.ai = ai;
       notify(ai.model ? 'AI settings saved.' : 'AI review paused. Collection remains available.');
     });
-    $('ai-provider').onchange = () => {
+    $('aiProvider').onchange = () => {
       const defaults = { ollama: 'http://127.0.0.1:11434', compatible: 'http://127.0.0.1:1234/v1', openrouter: 'https://openrouter.ai/api/v1' };
-      if (Object.values(defaults).includes($('ai-url').value)) $('ai-url').value = defaults[$('ai-provider').value];
+      if (Object.values(defaults).includes($('aiUrl').value)) $('aiUrl').value = defaults[$('aiProvider').value];
       this.aiHelp();
       this.refreshKeyStatus(true);
     };
-    $('ai-url').onchange = () => this.refreshKeyStatus(true);
-    $('model-key-form').onsubmit = async event => {
+    $('aiUrl').onchange = () => this.refreshKeyStatus(true);
+    $('modelKeyForm').onsubmit = async event => {
       event.preventDefault();
       await busy(event.submitter, async () => {
-        await api('model-key', 'PUT', { ...this.keyConfig(), key: $('model-api-key').value });
-        $('model-api-key').value = '';
+        await api('model-key', 'PUT', { ...this.keyConfig(), key: $('modelApiKey').value });
+        $('modelApiKey').value = '';
         notify('API key saved. Future model requests use it immediately.');
       }, 'Saving API key...');
       await this.refreshKeyStatus();
     };
-    $('model-key-remove').onclick = () => {
+    $('modelKeyRemove').onclick = () => {
       this.removingKeyConfig = this.keyConfig();
-      $('model-key-remove-target').textContent = `${this.removingKeyConfig.provider === 'openrouter' ? 'OpenRouter' : 'Compatible server'} · ${this.removingKeyConfig.baseUrl}`;
-      $('model-key-environment-fallback').hidden = !this.keyStatus?.environment;
-      $('model-key-remove-dialog').showModal();
-      $('model-key-remove-dialog').querySelector('[data-close]').focus();
+      $('modelKeyRemoveTarget').textContent = `${this.removingKeyConfig.provider === 'openrouter' ? 'OpenRouter' : 'Compatible server'} · ${this.removingKeyConfig.baseUrl}`;
+      $('modelKeyEnvironmentFallback').hidden = !this.keyStatus?.environment;
+      $('modelKeyRemoveDialog').showModal();
+      $('modelKeyRemoveDialog').querySelector('[data-close]').focus();
     };
-    $('model-key-remove-form').onsubmit = event => this.submit(event, async () => {
+    $('modelKeyRemoveForm').onsubmit = event => this.submit(event, async () => {
       await api('model-key/remove', 'POST', { ...this.removingKeyConfig, confirmation: 'REMOVE MODEL KEY' });
-      $('model-key-remove-dialog').close();
+      $('modelKeyRemoveDialog').close();
       await this.refreshKeyStatus();
       notify('Saved API key removed. Future requests use the updated key configuration.');
     });
-    $('test-model').onclick = () => busy($('test-model'), async () => {
-      $('model-test-result').hidden = false;
-      $('model-test-result').textContent = 'Asking your server to review a fictional sample article...';
+    $('testModel').onclick = () => busy($('testModel'), async () => {
+      $('modelTestResult').hidden = false;
+      $('modelTestResult').textContent = 'Asking your server to review a fictional sample article...';
       try {
-        const result = await api('test-model', 'POST', this.aiValues(), Number($('ai-timeout').value) * 1000 + 15000);
-        $('model-test-result').textContent = `Connection and output validation passed. Sample summary: ${result.summary}`;
-      } catch (error) { $('model-test-result').textContent = error.message; throw error; }
+        const result = await api('test-model', 'POST', this.aiValues(), Number($('aiTimeout').value) * 1000 + 15000);
+        $('modelTestResult').textContent = `Connection and output validation passed. Sample summary: ${result.summary}`;
+      } catch (error) { $('modelTestResult').textContent = error.message; throw error; }
     });
-    $('collection-form').onsubmit = event => this.submit(event, async () => {
-      const collection = { enabled: $('schedule-enabled').checked, intervalHours: Number($('schedule-interval').value),
-        itemsPerSource: Number($('items-per-source').value), maxReviews: Number($('max-reviews').value), lookbackDays: Number($('lookback').value) };
+    $('collectionForm').onsubmit = event => this.submit(event, async () => {
+      const collection = { enabled: $('scheduleEnabled').checked, intervalHours: Number($('scheduleInterval').value),
+        itemsPerSource: Number($('itemsPerSource').value), maxReviews: Number($('maxReviews').value), lookbackDays: Number($('lookback').value) };
       await api('settings', 'PUT', { collection });
       this.values.collection = collection;
       notify('Collection settings saved.');
     });
-    $('feedback-profile-form').onsubmit = event => this.submit(event, async () => {
-      await api('feedback/profile', 'PUT', { profile: $('feedback-profile').value, enabled: $('feedback-enabled').checked, autoUpdate: $('feedback-auto').checked });
+    $('feedbackProfileForm').onsubmit = event => this.submit(event, async () => {
+      await api('feedback/profile', 'PUT', { profile: $('feedbackProfile').value, enabled: $('feedbackEnabled').checked, autoUpdate: $('feedbackAuto').checked });
       notify('Learned preferences saved.');
       await this.loadFeedback();
     });
-    $('feedback-rebuild').onclick = () => busy($('feedback-rebuild'), async () => {
+    $('feedbackRebuild').onclick = () => busy($('feedbackRebuild'), async () => {
       await api('feedback/rebuild', 'POST', {}, Number(this.values.ai.timeoutSeconds) * 1000 + 15000);
       await this.loadFeedback();
       notify('Learned preferences updated from recent feedback.');
     }, 'Updating learned preferences...');
-    $('feedback-reset').onclick = () => $('feedback-reset-dialog').showModal();
-    $('feedback-confirm-reset').onclick = () => busy($('feedback-confirm-reset'), async () => {
+    $('feedbackReset').onclick = () => $('feedbackResetDialog').showModal();
+    $('feedbackConfirmReset').onclick = () => busy($('feedbackConfirmReset'), async () => {
       await api('fresh-start', 'POST', { confirmation: 'RESET SELECTED', selections: { feedback: true } });
-      $('feedback-reset-dialog').close();
+      $('feedbackResetDialog').close();
       await this.app.reloadDataset();
       notify('Article feedback and learned preferences were reset.');
     });
-    $('retry-failed').onclick = () => busy($('retry-failed'), async () => {
+    $('retryFailed').onclick = () => busy($('retryFailed'), async () => {
       const result = await api('requeue', 'POST', { failedOnly: true });
       notify(`${result.count} failed reviews reset. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
     $('reassess').onclick = () => {
-      $('confirm-dialog').showModal();
-      $('confirm-dialog').querySelector('[data-close]').focus();
+      $('confirmDialog').showModal();
+      $('confirmDialog').querySelector('[data-close]').focus();
     };
-    $('confirm-reassess').onclick = () => busy($('confirm-reassess'), async () => {
+    $('confirmReassess').onclick = () => busy($('confirmReassess'), async () => {
       const result = await api('requeue', 'POST', { failedOnly: false });
-      $('confirm-dialog').close();
+      $('confirmDialog').close();
       notify(`${result.count} stories queued. Use Review pending to process them.`);
       await this.app.refreshOverview();
     });
-    $('purge-duplicates').onclick = () => busy($('purge-duplicates'), async () => {
+    $('purgeDuplicates').onclick = () => busy($('purgeDuplicates'), async () => {
       const result = await api('maintenance/duplicates');
-      $('purge-duplicates-count').textContent = `${result.count} duplicate ${result.count === 1 ? 'story can' : 'stories can'} be removed.`;
-      $('confirm-purge-duplicates').disabled = result.count === 0;
-      $('purge-duplicates-dialog').showModal();
-      $('purge-duplicates-dialog').querySelector('[data-close]').focus();
+      $('purgeDuplicatesCount').textContent = `${result.count} duplicate ${result.count === 1 ? 'story can' : 'stories can'} be removed.`;
+      $('confirmPurgeDuplicates').disabled = result.count === 0;
+      $('purgeDuplicatesDialog').showModal();
+      $('purgeDuplicatesDialog').querySelector('[data-close]').focus();
     });
-    $('purge-duplicates-form').onsubmit = async event => {
+    $('purgeDuplicatesForm').onsubmit = async event => {
       event.preventDefault();
       await busy(event.submitter, async () => {
         const result = await api('maintenance/duplicates/purge', 'POST', { confirmation: 'PURGE DUPLICATES' }, 120000);
-        $('purge-duplicates-dialog').close();
+        $('purgeDuplicatesDialog').close();
         await this.app.reloadDataset();
         notify(result.warning || `${result.deleted} duplicate ${result.deleted === 1 ? 'story' : 'stories'} removed.${result.compacted ? ' Database compacted.' : ''} Bookmarks and preferences were kept.`, Boolean(result.warning));
       }, 'Purging duplicate stories and compacting the database...');
     };
-    $('clear-history').onclick = async () => {
-      $('clear-history-form').reset();
-      $('clear-history-error').textContent = '';
-      $('clear-history-dialog').querySelectorAll('[data-fresh-count]').forEach(count => { count.textContent = ''; });
-      $('fresh-start-size').textContent = 'Checking stored data...';
-      $('clear-history-dialog').showModal();
-      $('clear-history-dialog').querySelector('[data-close]').focus();
+    $('clearHistory').onclick = async () => {
+      $('clearHistoryForm').reset();
+      $('clearHistoryError').textContent = '';
+      $('clearHistoryDialog').querySelectorAll('[data-fresh-count]').forEach(count => { count.textContent = ''; });
+      $('freshStartSize').textContent = 'Checking stored data...';
+      $('clearHistoryDialog').showModal();
+      $('clearHistoryDialog').querySelector('[data-close]').focus();
       // Counts and the database size, like TaskList's and SpendTracker's Fresh Start.
       try {
         const summary = await api('fresh-start');
@@ -178,67 +178,67 @@ export class Settings {
           exclusions: plural(summary.exclusions, 'exclusion'), sources: plural(summary.sources, 'source'),
           recoveryBackups: `${plural(summary.recoveryBackups, 'file')}, ${formatBytes(summary.recoveryBackupBytes)}`,
         };
-        for (const [key, text] of Object.entries(counts)) $('clear-history-dialog').querySelector(`[data-fresh-count="${key}"]`).textContent = `(${text})`;
-        $('fresh-start-size').textContent = `Database size: ${formatBytes(summary.databaseBytes)}.`;
-      } catch (error) { $('fresh-start-size').textContent = `Could not read stored data: ${error.message}`; }
+        for (const [key, text] of Object.entries(counts)) $('clearHistoryDialog').querySelector(`[data-fresh-count="${key}"]`).textContent = `(${text})`;
+        $('freshStartSize').textContent = `Database size: ${formatBytes(summary.databaseBytes)}.`;
+      } catch (error) { $('freshStartSize').textContent = `Could not read stored data: ${error.message}`; }
     };
-    $('clear-history-form').onsubmit = event => this.submit(event, async () => {
+    $('clearHistoryForm').onsubmit = event => this.submit(event, async () => {
       try {
-        const selections = Object.fromEntries([...$('clear-history-form').querySelectorAll('.reset-options input')].map(input => [input.id.slice('reset-'.length), input.checked]));
-        const result = await api('fresh-start', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
-        $('clear-history-dialog').close();
+        const selections = Object.fromEntries([...$('clearHistoryForm').querySelectorAll('.reset-options input')].map(input => [input.dataset.freshStart, input.checked]));
+        const result = await api('fresh-start', 'POST', { confirmation: $('clearHistoryConfirmation').value, selections });
+        $('clearHistoryDialog').close();
         await this.app.reloadDataset();
         notify(`Fresh Start: ${result.deletedStories} ${result.deletedStories === 1 ? 'story' : 'stories'} and ${result.removedBackups} recovery ${result.removedBackups === 1 ? 'backup' : 'backups'} removed; freed ${formatBytes(result.freedBytes)}. Unchecked items were kept.`);
-      } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
+      } catch (error) { $('clearHistoryError').textContent = error.message; throw error; }
     });
-    $('add-source').onclick = () => this.editSource();
-    $('check-new-sources').onclick = () => this.app.collect('collect', $('check-new-sources'), { uncheckedOnly: true });
-    $('refresh-sources').onclick = () => this.app.collect('collect', $('refresh-sources'));
-    $('discover-feed').onclick = () => busy($('discover-feed'), async () => {
-      $('source-error').textContent = '';
+    $('addSource').onclick = () => this.editSource();
+    $('checkNewSources').onclick = () => this.app.collect('collect', $('checkNewSources'), { uncheckedOnly: true });
+    $('refreshSources').onclick = () => this.app.collect('collect', $('refreshSources'));
+    $('discoverFeed').onclick = () => busy($('discoverFeed'), async () => {
+      $('sourceError').textContent = '';
       try {
-        const result = await api('discover', 'POST', { url: $('source-url').value }, 90000);
-        $('source-feed').value = result.feedUrl;
+        const result = await api('discover', 'POST', { url: $('sourceUrl').value }, 90000);
+        $('sourceFeed').value = result.feedUrl;
         notify('Feed discovered. Save the source to keep it.');
-      } catch (error) { $('source-error').textContent = error.message; throw error; }
+      } catch (error) { $('sourceError').textContent = error.message; throw error; }
     });
-    $('preview-source').onclick = () => busy($('preview-source'), async () => {
-      $('source-error').textContent = '';
-      $('source-preview').hidden = false;
-      $('source-preview').textContent = 'Checking the source...';
+    $('previewSource').onclick = () => busy($('previewSource'), async () => {
+      $('sourceError').textContent = '';
+      $('sourcePreview').hidden = false;
+      $('sourcePreview').textContent = 'Checking the source...';
       try {
         const result = await api('preview-source', 'POST', this.sourceValues(), 120000);
-        if (result.feedUrl && !$('source-feed').value) $('source-feed').value = result.feedUrl;
-        $('source-preview').replaceChildren(el('strong', '', `Detected: ${({ page: 'Website page', feed: 'RSS/Atom', 'feed+page': 'RSS/Atom + website' })[result.method]} · ${result.entries.length} sample stories`));
+        if (result.feedUrl && !$('sourceFeed').value) $('sourceFeed').value = result.feedUrl;
+        $('sourcePreview').replaceChildren(el('strong', '', `Detected: ${({ page: 'Website page', feed: 'RSS/Atom', 'feed+page': 'RSS/Atom + website' })[result.method]} · ${result.entries.length} sample stories`));
         const list = el('ul');
         result.entries.forEach(story => { const item = el('li'); item.append(externalLink(story.url, story.headline)); list.append(item); });
-        $('source-preview').append(list);
-        if (result.note) $('source-preview').append(el('p', '', result.note));
-      } catch (error) { $('source-error').textContent = error.message; $('source-preview').hidden = true; throw error; }
+        $('sourcePreview').append(list);
+        if (result.note) $('sourcePreview').append(el('p', '', result.note));
+      } catch (error) { $('sourceError').textContent = error.message; $('sourcePreview').hidden = true; throw error; }
     });
-    $('source-form').onsubmit = event => this.submit(event, async () => {
-      const id = $('source-id').value;
+    $('sourceForm').onsubmit = event => this.submit(event, async () => {
+      const id = $('sourceId').value;
       const source = this.sourceValues();
       try {
         await api(id ? 'sources/' + id : 'sources', id ? 'PUT' : 'POST', source);
-        $('source-dialog').close();
+        $('sourceDialog').close();
         await this.refreshSources();
         notify('Source saved.');
-      } catch (error) { $('source-error').textContent = error.message; throw error; }
+      } catch (error) { $('sourceError').textContent = error.message; throw error; }
     });
   }
 
   submit(event, work) { event.preventDefault(); return busy(event.submitter, work); }
 
   sourceValues() {
-    return { name: $('source-name').value, url: $('source-url').value, feedUrl: $('source-feed').value,
-      category: $('source-category').value, enabled: $('source-enabled').checked, mode: $('source-mode').value,
-      linkPattern: $('source-pattern').value, staleDays: Number($('source-stale-days').value) };
+    return { name: $('sourceName').value, url: $('sourceUrl').value, feedUrl: $('sourceFeed').value,
+      category: $('sourceCategory').value, enabled: $('sourceEnabled').checked, mode: $('sourceMode').value,
+      linkPattern: $('sourcePattern').value, staleDays: Number($('sourceStaleDays').value) };
   }
 
   tab(name) {
     ['interests', 'topics', 'sources', 'ai', 'collection'].forEach(id => {
-      $('panel-' + id).hidden = name !== id;
+      $(`panel${id[0].toUpperCase()}${id.slice(1)}`).hidden = name !== id;
       document.querySelector(`[data-tab="${id}"]`).classList.toggle('active', name === id);
     });
     if (name === 'sources' && this.values) this.refreshSources().catch(error => notify(error.message, true));
@@ -247,36 +247,36 @@ export class Settings {
 
   async load() {
     // Controls must not accept edits that an in-flight initial load would replace.
-    $('settings-fields').disabled = true;
+    $('settingsFields').disabled = true;
     $('settings').setAttribute('aria-busy', 'true');
     try {
       this.values = await api('settings');
       await this.refreshSources();
       await this.loadTopics();
       const { interests, ai, collection } = this.values;
-      $('interest-rows').replaceChildren();
+      $('interestRows').replaceChildren();
       interests.topics.forEach(topic => this.interestRow(topic));
       $('guidance').value = interests.guidance;
       $('exclusions').value = interests.exclusions.join('\n');
       await this.loadFeedback();
-      $('ai-provider').value = ai.provider;
-      $('ai-url').value = ai.baseUrl;
-      $('ai-model').value = ai.model;
-      $('ai-timeout').value = ai.timeoutSeconds;
-      $('ai-input').value = ai.maxInputChars;
-      $('ai-output').value = ai.maxOutputTokens ?? 2400;
-      $('ai-unload').checked = ai.unloadAfterUse ?? true;
+      $('aiProvider').value = ai.provider;
+      $('aiUrl').value = ai.baseUrl;
+      $('aiModel').value = ai.model;
+      $('aiTimeout').value = ai.timeoutSeconds;
+      $('aiInput').value = ai.maxInputChars;
+      $('aiOutput').value = ai.maxOutputTokens ?? 2400;
+      $('aiUnload').checked = ai.unloadAfterUse ?? true;
       this.aiHelp();
       await this.refreshKeyStatus(true);
-      $('schedule-enabled').checked = collection.enabled;
-      $('schedule-interval').value = collection.intervalHours ?? 24;
-      $('items-per-source').value = collection.itemsPerSource;
-      $('max-reviews').value = collection.maxReviews;
+      $('scheduleEnabled').checked = collection.enabled;
+      $('scheduleInterval').value = collection.intervalHours ?? 24;
+      $('itemsPerSource').value = collection.itemsPerSource;
+      $('maxReviews').value = collection.maxReviews;
       $('lookback').value = collection.lookbackDays;
       this.renderRuns();
       syncDropdowns();
     } finally {
-      $('settings-fields').disabled = false;
+      $('settingsFields').disabled = false;
       $('settings').setAttribute('aria-busy', 'false');
     }
   }
@@ -285,20 +285,20 @@ export class Settings {
 
   /** Unsaved edits in the text box survive tab switches; a save or initial load replaces them. */
   renderTopics(topics, keepEdits = false) {
-    const edited = keepEdits && this.topics && $('topics-text').value !== this.topics.join('\n');
+    const edited = keepEdits && this.topics && $('topicsText').value !== this.topics.join('\n');
     this.topics = topics;
     // Default category suggestions are the managed topics; a match becomes a new story's initial label.
-    $('source-categories').replaceChildren(...topics.map(name => el('option', '', name)));
-    if (!edited) $('topics-text').value = topics.join('\n');
+    $('sourceCategories').replaceChildren(...topics.map(name => el('option', '', name)));
+    if (!edited) $('topicsText').value = topics.join('\n');
   }
 
   async saveTopics(removalConfirmed = false) {
-    const lines = $('topics-text').value.split('\n').map(line => line.trim()).filter(Boolean);
+    const lines = $('topicsText').value.split('\n').map(line => line.trim()).filter(Boolean);
     const { renames, removed } = topicEdits(this.topics, lines);
     if (removed.length && !removalConfirmed) {
-      $('topic-remove-names').replaceChildren(...removed.map(name => el('li', '', name)));
-      $('topic-remove-dialog').showModal();
-      $('topic-remove-dialog').querySelector('[data-close]').focus();
+      $('topicRemoveNames').replaceChildren(...removed.map(name => el('li', '', name)));
+      $('topicRemoveDialog').showModal();
+      $('topicRemoveDialog').querySelector('[data-close]').focus();
       return;
     }
     const result = await api('topics', 'PUT', { topics: lines, renames, ...(removed.length ? { confirmation: 'DELETE TOPIC' } : {}) });
@@ -328,78 +328,78 @@ export class Settings {
     remove.setAttribute('aria-label', `Remove interest ${topic.name}`);
     remove.onclick = () => row.remove();
     row.append(input, preference, remove);
-    $('interest-rows').append(row);
+    $('interestRows').append(row);
     syncDropdowns(row);
     if (!topic.name) input.focus();
   }
 
   async loadFeedback() {
     const value = await api('feedback');
-    $('feedback-enabled').checked = value.enabled;
-    $('feedback-auto').checked = value.autoUpdate;
-    $('feedback-profile').value = value.profile;
-    $('feedback-rebuild').disabled = value.count === 0;
-    $('feedback-profile-status').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profileRevision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
+    $('feedbackEnabled').checked = value.enabled;
+    $('feedbackAuto').checked = value.autoUpdate;
+    $('feedbackProfile').value = value.profile;
+    $('feedbackRebuild').disabled = value.count === 0;
+    $('feedbackProfileStatus').textContent = `${value.count} saved ${value.count === 1 ? 'rating' : 'ratings'}. ${value.revision !== value.profileRevision ? 'New feedback is awaiting a profile update.' : 'Profile is current.'}`;
   }
 
-  keyConfig() { return { provider: $('ai-provider').value, baseUrl: $('ai-url').value }; }
+  keyConfig() { return { provider: $('aiProvider').value, baseUrl: $('aiUrl').value }; }
 
   async refreshKeyStatus(clearInput = false) {
     const sequence = ++this.keyStatusSequence;
-    if (clearInput) $('model-api-key').value = '';
+    if (clearInput) $('modelApiKey').value = '';
     const config = this.keyConfig();
-    $('model-key-panel').hidden = config.provider === 'ollama';
+    $('modelKeyPanel').hidden = config.provider === 'ollama';
     this.keyStatus = null;
-    $('model-key-remove').disabled = true;
+    $('modelKeyRemove').disabled = true;
     if (config.provider === 'ollama') return;
-    $('model-key-status').textContent = 'Checking key configuration...';
-    $('model-key-save').disabled = true;
+    $('modelKeyStatus').textContent = 'Checking key configuration...';
+    $('modelKeySave').disabled = true;
     try {
       const status = await api('model-key/status', 'POST', config);
       if (sequence !== this.keyStatusSequence) return;
       this.keyStatus = status;
-      $('model-key-status').textContent = status.source === 'saved' ? 'Key configured.' : status.source === 'environment' ? 'Key configured from the server environment.' : 'No key configured.';
-      $('model-key-save').textContent = status.saved ? 'Replace Key' : 'Save Key';
-      $('model-key-remove').disabled = !status.saved;
+      $('modelKeyStatus').textContent = status.source === 'saved' ? 'Key configured.' : status.source === 'environment' ? 'Key configured from the server environment.' : 'No key configured.';
+      $('modelKeySave').textContent = status.saved ? 'Replace Key' : 'Save Key';
+      $('modelKeyRemove').disabled = !status.saved;
     } catch (error) {
       if (sequence !== this.keyStatusSequence) return;
-      $('model-key-status').textContent = 'Key status unavailable.';
+      $('modelKeyStatus').textContent = 'Key status unavailable.';
       if (!error.connection) notify(error.message, true);
     } finally {
-      if (sequence === this.keyStatusSequence) $('model-key-save').disabled = false;
+      if (sequence === this.keyStatusSequence) $('modelKeySave').disabled = false;
     }
   }
 
   aiValues() {
-    return { provider: $('ai-provider').value, baseUrl: $('ai-url').value,
-      model: $('ai-model').value.trim(), timeoutSeconds: Number($('ai-timeout').value), maxInputChars: Number($('ai-input').value), maxOutputTokens: Number($('ai-output').value), unloadAfterUse: $('ai-unload').checked };
+    return { provider: $('aiProvider').value, baseUrl: $('aiUrl').value,
+      model: $('aiModel').value.trim(), timeoutSeconds: Number($('aiTimeout').value), maxInputChars: Number($('aiInput').value), maxOutputTokens: Number($('aiOutput').value), unloadAfterUse: $('aiUnload').checked };
   }
 
   aiHelp() {
-    const provider = $('ai-provider').value;
-    $('ai-unload-row').hidden = provider !== 'ollama';
-    $('ai-model').placeholder = provider === 'openrouter' ? 'anthropic/claude-haiku-5.5' : 'Exact model name or server model ID';
+    const provider = $('aiProvider').value;
+    $('aiUnloadRow').hidden = provider !== 'ollama';
+    $('aiModel').placeholder = provider === 'openrouter' ? 'anthropic/claude-haiku-5.5' : 'Exact model name or server model ID';
     const help = {
       ollama: 'Ollama: use the server root, such as http://127.0.0.1:11434. Enter the exact installed model name. The app uses /api/chat with a JSON schema and thinking disabled.',
       compatible: 'Compatible server: include the API prefix, such as http://127.0.0.1:1234/v1 for LM Studio. The app uses /chat/completions and JSON output. Your model must follow the requested schema.',
       openrouter: 'OpenRouter: use https://openrouter.ai/api/v1 and a model ID such as anthropic/claude-haiku-5.5. Save your API key below. Thinking is disabled for reviews, sample tests, and preference updates. Article text and review preferences are sent to OpenRouter and its selected provider.',
     };
-    $('ai-help').textContent = help[provider];
-    if (provider !== 'openrouter') $('ai-help').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend must be able to reach it.'));
+    $('aiHelp').textContent = help[provider];
+    if (provider !== 'openrouter') $('aiHelp').append(document.createTextNode(' If the model runs on another computer, use its LAN address. The app backend must be able to reach it.'));
   }
 
   syncNewSources() {
     const running = Boolean(this.app.overview?.collector.running);
     const count = this.sources.filter(source => source.enabled && source.lastChecked === null).length;
-    $('check-new-sources').textContent = `Check New Sources (${count})`;
-    $('check-new-sources').disabled = running || count === 0;
-    document.querySelectorAll('#source-list .check-source').forEach(button => { button.disabled = running || button.dataset.enabled !== 'true'; });
-    $('check-new-sources').title = count ? 'Check only enabled sources with no recorded check' : 'No enabled sources are awaiting their first check';
+    $('checkNewSources').textContent = `Check New Sources (${count})`;
+    $('checkNewSources').disabled = running || count === 0;
+    document.querySelectorAll('#sourceList .check-source').forEach(button => { button.disabled = running || button.dataset.enabled !== 'true'; });
+    $('checkNewSources').title = count ? 'Check only enabled sources with no recorded check' : 'No enabled sources are awaiting their first check';
   }
 
   async refreshSources() {
     this.sources = await api('sources');
-    $('source-list').replaceChildren(...this.sources.map(source => {
+    $('sourceList').replaceChildren(...this.sources.map(source => {
       const row = el('div', 'source-row');
       const info = el('div', 'source-info');
       const title = el('strong');
@@ -432,27 +432,27 @@ export class Settings {
   }
 
   editSource(source = null) {
-    $('source-dialog-title').textContent = source ? 'Edit Source' : 'Add a Source';
-    $('source-id').value = source?.id || '';
-    $('source-name').value = source?.name || '';
-    $('source-url').value = source?.url || '';
-    $('source-feed').value = source?.feedUrl || '';
-    $('source-mode').value = source?.mode || 'auto';
-    $('source-pattern').value = source?.linkPattern || '';
-    $('source-stale-days').value = source?.staleDays || 14;
-    $('source-preview').hidden = true;
-    $('source-category').value = source?.category || $('source-categories').options[0]?.value || 'News';
-    $('source-enabled').checked = source ? Boolean(source.enabled) : true;
-    $('source-error').textContent = '';
-    syncDropdowns($('source-dialog'));
-    $('source-dialog').showModal();
-    $('source-name').focus();
+    $('sourceDialogTitle').textContent = source ? 'Edit Source' : 'Add a Source';
+    $('sourceId').value = source?.id || '';
+    $('sourceName').value = source?.name || '';
+    $('sourceUrl').value = source?.url || '';
+    $('sourceFeed').value = source?.feedUrl || '';
+    $('sourceMode').value = source?.mode || 'auto';
+    $('sourcePattern').value = source?.linkPattern || '';
+    $('sourceStaleDays').value = source?.staleDays || 14;
+    $('sourcePreview').hidden = true;
+    $('sourceCategory').value = source?.category || $('sourceCategories').options[0]?.value || 'News';
+    $('sourceEnabled').checked = source ? Boolean(source.enabled) : true;
+    $('sourceError').textContent = '';
+    syncDropdowns($('sourceDialog'));
+    $('sourceDialog').showModal();
+    $('sourceName').focus();
   }
 
   renderRuns() {
     if (!this.app.overview) return;
     const overview = this.app.overview;
-    $('schedule-timezone').textContent = `Collects every configured number of hours after the last full collection starts. The server must be running; overdue work catches up after startup. Manual full collections restart the interval.`;
+    $('scheduleTimezone').textContent = `Collects every configured number of hours after the last full collection starts. The server must be running; overdue work catches up after startup. Manual full collections restart the interval.`;
     const runs = overview.runs.map(run => {
       const details = el('details', 'run');
       details.append(el('summary', '', `${formatTime(run.startedAt)} · ${run.kind}${run.details.scope === 'unchecked' ? ' (new sources only)' : run.details.scope === 'source' ? ` (${run.details.source} only)` : ''} · ${run.status}`));
@@ -466,6 +466,6 @@ export class Settings {
       }
       return details;
     });
-    $('run-history').replaceChildren(...(runs.length ? runs : [el('p', 'muted', 'No runs yet. Check sources to collect your first edition.')]));
+    $('runHistory').replaceChildren(...(runs.length ? runs : [el('p', 'muted', 'No runs yet. Check sources to collect your first edition.')]));
   }
 }

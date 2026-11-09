@@ -22,8 +22,8 @@ public class AuthBrowserTests : BrowserTest
         await page.Locator("#loginButton").ClickAsync();
         await Expect(page.Locator("#version")).ToBeVisibleAsync();
         // A new database asks to restore a backup first, in the same box as TaskList: Start Fresh, then Import/Export....
-        await Expect(page.Locator("#first-run-dialog .dialog-actions button")).ToHaveTextAsync(new[] { "Start Fresh", "Import/Export..." });
-        await page.Locator("#first-run-continue").ClickAsync();
+        await Expect(page.Locator("#firstRunDialog .dialog-actions button")).ToHaveTextAsync(new[] { "Start Fresh", "Import/Export..." });
+        await page.Locator("#firstRunContinue").ClickAsync();
         await page.MenuAsync("File", "Log Out");
         await Expect(page.Locator("#loginWindowTitle")).ToHaveTextAsync("Log In");
         await Expect(page.Locator("#setupTokenGroup")).ToBeHiddenAsync();

@@ -13,45 +13,45 @@ export class Transfer {
     this.app = app;
     this.busy = false;
     this.file = null;
-    $('transfer-nav').onclick = () => {
+    $('transferNav').onclick = () => {
       if (!app.authenticated) return;
       this.sync();
-      $('transfer-dialog').showModal();
+      $('transferDialog').showModal();
     };
-    $('choose-backup').onclick = () => {
-      $('backup-file').value = '';
-      $('backup-file').click();
+    $('chooseBackup').onclick = () => {
+      $('backupFile').value = '';
+      $('backupFile').click();
     };
-    $('backup-file').onchange = () => {
-      const file = $('backup-file').files[0];
+    $('backupFile').onchange = () => {
+      const file = $('backupFile').files[0];
       if (!file) return;
       if (!file.name.toLowerCase().endsWith('.zip') || file.size > MAX_UPLOAD) {
         notify('Choose a NewsReview backup ZIP no larger than 256 MiB.', true);
         return;
       }
       this.file = file;
-      $('transfer-dialog').close();
-      $('restore-file-name').textContent = file.name;
-      $('restore-dialog').showModal();
+      $('transferDialog').close();
+      $('restoreFileName').textContent = file.name;
+      $('restoreDialog').showModal();
     };
-    $('restore-form').onsubmit = event => {
+    $('restoreForm').onsubmit = event => {
       event.preventDefault();
-      $('restore-dialog').close();
+      $('restoreDialog').close();
       this.restore(this.file);
     };
-    $('export-backup').onclick = () => this.export();
-    $('transfer-dialog').addEventListener('cancel', event => { if (this.busy) event.preventDefault(); });
+    $('exportBackup').onclick = () => this.export();
+    $('transferDialog').addEventListener('cancel', event => { if (this.busy) event.preventDefault(); });
   }
 
   /** Restoring waits for a running collection to finish. */
   sync() {
-    $('choose-backup').disabled = this.busy || Boolean(this.app.overview?.collector.running);
+    $('chooseBackup').disabled = this.busy || Boolean(this.app.overview?.collector.running);
   }
 
   lock(value) {
     this.busy = value;
     document.querySelector('.window').inert = value;
-    $('transfer-dialog').querySelectorAll('button,input').forEach(control => { control.disabled = value; });
+    $('transferDialog').querySelectorAll('button,input').forEach(control => { control.disabled = value; });
     this.sync();
     this.app.poll();
   }

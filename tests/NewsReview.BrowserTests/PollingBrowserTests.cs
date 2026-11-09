@@ -38,16 +38,16 @@ public class PollingBrowserTests : BrowserTest
         await page.MenuAsync("File", "Refresh");
         await Advance(150);
         await Expect(page.Locator("footer")).ToHaveAttributeAsync("aria-busy", "true");
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Fixture job started");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Fixture job started");
 
         collector.Update(("message", "Fixture job progressed"));
         await Advance(2600);
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Fixture job progressed");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Fixture job progressed");
         Assert.True(Count() > count);
         collector.Update(("running", false), ("message", "Fixture job finished"));
         await Advance(2600);
         await Expect(page.Locator("footer")).ToHaveAttributeAsync("aria-busy", "false");
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Fixture job finished");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Fixture job finished");
         count = Count();
         await Advance(35000);
         Assert.True(Count() == count, "Polling continued after the job finished");
@@ -57,19 +57,19 @@ public class PollingBrowserTests : BrowserTest
         collector.Update(("message", "Changed elsewhere"));
         await page.MenuAsync("File", "Refresh");
         await Advance(150);
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Changed elsewhere");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Changed elsewhere");
         await Expect(page.Locator("#guidance")).ToHaveValueAsync("Unsaved editorial guidance");
 
         await page.Context.SetOfflineAsync(true);
         await page.MenuAsync("File", "Refresh");
         await Advance(150);
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Cannot reach");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Cannot reach");
         count = Count();
         await Advance(5100);
         Assert.True(Count() > count, "Connection failure was not retried");
         await page.Context.SetOfflineAsync(false);
         await Advance(5100);
-        await Expect(page.Locator("#status-message")).Not.ToContainTextAsync("Cannot reach");
+        await Expect(page.Locator("#statusMessage")).Not.ToContainTextAsync("Cannot reach");
         count = Count();
         await Advance(35000);
         Assert.True(Count() == count, "Recovery polling continued after reconnecting");

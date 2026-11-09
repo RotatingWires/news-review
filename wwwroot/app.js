@@ -66,8 +66,8 @@ class App {
     // Hidden tabs pause job-progress and reconnect checks; showing the tab again only resumes those.
     document.addEventListener('visibilitychange', () => this.poll());
     // File / View / Help like the other apps; Daily Feed, Bookmarks, and Settings are tabs below the toolbar.
-    $('file-menu-button').onclick = event => { event.stopPropagation(); toggleMenu($('file-menu-button'), $('file-menu')); };
-    $('view-menu-button').onclick = event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('view-menu-button'), $('view-menu')); };
+    $('fileMenuButton').onclick = event => { event.stopPropagation(); toggleMenu($('fileMenuButton'), $('fileMenu')); };
+    $('viewMenuButton').onclick = event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('viewMenuButton'), $('viewMenu')); };
     document.addEventListener('click', closeMenus);
     // Escape closes an open menu first, without also closing a dialog.
     document.addEventListener('keydown', event => {
@@ -75,12 +75,12 @@ class App {
       event.preventDefault();
       closeMenus();
     }, true);
-    $('refresh-menu-item').onclick = () => { closeMenus(); this.syncView(true); };
+    $('refreshMenuItem').onclick = () => { closeMenus(); this.syncView(true); };
     document.querySelectorAll('.tabs [role="tab"]').forEach(tab => { tab.onclick = () => this.show(tab.dataset.tab); });
-    $('dismiss-status').onclick = dismissStatus;
-    $('help-nav').onclick = () => { closeMenus(); $('help-dialog').showModal(); };
+    $('dismissStatus').onclick = dismissStatus;
+    $('helpNav').onclick = () => { closeMenus(); $('helpDialog').showModal(); };
     $('collect').onclick = () => this.collect('collect', $('collect'));
-    $('review-pending').onclick = () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('review-pending'));
+    $('reviewPending').onclick = () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('reviewPending'));
     $('logout').onclick = async () => {
       closeMenus();
       try {
@@ -114,25 +114,25 @@ class App {
     try {
       if (!(await api('onboarding')).importReminderPending) return;
     } catch { return; }
-    $('first-run-error').textContent = '';
+    $('firstRunError').textContent = '';
     const dismiss = async openImport => {
-      const buttons = [$('first-run-import'), $('first-run-continue')];
+      const buttons = [$('firstRunImport'), $('firstRunContinue')];
       buttons.forEach(button => { button.disabled = true; });
       try {
         await api('onboarding/acknowledge', 'POST', {});
-        $('first-run-dialog').close();
-        if (openImport) $('transfer-nav').click();
+        $('firstRunDialog').close();
+        if (openImport) $('transferNav').click();
       } catch (error) {
-        $('first-run-error').textContent = error.message;
+        $('firstRunError').textContent = error.message;
       } finally {
         buttons.forEach(button => { button.disabled = false; });
       }
     };
-    $('first-run-import').onclick = () => dismiss(true);
-    $('first-run-continue').onclick = () => dismiss(false);
-    $('first-run-dialog').oncancel = event => { event.preventDefault(); dismiss(false); };
-    $('first-run-dialog').showModal();
-    $('first-run-import').focus();
+    $('firstRunImport').onclick = () => dismiss(true);
+    $('firstRunContinue').onclick = () => dismiss(false);
+    $('firstRunDialog').oncancel = event => { event.preventDefault(); dismiss(false); };
+    $('firstRunDialog').showModal();
+    $('firstRunImport').focus();
   }
 
   async reloadDataset() {
@@ -152,20 +152,20 @@ class App {
     $('version').textContent = 'v' + this.release;
     // The version is its own span so phones can hide it from the title bar.
     document.querySelector('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.release}` }));
-    $('help-version').textContent = 'NewsReview v' + this.release;
+    $('helpVersion').textContent = 'NewsReview v' + this.release;
     const state = this.overview.collector;
     document.querySelector('.status-dot').classList.toggle('collecting', state.running);
     document.querySelector('footer').setAttribute('aria-busy', String(state.running));
     const pending = this.overview.counts.pending || 0;
     setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
     $('collect').disabled = state.running;
-    $('review-pending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping Review...' : 'Stop Review' : 'Review Pending';
-    $('review-pending').classList.toggle('danger', Boolean(state.reviewing));
-    $('review-pending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
-    $('review-pending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
+    $('reviewPending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping Review...' : 'Stop Review' : 'Review Pending';
+    $('reviewPending').classList.toggle('danger', Boolean(state.reviewing));
+    $('reviewPending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
+    $('reviewPending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
-    $('clear-history').disabled = state.running;
-    $('refresh-sources').disabled = state.running;
+    $('clearHistory').disabled = state.running;
+    $('refreshSources').disabled = state.running;
     this.settings.syncNewSources();
     this.transfer.sync();
     const last = this.overview.runs.find(run => run.kind === 'collect');
@@ -176,7 +176,7 @@ class App {
       if (state.running || (last && last.id > this.unconfirmedRefresh)) this.unconfirmedRefresh = null;
       else refreshStatus = 'No newer collection was recorded. Press Refresh sources to retry. ' + refreshStatus;
     }
-    $('source-refresh-status').textContent = refreshStatus;
+    $('sourceRefreshStatus').textContent = refreshStatus;
     this.settings.renderRuns();
     this.poll();
   }
@@ -213,7 +213,7 @@ class App {
       else if (this.view === 'settings') {
         // Returning to the page must not overwrite unsaved preference forms.
         if (replaced) await this.settings.load();
-        else if (changed || (force && !$('panel-sources').hidden) || this.overview.collector.running)
+        else if (changed || (force && !$('panelSources').hidden) || this.overview.collector.running)
           await this.settings.refreshSources();
       }
     } catch (error) {
@@ -248,7 +248,7 @@ class App {
     // A heading over each group, like TaskList's View menu.
     const tabsHeading = el('div', 'menu-heading', 'Tabs');
     tabsHeading.setAttribute('role', 'presentation');
-    $('view-menu').replaceChildren(tabsHeading,
+    $('viewMenu').replaceChildren(tabsHeading,
       ...[...document.querySelectorAll('.tabs [role="tab"]')].map(tab =>
         menuItem(tab.textContent, { role: 'menuitemradio', checked: tab.dataset.tab === this.view, onClick: () => this.show(tab.dataset.tab) })),
       menuSeparator(), heading,
@@ -259,7 +259,7 @@ class App {
   }
 
   async stopReview() {
-    await busy($('review-pending'), async () => {
+    await busy($('reviewPending'), async () => {
       await api('jobs/stop-review', 'POST', {});
     }, 'Stopping AI review after the current article; remaining stories stay queued.');
     try { await this.refreshOverview(); }
@@ -278,7 +278,7 @@ class App {
       } catch (error) {
         if (error.connection) {
           if (kind === 'collect') this.unconfirmedRefresh = previousRun;
-          $('source-refresh-status').textContent = 'Refresh request was not confirmed. Reconnecting to check whether the server started it.';
+          $('sourceRefreshStatus').textContent = 'Refresh request was not confirmed. Reconnecting to check whether the server started it.';
         }
         throw error;
       }

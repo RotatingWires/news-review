@@ -14,12 +14,12 @@ let dataRevision = null;
 export function revisionHeaders() { return dataRevision ? { 'X-NewsReview-Revision': dataRevision } : {}; }
 function renderStatus() {
   const message = connectionError || notice?.message || defaultStatus;
-  $('status-message').textContent = message;
-  $('status-message').title = message;
+  $('statusMessage').textContent = message;
+  $('statusMessage').title = message;
   const error = Boolean(connectionError || notice?.error);
-  $('status-message').classList.toggle('status-error', error);
+  $('statusMessage').classList.toggle('status-error', error);
   document.querySelector('.footer-status').classList.toggle('has-error', error);
-  $('dismiss-status').hidden = !error;
+  $('dismissStatus').hidden = !error;
 }
 export function setConnectionStatus(message) {
   connectionError = message || '';
