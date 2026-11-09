@@ -439,7 +439,7 @@ public class SmokeBrowserTests : BrowserTest
         lock (apiRequests) apiRequests.Clear();
         await page.GetByLabel("Type RESET SELECTED to confirm", new() { Exact = true }).FillAsync("RESET SELECTED");
         await Button("Reset selected data").ClickAsync();
-        await Expect(page.Locator("#status-message")).ToContainTextAsync("Selected data reset");
+        await Expect(page.Locator("#status-message")).ToContainTextAsync("Fresh Start:");
         lock (apiRequests) Assert.True(apiRequests.Count(r => r == "sources") == 1, "Reset fetched source settings more than once");
         Assert.Equal(0, Store.Stories(new())["total"]!.AsLong());
         Assert.True(JsonNode.DeepEquals(preferences, Store.Settings()));

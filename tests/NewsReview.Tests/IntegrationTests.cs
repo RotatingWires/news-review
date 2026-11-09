@@ -885,6 +885,25 @@ public class WorkflowTests : IntegrationBase
     }
 
     [Fact]
+    public async Task FreshStartCountsAndRecoveryBackupsLikeTheOtherApps()
+    {
+        var (status, summary) = await Request("/api/fresh-start");
+        Assert.Equal(200, status);
+        foreach (var key in new[] { "history", "bookmarks", "runs", "sources", "recovery_backups", "database_bytes" }) Assert.NotNull(summary![key]);
+        var backups = Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(store.Path)!, "backups"));
+        File.WriteAllText(Path.Combine(backups.FullName, "before-restore-20260101-000000-test.zip"), "old");
+        Assert.Equal(1, (await Request("/api/fresh-start")).Body!["recovery_backups"]!.AsLong());
+        var stories = store.Stories(new())["total"]!.AsLong();
+        // Only the recovery backups: no story data is touched.
+        var (cleared, result) = await Request("/api/fresh-start", "POST", new { confirmation = "RESET SELECTED", selections = new { recoveryBackups = true } });
+        Assert.Equal(200, cleared);
+        Assert.Equal(1, result!["removed_backups"]!.AsLong());
+        Assert.Empty(backups.GetFiles());
+        Assert.Equal(stories, store.Stories(new())["total"]!.AsLong());
+        Assert.Equal(400, (await Request("/api/fresh-start", "POST", new { confirmation = "RESET SELECTED", selections = new { recoveryBackups = false } })).Status);
+    }
+
+    [Fact]
     public async Task ApiUsesCamelCase()
     {
         // Like the other apps: camelCase on the wire, while snake_case input keeps working.

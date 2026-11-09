@@ -226,22 +226,23 @@
     <div class="dialog-actions"><button type="button" data-close="purge-duplicates-dialog">Cancel</button><button id="confirm-purge-duplicates" class="danger" type="submit">Purge duplicates</button></div>
   </form></dialog>
   <dialog id="clear-history-dialog"><form id="clear-history-form" class="dialog-layout">
-    <div class="dialog-heading"><h2>Fresh start</h2></div>
+    <div class="dialog-heading"><h2>Fresh Start</h2></div>
     <div class="dialog-body">
-      <p>Only the selected items will be cleared. This cannot be undone in the app. Export a ZIP first if you might want to restore them.</p>
-      <fieldset class="reset-options"><legend>Choose what to clear</legend>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-history" checked> Story history (keep bookmarked stories unless Bookmarks is also selected)</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-bookmarks"> Bookmarks (remove saved flags; delete saved stories too if Story history is selected)</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-runs" checked> Collection/review runs and source check history</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-topics"> Interest topics and ranks</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-feedback"> Article ratings, reasons, and learned preferences</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-guidance"> Editorial guidance</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-exclusions"> Exclusions</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-sources"> Configured sources (preserve labels on any retained stories)</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-ai"> AI settings (restore defaults and pause review)</label>
-        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-collection"> Collection settings (restore defaults)</label>
+      <p>Only the selected items will be cleared, then the database is compacted to free disk space. This cannot be undone in NewsReview. Use File &gt; Import/Export... to download a backup first if you might want to restore them.</p>
+      <fieldset class="reset-options fresh-start-options"><legend>Choose what to clear</legend>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-history" checked> <span><strong>Story history</strong> <span data-fresh-count="history"></span><br>Collected stories with their summaries. Bookmarked stories stay unless Bookmarks is also selected.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-bookmarks"> <span><strong>Bookmarks</strong> <span data-fresh-count="bookmarks"></span><br>Removes saved flags; deletes the saved stories too if Story history is also selected.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-runs" checked> <span><strong>Collection runs</strong> <span data-fresh-count="runs"></span><br>Collection and review runs, and each source's check history.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-topics"> <span><strong>Interest topics and ranks</strong> <span data-fresh-count="topics"></span></span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-feedback"> <span><strong>Article ratings</strong> <span data-fresh-count="feedback"></span><br>Ratings, reasons, and learned preferences.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-guidance"> <span><strong>Editorial guidance</strong> <span data-fresh-count="guidance"></span></span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-exclusions"> <span><strong>Exclusions</strong> <span data-fresh-count="exclusions"></span></span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-sources"> <span><strong>Configured sources</strong> <span data-fresh-count="sources"></span><br>Labels on retained stories are kept.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-ai"> <span><strong>AI settings</strong> <span data-fresh-count="ai"></span><br>Restores the defaults and pauses review.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-collection"> <span><strong>Collection settings</strong> <span data-fresh-count="collection"></span><br>Restores the defaults.</span></label>
+        <label class="checkbox"><input type="checkbox" class="retro-check" id="reset-recoveryBackups" checked> <span><strong>Pre-restore recovery backups</strong> <span data-fresh-count="recoveryBackups"></span><br>ZIPs the server saved in data/backups before each restore.</span></label>
       </fieldset>
-      <p class="muted">Clearing story/run history restarts the automatic collection interval. Manual Check sources remains available.</p>
+      <p class="muted">Clearing story or run history restarts the automatic collection interval. Manual Check Sources remains available. Your password and saved model keys are kept. <span id="fresh-start-size"></span></p>
       <label>Type RESET SELECTED to confirm<input id="clear-history-confirmation" autocomplete="off" required pattern="RESET SELECTED"></label>
       <p id="clear-history-error" class="error" role="alert"></p>
     </div>

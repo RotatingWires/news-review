@@ -1,6 +1,16 @@
 import { syncDropdowns } from './dropdowns.js';
 import { $, api, busy, el, externalLink, formatTime, notify } from './shared.js';
 
+/** Sizes like TaskList's and SpendTracker's Fresh Start: bytes, KB, MB, or GB. */
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
+
 /**
  * Turns an edited one-per-line list into explicit renames and removals. Unchanged lines anchor the diff; between
  * anchors, removed and added lines pair up in order as renames (a line edited in place). A name present in both
@@ -151,11 +161,26 @@ export class Settings {
         notify(result.warning || `${result.deleted} duplicate ${result.deleted === 1 ? 'story' : 'stories'} removed.${result.compacted ? ' Database compacted.' : ''} Bookmarks and preferences were kept.`, Boolean(result.warning));
       }, 'Purging duplicate stories and compacting the database...');
     };
-    $('clear-history').onclick = () => {
+    $('clear-history').onclick = async () => {
       $('clear-history-form').reset();
       $('clear-history-error').textContent = '';
+      $('clear-history-dialog').querySelectorAll('[data-fresh-count]').forEach(count => { count.textContent = ''; });
+      $('fresh-start-size').textContent = 'Checking stored data...';
       $('clear-history-dialog').showModal();
       $('clear-history-dialog').querySelector('[data-close]').focus();
+      // Counts and the database size, like TaskList's and SpendTracker's Fresh Start.
+      try {
+        const summary = await api('fresh-start');
+        const plural = (count, one, many = one + 's') => `${count} ${count === 1 ? one : many}`;
+        const counts = {
+          history: plural(summary.history, 'story', 'stories'), bookmarks: plural(summary.bookmarks, 'bookmark'),
+          runs: plural(summary.runs, 'run'), topics: plural(summary.topics, 'topic'), feedback: plural(summary.feedback, 'rating'),
+          exclusions: plural(summary.exclusions, 'exclusion'), sources: plural(summary.sources, 'source'),
+          recoveryBackups: `${plural(summary.recoveryBackups, 'file')}, ${formatBytes(summary.recoveryBackupBytes)}`,
+        };
+        for (const [key, text] of Object.entries(counts)) $('clear-history-dialog').querySelector(`[data-fresh-count="${key}"]`).textContent = `(${text})`;
+        $('fresh-start-size').textContent = `Database size: ${formatBytes(summary.databaseBytes)}.`;
+      } catch (error) { $('fresh-start-size').textContent = `Could not read stored data: ${error.message}`; }
     };
     $('clear-history-form').onsubmit = event => this.submit(event, async () => {
       try {
@@ -163,7 +188,7 @@ export class Settings {
         const result = await api('fresh-start', 'POST', { confirmation: $('clear-history-confirmation').value, selections });
         $('clear-history-dialog').close();
         await this.app.reloadDataset();
-        notify(`Selected data reset (${result.deletedStories} stories removed). Unchecked categories were kept.`);
+        notify(`Fresh Start: ${result.deletedStories} ${result.deletedStories === 1 ? 'story' : 'stories'} and ${result.removedBackups} recovery ${result.removedBackups === 1 ? 'backup' : 'backups'} removed; freed ${formatBytes(result.freedBytes)}. Unchecked items were kept.`);
       } catch (error) { $('clear-history-error').textContent = error.message; throw error; }
     });
     $('add-source').onclick = () => this.editSource();

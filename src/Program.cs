@@ -404,13 +404,44 @@ app.MapPost("/api/maintenance/duplicates/purge", async (HttpRequest request) =>
     if (!Api.Confirmed(await Api.Body(request), "PURGE DUPLICATES")) throw new ValidationException("Confirm duplicate purging before continuing");
     return Exclusive("Wait for collection/review or restore to finish before purging duplicates", () => Api.Send(store.PurgeDuplicates()));
 });
+FileInfo[] RecoveryBackups()
+{
+    var directory = new DirectoryInfo(Path.Combine(DataDirectory(app.Services), "backups"));
+    return directory.Exists ? directory.GetFiles("before-restore-*.zip") : [];
+}
+// Fresh Start like TaskList and SpendTracker: counts for each option first, then clear the chosen ones and compact.
+app.MapGet("/api/fresh-start", () =>
+{
+    var summary = store.FreshStartSummary();
+    var backups = RecoveryBackups();
+    summary["recovery_backups"] = backups.Length;
+    summary["recovery_backup_bytes"] = backups.Sum(file => file.Length);
+    summary["database_bytes"] = store.DatabaseBytes();
+    return Api.Send(summary);
+});
 app.MapPost("/api/fresh-start", async (HttpRequest request) =>
 {
     var data = await Api.Body(request);
     if (!Api.Confirmed(data, "RESET SELECTED")) throw new ValidationException("Type RESET SELECTED to confirm");
+    var selections = data["selections"] as JsonObject ?? throw new ValidationException("Choose at least one item to clear");
+    var clearBackups = false;
+    if (selections["recovery_backups"] is { } backupsChoice)
+    {
+        if (!Json.IsBool(backupsChoice, out clearBackups)) throw new ValidationException("Choose at least one valid reset option");
+        selections.Remove("recovery_backups");
+    }
+    var resetData = selections.Any(pair => Json.IsBool(pair.Value, out var chosen) && chosen);
+    if (!resetData && !clearBackups) throw new ValidationException("Choose at least one item to clear");
     return Exclusive("Wait for collection/review or restore to finish before resetting data", () =>
     {
-        var result = store.Reset(data["selections"]);
+        var before = store.DatabaseBytes() + RecoveryBackups().Sum(file => file.Length);
+        var result = resetData ? store.Reset(selections) : new JsonObject { ["deleted_stories"] = 0, ["cleared_bookmarks"] = 0 };
+        var removedBackups = 0;
+        if (clearBackups)
+            foreach (var file in RecoveryBackups()) { file.Delete(); removedBackups++; }
+        store.Compact();
+        result["removed_backups"] = removedBackups;
+        result["freed_bytes"] = Math.Max(0, before - store.DatabaseBytes() - RecoveryBackups().Sum(file => file.Length));
         collector.Update(("message", "Selected data was reset. Other data and preferences were kept."));
         return Api.Send(result);
     });

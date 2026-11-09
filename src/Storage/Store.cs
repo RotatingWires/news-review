@@ -685,6 +685,29 @@ sealed class Store
 
     static readonly string[] ResetOptions = ["history", "bookmarks", "runs", "topics", "guidance", "exclusions", "sources", "ai", "collection", "feedback"];
 
+    /// <summary>What each Fresh Start option would clear, like TaskList's and SpendTracker's counts.</summary>
+    public JsonObject FreshStartSummary() => Read(db =>
+    {
+        var interests = (JsonObject)db.SettingJson("interests")!;
+        static long Count(JsonNode? node) => node is JsonArray array ? array.Count : node is JsonObject obj ? obj.Count : 0;
+        return new JsonObject
+        {
+            ["history"] = db.Long("SELECT COUNT(*) FROM stories WHERE bookmarked=0"),
+            ["bookmarks"] = db.Long("SELECT COUNT(*) FROM stories WHERE bookmarked=1"),
+            ["runs"] = db.Long("SELECT COUNT(*) FROM runs"),
+            ["topics"] = Count(interests["topics"]),
+            ["feedback"] = Count(Feedback.State(interests)["ratings"]),
+            ["exclusions"] = Count(interests["exclusions"]),
+            ["sources"] = db.Long("SELECT COUNT(*) FROM sources WHERE removed=0"),
+        };
+    });
+
+    /// <summary>The database file plus its write-ahead log, for Fresh Start's size and freed space.</summary>
+    public long DatabaseBytes() => new FileInfo(Path).Length + (File.Exists(Path + "-wal") ? new FileInfo(Path + "-wal").Length : 0);
+
+    /// <summary>Rewrites the database without its free pages, like TaskList's and SpendTracker's Fresh Start.</summary>
+    public void Compact() => Read(db => db.Execute("VACUUM"));
+
     public JsonObject Reset(JsonNode? selectionsNode)
     {
         if (selectionsNode is not JsonObject selectionsObject || selectionsObject.Any(pair => !ResetOptions.Contains(pair.Key))

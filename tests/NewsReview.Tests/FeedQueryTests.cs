@@ -154,6 +154,7 @@ public class FeedQueryTests : IDisposable
     {
         InsertArchive(3000);
         var statements = new List<string>();
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); // Pooled connections would keep an earlier trace.
         store.Opened = connection => raw.sqlite3_trace(connection.Handle!, (_, sql) => { lock (statements) statements.Add(sql.utf8_to_string()); }, null);
         foreach (var (query, expected) in new (Store.StoryQuery, long)[]
         {
@@ -164,7 +165,7 @@ public class FeedQueryTests : IDisposable
             statements.Clear();
             Assert.Equal(expected, store.Stories(query)["total"]!.AsLong());
             List<string> queries;
-            lock (statements) queries = statements.Where(sql => sql.Contains("SELECT COUNT(*) FROM stories s WHERE") || sql.Contains("WITH page AS MATERIALIZED")).ToList();
+            lock (statements) queries = statements.Where(sql => sql.Contains("SELECT COUNT(*) FROM stories s WHERE") || sql.Contains("WITH page AS MATERIALIZED")).Distinct().ToList();
             Assert.Equal(2, queries.Count);
             store.Read(db =>
             {

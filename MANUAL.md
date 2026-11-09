@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.31
+# NewsReview v1.0.32
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -280,9 +280,9 @@ Saving affects the next job's AI decisions. A currently running job keeps the se
 
 Filtered stories stay in the database. Their default view is hidden, so you can inspect the decisions or reassess them later. Source retention remains independent of relevance.
 
-### Fresh start: selective reset
+### Fresh Start: selective reset
 
-Choose **File → Fresh Start...**, choose the categories to clear, and type `RESET SELECTED`. History and run/source-check history are initially checked. Bookmarks, interest topics/ranks, editorial guidance, exclusions, configured sources, AI settings, and collection settings can each be selected separately.
+Choose **File → Fresh Start...**, which works like TaskList's and SpendTracker's: each option shows what it would clear (counts, plus the size of the pre-restore recovery backups), the database size is shown below the options, and after clearing the database is compacted to free disk space. **Pre-restore recovery backups** deletes the ZIPs in `data/backups` and is checked by default. Choose the categories to clear, and type `RESET SELECTED`. History and run/source-check history are initially checked. Bookmarks, interest topics/ranks, editorial guidance, exclusions, configured sources, AI settings, and collection settings can each be selected separately.
 
 Clearing history keeps bookmarked stories unless Bookmarks is also selected. Bookmarks alone removes saved flags without deleting stories. Clearing sources retires the configuration while preserving labels on retained stories; defaults are not reseeded. Resetting AI/collection settings restores their defaults. Unchecked preferences remain intact. The operation is transactional and rejected while collection/review runs.
 
@@ -599,6 +599,11 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+### v1.0.32
+
+- Fresh Start works like TaskList's and SpendTracker's: each option shows a count, the dialog shows the database size, the database is compacted afterward, and a new **Pre-restore recovery backups** option clears data/backups. `GET /api/fresh-start` returns the counts.
+- A query-plan test no longer flakes when a pooled connection kept an earlier trace.
 
 ### v1.0.31
 
