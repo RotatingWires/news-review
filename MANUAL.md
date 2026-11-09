@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.47
+# NewsReview v1.0.48
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -48,11 +48,13 @@ NewsReview.csproj         project file and authoritative version
 src/
   Program.cs              startup, options, authentication, security headers, and API routes
   PasswordAuth.cs         setup token, password file, and sign-in cookie (the same file in all four apps)
+  SingleFileLogger.cs     single-file logging with in-place 10 MiB truncation (the same file in all four apps)
+  Onboarding.cs           first-start backup reminder marker (the same file as TaskList's and SpendTracker's)
   Hosting/
     Auth.cs               keeps the auth.json path and this run's setup token for the endpoints
-    SingleFileLogger.cs   single-file logging with in-place 10 MiB truncation (shared with TaskList)
   Storage/
     Store.cs              SQLite schema, queries, queue and settings persistence
+    FreshStart.cs         File > Fresh Start...: counts, clearing chosen data, and compaction (like the other apps)
     Defaults.cs           first-run interests and collection/model settings
     Search.cs             TaskList-compatible date/time range parsing
     Transfer.cs           validated ZIP snapshots, transactional restoration, and the backup command
@@ -625,7 +627,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.0.47**.
+Current release: **v1.0.48**.
+
+### v1.0.48
+
+- Code: Fresh Start moved out of `Store.cs` into `Storage/FreshStart.cs`, and `SingleFileLogger.cs` and `Onboarding.cs` sit in `src/` like the other apps' copies.
 
 ### v1.0.47
 
