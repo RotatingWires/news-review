@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.41
+# NewsReview v1.0.42
 
 A self-hosted news aggregator that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 
@@ -63,7 +63,7 @@ Save model API keys in **Settings > AI > API Key**. They are stored separately i
 
 `.env` files are not loaded automatically. `NEWSREVIEW_MODEL_API_KEY` remains an optional fallback for compatible servers/OpenRouter without a saved key. A saved provider/server key takes priority. Removing a saved key reveals that fallback if present; changing an environment variable still requires restarting the process.
 
-Database exports and recovery ZIPs contain private reading history/preferences and are unencrypted. Restoring a ZIP replaces the dataset; the app first saves a recovery ZIP. Do not delete the data directory while the app runs or copy only a live SQLite main file; use the [backup and restore instructions](MANUAL.md#backup-restore-and-updates).
+Database exports and recovery ZIPs contain private reading history/preferences and are unencrypted. Restoring a ZIP replaces the dataset; the app first saves a recovery ZIP. Do not delete the data directory while the app runs or copy only a live SQLite main file; use the [backup and restore instructions](MANUAL.md#import-and-export).
 
 See the manual for [model setup](MANUAL.md#connect-your-own-model), [configuration](MANUAL.md#data-configuration-and-logging), [service installation](MANUAL.md#run-as-a-service), and [troubleshooting](MANUAL.md#troubleshooting).
 
@@ -96,6 +96,15 @@ While AI reviews run, **Review Pending** becomes **Stop Review**. Stopping lets 
 Use the thumbs-up/down buttons on any story to save a rating and optional reason. **Settings > Interests > Learned preferences** lets you edit, update, disable, or reset the cached profile. Automatic updates use the 10 most recent ratings once before a review batch; individual reviews receive only the profile. Explicit interests and guidance take priority. Ratings/reasons are included in ZIP backups and are separate from bookmarks.
 
 Opening an article from NewsReview adds **Read** beneath its publisher. This marker is saved in SQLite and included in backups; unopened stories have no extra label.
+
+## Sibling apps
+
+TaskList, TaskList Stats, NewsReview, and SpendTracker are four small self-hosted apps with the same Windows 95 look, sign-in, backups, and keyboard use. Each runs on its own and keeps its own data.
+
+- [TaskList](https://github.com/RotatingWires/task-list): tasks, nested subtasks, and lists.
+- [TaskList Stats](https://github.com/RotatingWires/task-list-stats): statistics and history for TaskList, read without changing it.
+- [NewsReview](https://github.com/RotatingWires/news-review): a personal news reader with AI review of your sources.
+- [SpendTracker](https://github.com/RotatingWires/spend-tracker): purchases, refunds, shared costs, and paybacks.
 
 ## Credits
 

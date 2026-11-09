@@ -1,14 +1,37 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.41
+# NewsReview v1.0.42
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
 Browse daily story tiles, bookmark useful articles, search your archive, and step backward or forward through days. SQLite keeps the history. Local model review needs no paid API, ChatGPT subscription, or cloud model; OpenRouter is an optional paid API provider.
 <img width="2560" height="1301" alt="image" src="https://github.com/user-attachments/assets/55098e81-e3db-46bb-8583-f5ed1b1b9398" />
 
-## Stack and project conventions
+- [Technology stack](#technology-stack)
+- [Project layout](#project-layout)
+- [Configuration and running](#configuration-and-running)
+- [Authentication](#authentication)
+- [First-run backup reminder](#first-run-backup-reminder)
+- [Connect your own model](#connect-your-own-model)
+- [Interface and help](#interface-and-help)
+- [Reading and searching](#reading-and-searching)
+- [Sources](#sources)
+- [Interests and editorial behavior](#interests-and-editorial-behavior)
+- [Collection and AI pipeline](#collection-and-ai-pipeline)
+- [Article feedback and learned preferences](#article-feedback-and-learned-preferences)
+- [Purging duplicate stories](#purging-duplicate-stories)
+- [Data, configuration, and logging](#data-configuration-and-logging)
+- [Run as a service](#run-as-a-service)
+- [Browser-blocked requests](#browser-blocked-requests)
+- [Import and export](#import-and-export)
+- [Home screen and PWA](#home-screen-and-pwa)
+- [Troubleshooting](#troubleshooting)
+- [Development checks](#development-checks)
+- [Maintenance and cleanup](#maintenance-and-cleanup)
+- [Release notes](#release-notes)
+
+## Technology stack
 
 - ASP.NET Core on .NET 10, the same stack as TaskList and TaskList Stats; runs on Windows, Linux, and macOS.
 - SQLite through `Microsoft.Data.Sqlite`, the only package dependency. XML parsing, HTTP, ZIP, and time zones use the .NET runtime.
@@ -18,7 +41,58 @@ Browse daily story tiles, bookmark useful articles, search your archive, and ste
 - Commits use the existing project convention: `v0.4.15: Describe the change`, followed by a blank line and detailed bullets explaining behavior, implementation, and validation. Earlier release commits now include those bodies too. Their trees are unchanged, but rewriting messages changes commit IDs; existing clones should fetch and reconcile local branches before pushing.
 - Run the meaningful automated checks before committing. Update this README when setup, behavior, storage, or limitations change.
 
-## Quick start
+## Project layout
+
+```text
+NewsReview.csproj         project file and authoritative version
+src/
+  Program.cs              startup, options, authentication, security headers, and API routes
+  PasswordAuth.cs         setup token, password file, and sign-in cookie (the same file in all four apps)
+  Hosting/
+    Auth.cs               keeps the auth.json path and this run's setup token for the endpoints
+    SingleFileLogger.cs   single-file logging with in-place 10 MiB truncation (shared with TaskList)
+  Storage/
+    Store.cs              SQLite schema, queries, queue and settings persistence
+    Defaults.cs           first-run interests and collection/model settings
+    Search.cs             TaskList-compatible date/time range parsing
+    Transfer.cs           validated ZIP snapshots, transactional restoration, and the backup command
+  Collection/
+    Collector.cs          collection/review worker and interval scheduler
+    Sources.cs            Automatic/feed/page collection strategy and source health
+    Feeds.cs              RSS/Atom parsing/discovery and article extraction
+    Listings.cs           website article-card/headline/structured-list extraction
+    HtmlTokenizer.cs      tolerant HTML tokenizer used by the extractors
+    Network.cs            bounded HTTP transport and public-address checks for news sources
+    UrlTools.cs           URL splitting, joining, and canonical forms matching stored story URLs
+  Review/
+    Reviewer.cs           model adapters, editorial prompt, output validation
+    Feedback.cs           bounded ratings, profile validation, and compact model context
+    ModelKeys.cs          provider/server credentials and separate atomic key-file persistence
+  Common/
+    Validation.cs         strict JSON typing and source/settings input validation
+    PyText.cs             code-point lengths and ISO timestamps matching stored records
+wwwroot/
+  login.html              TaskList-style setup/login page
+  login.js                setup token, password creation, and sign-in
+  theme.css               light/dark color tokens shared by every stylesheet
+  auth.css                shared sibling-app login layout
+  index.html              reader, settings panels, dialogs
+  style.css               responsive Windows 95 layout and components
+  app.js                  startup, navigation and collection status
+  shared.js               API, DOM, notification and formatting helpers
+  feed.js                 tiles, search, dates, pagination and bookmarks
+  settings.js             interests, topics, sources, AI and scheduling controls
+  transfer.js             browser ZIP download/upload and restore confirmation
+  dropdowns.js            shared Win95 single-select and editable category menus
+  icons/                  favicon.svg, favicon.ico, and touch-180/192/512.png, the same names in every app
+tests/
+  NewsReview.Tests/       unit and integration tests
+  NewsReview.BrowserTests/ optional Playwright browser checks
+deploy/                   example systemd unit
+appsettings.json          listen address and log level
+```
+
+## Configuration and running
 
 Install the **.NET 10 SDK**, then from the repository directory:
 
@@ -27,7 +101,7 @@ dotnet restore
 dotnet run
 ```
 
-Open **http://127.0.0.1:8714**. NewsReview listens on loopback port 8714 unless `--urls` (or `ASPNETCORE_URLS`) chooses another address; see [LAN access](#lan-access-and-authentication).
+Open **http://127.0.0.1:8714**. NewsReview listens on loopback port 8714 unless `--urls` (or `ASPNETCORE_URLS`) chooses another address; see [LAN access](#authentication).
 
 1. Open **Settings > AI**, choose your server type, and enter the server URL and model name.
 2. Use **Test with a Sample Article**, then **Save**.
@@ -44,6 +118,34 @@ dotnet run --no-scheduler
 ```
 
 This flag disables the scheduler for that process only. The UI's schedule setting is persistent. Only one application process should use a data directory.
+
+## Authentication
+
+Loopback access is the default. For LAN access, explicitly change the listening address:
+
+```bash
+dotnet run --urls "http://0.0.0.0:8714"
+```
+
+On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
+
+The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. A hash saved with fewer iterations still verifies and is re-hashed once, on the next successful login, by writing a temporary file and renaming it. The password code is the same file (`src/PasswordAuth.cs`) in all four apps; files saved by earlier NewsReview releases still verify. A malformed or interrupted `auth.json` signs nobody in rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
+
+ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
+
+The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie survive restarts, so sessions do too. When NewsReview runs from a signed-in Windows account, they are kept in that profile's ASP.NET key ring (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys`), as for TaskList, TaskList Stats, and SpendTracker. Otherwise (Linux, or Windows Task Scheduler without a loaded profile) they are stored in `data/keys/`, protected on Windows with machine-scope DPAPI. The startup log names the location (`Sign-in keys: ...`). Delete the `data/keys/` folder while NewsReview is stopped to sign every browser out there. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
+
+API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
+
+This is a single-user/household application, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
+
+## First-run backup reminder
+
+When NewsReview creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
+
+> If you have a NewsReview backup ZIP, restore it before adding sources. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you set up first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
+
+**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
 
 ## Connect your own model
 
@@ -169,10 +271,6 @@ NewsReview does **not** poll `/api/overview` while idle. Opening the app, changi
 While a visible tab knows a collection/review job is running, it checks progress every **2.5 seconds** and reloads the relevant content when the job finishes. Connection failures retry read requests every **5 seconds** until recovery. Hidden tabs pause these checks and resume them when shown again; a read already in flight may finish. Checks also pause during ZIP transfer and resume afterward if needed. Idle checks stop again once the job or connection recovery finishes.
 
 The interval scheduler runs independently on the server and still collects with no browser open. If a scheduled job starts while an open tab is idle, the display catches up when you choose File > Refresh, change the main view, or reload the page. Other-tab bookmark/source changes are picked up the same way; there is no continuous background synchronization.
-
-## Mobile home-screen installation
-
-Use Safari's Share > Add to Home Screen on iPhone/iPad, or the browser's Install/Add to Home Screen action on Android. Both the login and reader pages advertise the NewsReview icon and manifest. Existing home-screen shortcuts may need to be removed and added again to refresh their icon. This is an online reader: the NewsReview server must remain reachable; installing it does not add offline storage.
 
 ## Reading and searching
 
@@ -392,26 +490,6 @@ The database stores original URLs/headlines, excerpts, bounded extracted text, s
 
 The JSON API uses camelCase names, like TaskList, TaskList Stats, and SpendTracker (for example `feedUrl` and `uncheckedOnly`); older snake_case names in requests are still accepted.
 
-## LAN access and authentication
-
-Loopback access is the default. For LAN access, explicitly change the listening address:
-
-```bash
-dotnet run --urls "http://0.0.0.0:8714"
-```
-
-On first startup, NewsReview prints a one-time setup token in the server console. Open the app, enter that token, and create and confirm a password (8–1024 characters). The setup/login page uses the same layout as TaskList and TaskList Stats. The token changes on restart until setup succeeds, then is discarded. It is not an API key and is not written to `logs/console.log` (a service manager may capture console output).
-
-The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatically in `data/auth.json` (or your chosen data directory), with owner-only permissions on POSIX. Future starts ask only for your password. A hash saved with fewer iterations still verifies and is re-hashed once, on the next successful login, by writing a temporary file and renaming it. The password code is the same file (`src/PasswordAuth.cs`) in all four apps; files saved by earlier NewsReview releases still verify. A malformed or interrupted `auth.json` signs nobody in rather than reopening setup; if first-run setup was interrupted, stop the app and remove only the incomplete `auth.json` before trying again.
-
-ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
-
-The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie survive restarts, so sessions do too. When NewsReview runs from a signed-in Windows account, they are kept in that profile's ASP.NET key ring (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys`), as for TaskList, TaskList Stats, and SpendTracker. Otherwise (Linux, or Windows Task Scheduler without a loaded profile) they are stored in `data/keys/`, protected on Windows with machine-scope DPAPI. The startup log names the location (`Sign-in keys: ...`). Delete the `data/keys/` folder while NewsReview is stopped to sign every browser out there. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
-
-API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
-
-This is a single-user/household application, not a public multi-tenant service. Bind to loopback behind an HTTPS reverse proxy for remote access, and preserve the incoming `Host` header. Keep the model server on a trusted network. Source and model settings are trusted-administrator capabilities; URL checks are defense in depth, not complete isolation against hostile DNS infrastructure.
-
 ## Run as a service
 
 The app must stay running for its scheduler to run. It can also be launched at login using your existing service/task setup.
@@ -432,15 +510,11 @@ The template listens on loopback. Change its `--urls` value for direct LAN acces
 
 Build once with `dotnet build` (or `dotnet publish -c Release -o C:\path\to\newsreview`), then create a task that starts `NewsReview.exe` directly with arguments such as `--urls "http://0.0.0.0:8714"`, and set **Start in** to the folder containing `wwwroot` (the checkout, or the publish folder). Configure it to run at startup/login and restart on failure. Set environment variables for the account/process that launches it. Keep the process running rather than scheduling a new copy each day; the app owns the interval schedule.
 
-## First-run backup reminder
+## Browser-blocked requests
 
-When NewsReview creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
+If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the browser side, commonly by a content blocker or a browser request-blocking rule. In the reported case, GET requests worked but a POST whose path ended in `collect` was blocked immediately; NewsReview starts jobs through `/api/jobs/start` to avoid that pattern. If blocking persists, allow the NewsReview origin in the responsible extension or remove the matching DevTools blocking rule. A generic fetch failure cannot reliably identify the extension or prove whether a write reached the server, so NewsReview reports it as unconfirmed, checks current status, and never automatically resends the write.
 
-> If you have a NewsReview backup ZIP, restore it before adding sources. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you set up first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
-
-**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
-
-## Backup, restore, and updates
+## Import and export
 
 ### ZIP import/export in Settings
 
@@ -483,9 +557,9 @@ NewsReview 1.0 replaces the Python implementation with ASP.NET Core and keeps yo
 
 Your stories, sources, settings, topics, feedback, bookmarks, read markers, `auth.json`, and saved model API keys are used as they are; nothing is migrated or rewritten. Older ZIP backups, including schema-2/3 exports, still restore. `NEWSREVIEW_PASSWORD` and `NEWSREVIEW_SECURE_COOKIE` are no longer read, and the unused `/api/collect`, `/api/login`, `/api/session`, `/api/logout`, and `/api/history/clear` aliases were removed.
 
-## Browser-blocked requests
+## Home screen and PWA
 
-If DevTools reports `net::ERR_BLOCKED_BY_CLIENT`, the request was blocked on the browser side, commonly by a content blocker or a browser request-blocking rule. In the reported case, GET requests worked but a POST whose path ended in `collect` was blocked immediately; NewsReview starts jobs through `/api/jobs/start` to avoid that pattern. If blocking persists, allow the NewsReview origin in the responsible extension or remove the matching DevTools blocking rule. A generic fetch failure cannot reliably identify the extension or prove whether a write reached the server, so NewsReview reports it as unconfirmed, checks current status, and never automatically resends the write.
+Use Safari's Share > Add to Home Screen on iPhone/iPad, or the browser's Install/Add to Home Screen action on Android. Both the login and reader pages advertise the NewsReview icon and manifest. Existing home-screen shortcuts may need to be removed and added again to refresh their icon. This is an online reader: the NewsReview server must remain reachable; installing it does not add offline storage.
 
 ## Troubleshooting
 
@@ -541,57 +615,6 @@ Browsers already installed by Playwright 1.60 for Python or Node are reused, so 
 
 GitHub Actions builds the app and runs `tests/NewsReview.Tests` on every push. A real installed user model still needs its own connection and quality check.
 
-## Project layout
-
-```text
-NewsReview.csproj         project file and authoritative version
-src/
-  Program.cs              startup, options, authentication, security headers, and API routes
-  PasswordAuth.cs         setup token, password file, and sign-in cookie (the same file in all four apps)
-  Hosting/
-    Auth.cs               keeps the auth.json path and this run's setup token for the endpoints
-    SingleFileLogger.cs   single-file logging with in-place 10 MiB truncation (shared with TaskList)
-  Storage/
-    Store.cs              SQLite schema, queries, queue and settings persistence
-    Defaults.cs           first-run interests and collection/model settings
-    Search.cs             TaskList-compatible date/time range parsing
-    Transfer.cs           validated ZIP snapshots, transactional restoration, and the backup command
-  Collection/
-    Collector.cs          collection/review worker and interval scheduler
-    Sources.cs            Automatic/feed/page collection strategy and source health
-    Feeds.cs              RSS/Atom parsing/discovery and article extraction
-    Listings.cs           website article-card/headline/structured-list extraction
-    HtmlTokenizer.cs      tolerant HTML tokenizer used by the extractors
-    Network.cs            bounded HTTP transport and public-address checks for news sources
-    UrlTools.cs           URL splitting, joining, and canonical forms matching stored story URLs
-  Review/
-    Reviewer.cs           model adapters, editorial prompt, output validation
-    Feedback.cs           bounded ratings, profile validation, and compact model context
-    ModelKeys.cs          provider/server credentials and separate atomic key-file persistence
-  Common/
-    Validation.cs         strict JSON typing and source/settings input validation
-    PyText.cs             code-point lengths and ISO timestamps matching stored records
-wwwroot/
-  login.html              TaskList-style setup/login page
-  login.js                setup token, password creation, and sign-in
-  theme.css               light/dark color tokens shared by every stylesheet
-  auth.css                shared sibling-app login layout
-  index.html              reader, settings panels, dialogs
-  style.css               responsive Windows 95 layout and components
-  app.js                  startup, navigation and collection status
-  shared.js               API, DOM, notification and formatting helpers
-  feed.js                 tiles, search, dates, pagination and bookmarks
-  settings.js             interests, topics, sources, AI and scheduling controls
-  transfer.js             browser ZIP download/upload and restore confirmation
-  dropdowns.js            shared Win95 single-select and editable category menus
-  icons/                  favicon.svg, favicon.ico, and touch-180/192/512.png, the same names in every app
-tests/
-  NewsReview.Tests/       unit and integration tests
-  NewsReview.BrowserTests/ optional Playwright browser checks
-deploy/                   example systemd unit
-appsettings.json          listen address and log level
-```
-
 ## Maintenance and cleanup
 
 Cleanup is behavior-preserving work in the owning files, not a rewrite or a line-count target. Keep compatibility code unless it is demonstrably obsolete, avoid runtime overrides and release-specific shims, and do not add dependencies just for cleanup. Acceptance of older source markers and schema-2/3 layouts in ZIP restores is retained for existing backups.
@@ -601,6 +624,14 @@ The application owns dataset reloads after reset/restore, invalidating pending f
 For verification, run `dotnet build` (no warnings expected), the unit/integration suite, and the relevant browser checks. Review the final diff, release version, README headings, and compatibility behavior before making a versioned commit with a detailed body.
 
 ## Release notes
+
+Current release: **v1.0.42**.
+
+### v1.0.42
+
+- MANUAL.md uses the same section names and order as the other apps, with a contents list at the top and a **Current release** line under Release notes; no text was removed, only moved or retitled.
+- README.md has a **Sibling apps** section linking all four apps.
+- `.gitignore` has the same rules in every app.
 
 ### v1.0.41
 
