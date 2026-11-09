@@ -1,4 +1,6 @@
-export const $ = id => document.getElementById(id);
+// $ and $$ take CSS selectors, the same helpers as TaskList, TaskList Stats, and SpendTracker.
+export const $ = selector => document.querySelector(selector);
+export const $$ = selector => [...document.querySelectorAll(selector)];
 export function el(tag, className = '', text = '') {
   const node = document.createElement(tag);
   if (tag === 'button') node.type = 'button'; // Every button is typed, like the other apps.
@@ -14,12 +16,12 @@ let dataRevision = null;
 export function revisionHeaders() { return dataRevision ? { 'X-NewsReview-Revision': dataRevision } : {}; }
 function renderStatus() {
   const message = connectionError || notice?.message || defaultStatus;
-  $('statusMessage').textContent = message;
-  $('statusMessage').title = message;
+  $('#statusMessage').textContent = message;
+  $('#statusMessage').title = message;
   const error = Boolean(connectionError || notice?.error);
-  $('statusMessage').classList.toggle('status-error', error);
-  document.querySelector('.footer-status').classList.toggle('has-error', error);
-  $('dismissStatus').hidden = !error;
+  $('#statusMessage').classList.toggle('status-error', error);
+  $('.footer-status').classList.toggle('has-error', error);
+  $('#dismissStatus').hidden = !error;
 }
 export function setConnectionStatus(message) {
   connectionError = message || '';
@@ -99,8 +101,8 @@ export function formatTime(value) {
 
 /** Menus like the other apps' File / View / Help bar: one open at a time, closed by any outside click or Escape. */
 export function closeMenus() {
-  document.querySelectorAll('.menu-dropdown').forEach(menu => { menu.hidden = true; });
-  document.querySelectorAll('[aria-haspopup="menu"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+  $$('.menu-dropdown').forEach(menu => { menu.hidden = true; });
+  $$('[aria-haspopup="menu"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
 }
 export function toggleMenu(button, menu) {
   const open = menu.hidden;
@@ -114,7 +116,7 @@ export function menuItem(label, { role = 'menuitem', checked = false, onClick })
   button.setAttribute('role', role);
   if (role !== 'menuitem') button.setAttribute('aria-checked', String(checked));
   button.append(el('span', 'menu-check'), el('span', 'menu-label', label));
-  button.onclick = () => { closeMenus(); onClick(); };
+  button.addEventListener('click', () => { closeMenus(); onClick(); });
   return button;
 }
 export function menuSeparator() {

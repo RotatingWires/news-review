@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.44
+# NewsReview v1.0.45
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -625,7 +625,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.0.44**.
+Current release: **v1.0.45**.
+
+### v1.0.45
+
+- Code: `$` takes a CSS selector and `$$` returns every match, the same helpers as the other apps (`$` used to take a bare ID), and every handler is attached with `addEventListener` like the other apps.
 
 ### v1.0.44
 

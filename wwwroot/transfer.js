@@ -13,45 +13,45 @@ export class Transfer {
     this.app = app;
     this.busy = false;
     this.file = null;
-    $('transferNav').onclick = () => {
+    $('#transferNav').addEventListener('click', () => {
       if (!app.authenticated) return;
       this.sync();
-      $('transferDialog').showModal();
-    };
-    $('chooseBackup').onclick = () => {
-      $('backupFile').value = '';
-      $('backupFile').click();
-    };
-    $('backupFile').onchange = () => {
-      const file = $('backupFile').files[0];
+      $('#transferDialog').showModal();
+    });
+    $('#chooseBackup').addEventListener('click', () => {
+      $('#backupFile').value = '';
+      $('#backupFile').click();
+    });
+    $('#backupFile').addEventListener('change', () => {
+      const file = $('#backupFile').files[0];
       if (!file) return;
       if (!file.name.toLowerCase().endsWith('.zip') || file.size > MAX_UPLOAD) {
         notify('Choose a NewsReview backup ZIP no larger than 256 MiB.', true);
         return;
       }
       this.file = file;
-      $('transferDialog').close();
-      $('restoreFileName').textContent = file.name;
-      $('restoreDialog').showModal();
-    };
-    $('restoreForm').onsubmit = event => {
+      $('#transferDialog').close();
+      $('#restoreFileName').textContent = file.name;
+      $('#restoreDialog').showModal();
+    });
+    $('#restoreForm').addEventListener('submit', event => {
       event.preventDefault();
-      $('restoreDialog').close();
+      $('#restoreDialog').close();
       this.restore(this.file);
-    };
-    $('exportBackup').onclick = () => this.export();
-    $('transferDialog').addEventListener('cancel', event => { if (this.busy) event.preventDefault(); });
+    });
+    $('#exportBackup').addEventListener('click', () => this.export());
+    $('#transferDialog').addEventListener('cancel', event => { if (this.busy) event.preventDefault(); });
   }
 
   /** Restoring waits for a running collection to finish. */
   sync() {
-    $('chooseBackup').disabled = this.busy || Boolean(this.app.overview?.collector.running);
+    $('#chooseBackup').disabled = this.busy || Boolean(this.app.overview?.collector.running);
   }
 
   lock(value) {
     this.busy = value;
-    document.querySelector('.window').inert = value;
-    $('transferDialog').querySelectorAll('button,input').forEach(control => { control.disabled = value; });
+    $('.window').inert = value;
+    $('#transferDialog').querySelectorAll('button,input').forEach(control => { control.disabled = value; });
     this.sync();
     this.app.poll();
   }
@@ -93,7 +93,7 @@ export class Transfer {
     } catch (error) {
       let message = restored ? `Backup restored, but the display could not be refreshed: ${error.message}` : `Restore could not be confirmed: ${error.message}`;
       try { await this.app.reloadDataset(); message += ' Current server data has been reloaded.'; }
-      catch { $('stories').replaceChildren(); message += ' Could not reload server data; reconnect before continuing.'; }
+      catch { $('#stories').replaceChildren(); message += ' Could not reload server data; reconnect before continuing.'; }
       notify(message, true);
     } finally {
       this.file = null;

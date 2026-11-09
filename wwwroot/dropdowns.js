@@ -67,7 +67,7 @@ function build(field) {
     const check = el('span', 'dropdown-check', '✓');
     check.setAttribute('aria-hidden', 'true');
     choice.append(check, el('span', '', option.textContent || option.value));
-    choice.onclick = event => {
+    choice.addEventListener('click', event => {
       event.preventDefault();
       field.value = option.value;
       sync();
@@ -75,7 +75,7 @@ function build(field) {
       field.dispatchEvent(new Event('change', { bubbles: true }));
       closeMenu();
       (combo ? field : trigger).focus();
-    };
+    });
     return choice;
   }));
   const open = () => {
@@ -85,7 +85,7 @@ function build(field) {
     trigger.setAttribute('aria-expanded', 'true');
     sync();
   };
-  trigger.onclick = event => { event.preventDefault(); opened?.trigger === trigger ? closeMenu() : open(); };
+  trigger.addEventListener('click', event => { event.preventDefault(); opened?.trigger === trigger ? closeMenu() : open(); });
   // Arrow keys, Home, End, and Escape come from dropdown.js, shared with the other apps. An editable field opens its
   // list with Arrow Down too.
   if (combo) field.addEventListener('keydown', event => {

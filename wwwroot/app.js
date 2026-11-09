@@ -3,7 +3,7 @@ import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
 
-import { $, el, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus, closeMenus, toggleMenu, menuItem, menuSeparator, parseTypedDate, typedDate } from './shared.js';
+import { $, el, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus, closeMenus, toggleMenu, menuItem, menuSeparator, parseTypedDate, typedDate, $$ } from './shared.js';
 
 /** The release from /version.json, like the other apps; the server's version if that file can't be read. */
 async function releaseVersion(fallback) {
@@ -66,33 +66,36 @@ class App {
     // Hidden tabs pause job-progress and reconnect checks; showing the tab again only resumes those.
     document.addEventListener('visibilitychange', () => this.poll());
     // File / View / Help like the other apps; Daily Feed, Bookmarks, and Settings are tabs below the toolbar.
-    $('fileMenuButton').onclick = event => { event.stopPropagation(); toggleMenu($('fileMenuButton'), $('fileMenu')); };
-    $('viewMenuButton').onclick = event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('viewMenuButton'), $('viewMenu')); };
+    $('#fileMenuButton').addEventListener('click', event => { event.stopPropagation(); toggleMenu($('#fileMenuButton'), $('#fileMenu')); });
+    $('#viewMenuButton').addEventListener('click', event => { event.stopPropagation(); this.populateViewMenu(); toggleMenu($('#viewMenuButton'), $('#viewMenu')); });
     document.addEventListener('click', closeMenus);
     // Escape closes an open menu first, without also closing a dialog.
     document.addEventListener('keydown', event => {
-      if (event.key !== 'Escape' || !document.querySelector('.menu-dropdown:not([hidden])')) return;
+      if (event.key !== 'Escape' || !$('.menu-dropdown:not([hidden])')) return;
       event.preventDefault();
       closeMenus();
     }, true);
-    $('refreshMenuItem').onclick = () => { closeMenus(); this.syncView(true); };
-    document.querySelectorAll('.tabs [role="tab"]').forEach(tab => { tab.onclick = () => this.show(tab.dataset.tab); });
-    $('dismissStatus').onclick = dismissStatus;
-    $('helpNav').onclick = () => { closeMenus(); $('helpDialog').showModal(); };
-    $('collect').onclick = () => this.collect('collect', $('collect'));
-    $('reviewPending').onclick = () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('reviewPending'));
-    $('logout').onclick = async () => {
+    $('#refreshMenuItem').addEventListener('click', () => { closeMenus(); this.syncView(true); });
+    $('#firstRunImport').addEventListener('click', () => this.dismissImportReminder(true));
+    $('#firstRunContinue').addEventListener('click', () => this.dismissImportReminder(false));
+    $('#firstRunDialog').addEventListener('cancel', event => { event.preventDefault(); this.dismissImportReminder(false); });
+    $$('.tabs [role="tab"]').forEach(tab => { tab.addEventListener('click', () => this.show(tab.dataset.tab)); });
+    $('#dismissStatus').addEventListener('click', dismissStatus);
+    $('#helpNav').addEventListener('click', () => { closeMenus(); $('#helpDialog').showModal(); });
+    $('#collect').addEventListener('click', () => this.collect('collect', $('#collect')));
+    $('#reviewPending').addEventListener('click', () => this.overview?.collector.reviewing ? this.stopReview() : this.collect('review', $('#reviewPending')));
+    $('#logout').addEventListener('click', async () => {
       closeMenus();
       try {
         await api('auth/logout', 'POST', {});
         this.authenticated = false;
         clearTimeout(this.pollTimer);
-        $('stories').replaceChildren();
-        $('settings').hidden = true;
-        $('reader').hidden = false;
+        $('#stories').replaceChildren();
+        $('#settings').hidden = true;
+        $('#reader').hidden = false;
         location.replace('/login.html');
       } catch (error) { notify(error.message, true); }
-    };
+    });
     try {
       const session = await api('auth/status');
       if (!session.authenticated) { location.replace('/login.html'); return; }
@@ -103,10 +106,25 @@ class App {
   async load() {
     this.authenticated = true;
     await this.refreshOverview();
-    if (!parseTypedDate($('day').value)) $('day').value = typedDate(this.overview.today);
+    if (!parseTypedDate($('#day').value)) $('#day').value = typedDate(this.overview.today);
     await this.feed.load();
     this.poll();
     await this.showImportReminder();
+  }
+
+  /** Answers the first-start box: Import/Export... (openImport) or Start Fresh. */
+  async dismissImportReminder(openImport) {
+    const buttons = [$('#firstRunImport'), $('#firstRunContinue')];
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      await api('onboarding/acknowledge', 'POST', {});
+      $('#firstRunDialog').close();
+      if (openImport) $('#transferNav').click();
+    } catch (error) {
+      $('#firstRunError').textContent = error.message;
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
   }
 
   /** "Restore a Backup Before Starting" on a brand-new database, the same box as TaskList's. */
@@ -114,31 +132,15 @@ class App {
     try {
       if (!(await api('onboarding')).importReminderPending) return;
     } catch { return; }
-    $('firstRunError').textContent = '';
-    const dismiss = async openImport => {
-      const buttons = [$('firstRunImport'), $('firstRunContinue')];
-      buttons.forEach(button => { button.disabled = true; });
-      try {
-        await api('onboarding/acknowledge', 'POST', {});
-        $('firstRunDialog').close();
-        if (openImport) $('transferNav').click();
-      } catch (error) {
-        $('firstRunError').textContent = error.message;
-      } finally {
-        buttons.forEach(button => { button.disabled = false; });
-      }
-    };
-    $('firstRunImport').onclick = () => dismiss(true);
-    $('firstRunContinue').onclick = () => dismiss(false);
-    $('firstRunDialog').oncancel = event => { event.preventDefault(); dismiss(false); };
-    $('firstRunDialog').showModal();
-    $('firstRunImport').focus();
+    $('#firstRunError').textContent = '';
+    $('#firstRunDialog').showModal();
+    $('#firstRunImport').focus();
   }
 
   async reloadDataset() {
     // Reset/restore must invalidate pending feed reads before replacing cached rows.
     this.feed.requestId++;
-    $('stories').replaceChildren();
+    $('#stories').replaceChildren();
     await this.refreshOverview();
     this.feed.clearFilters();
     this.feed.page = 1;
@@ -149,23 +151,23 @@ class App {
   async refreshOverview() {
     this.overview = await api('overview');
     this.release ??= await releaseVersion(this.overview.version);
-    $('version').textContent = 'v' + this.release;
+    $('#version').textContent = 'v' + this.release;
     // The version is its own span so phones can hide it from the title bar.
-    document.querySelector('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.release}` }));
-    $('helpVersion').textContent = 'NewsReview v' + this.release;
+    $('.titlebar-name').replaceChildren('NewsReview', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${this.release}` }));
+    $('#helpVersion').textContent = 'NewsReview v' + this.release;
     const state = this.overview.collector;
-    document.querySelector('.status-dot').classList.toggle('collecting', state.running);
-    document.querySelector('footer').setAttribute('aria-busy', String(state.running));
+    $('.status-dot').classList.toggle('collecting', state.running);
+    $('footer').setAttribute('aria-busy', String(state.running));
     const pending = this.overview.counts.pending || 0;
     setDefaultStatus(state.running ? state.message : `${state.message} · ${pending} awaiting review`);
-    $('collect').disabled = state.running;
-    $('reviewPending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping Review...' : 'Stop Review' : 'Review Pending';
-    $('reviewPending').classList.toggle('danger', Boolean(state.reviewing));
-    $('reviewPending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
-    $('reviewPending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
+    $('#collect').disabled = state.running;
+    $('#reviewPending').textContent = state.reviewing ? state.reviewStopRequested ? 'Stopping Review...' : 'Stop Review' : 'Review Pending';
+    $('#reviewPending').classList.toggle('danger', Boolean(state.reviewing));
+    $('#reviewPending').title = state.reviewing ? 'Finish the current article, then stop. Remaining stories stay queued.' : 'Review queued stories with your configured model';
+    $('#reviewPending').disabled = state.reviewing ? Boolean(state.reviewStopRequested) : state.running || pending === 0;
     this.feed.renderTopics(this.overview.tags);
-    $('clearHistory').disabled = state.running;
-    $('refreshSources').disabled = state.running;
+    $('#clearHistory').disabled = state.running;
+    $('#refreshSources').disabled = state.running;
     this.settings.syncNewSources();
     this.transfer.sync();
     const last = this.overview.runs.find(run => run.kind === 'collect');
@@ -176,7 +178,7 @@ class App {
       if (state.running || (last && last.id > this.unconfirmedRefresh)) this.unconfirmedRefresh = null;
       else refreshStatus = 'No newer collection was recorded. Press Refresh sources to retry. ' + refreshStatus;
     }
-    $('sourceRefreshStatus').textContent = refreshStatus;
+    $('#sourceRefreshStatus').textContent = refreshStatus;
     this.settings.renderRuns();
     this.poll();
   }
@@ -213,7 +215,7 @@ class App {
       else if (this.view === 'settings') {
         // Returning to the page must not overwrite unsaved preference forms.
         if (replaced) await this.settings.load();
-        else if (changed || (force && !$('panelSources').hidden) || this.overview.collector.running)
+        else if (changed || (force && !$('#panelSources').hidden) || this.overview.collector.running)
           await this.settings.refreshSources();
       }
     } catch (error) {
@@ -228,9 +230,9 @@ class App {
   async show(view) {
     if (!this.authenticated) return;
     this.view = view;
-    document.querySelectorAll('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.tab === view)));
-    $('settings').hidden = view !== 'settings';
-    $('reader').hidden = view === 'settings';
+    $$('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.tab === view)));
+    $('#settings').hidden = view !== 'settings';
+    $('#reader').hidden = view === 'settings';
     try {
       await this.refreshOverview();
       if (view === 'settings') await this.settings.load();
@@ -248,8 +250,8 @@ class App {
     // A heading over each group, like TaskList's View menu.
     const tabsHeading = el('div', 'menu-heading', 'Tabs');
     tabsHeading.setAttribute('role', 'presentation');
-    $('viewMenu').replaceChildren(tabsHeading,
-      ...[...document.querySelectorAll('.tabs [role="tab"]')].map(tab =>
+    $('#viewMenu').replaceChildren(tabsHeading,
+      ...[...$$('.tabs [role="tab"]')].map(tab =>
         menuItem(tab.textContent, { role: 'menuitemradio', checked: tab.dataset.tab === this.view, onClick: () => this.show(tab.dataset.tab) })),
       menuSeparator(), heading,
       ...[['light', 'Light'], ['dark', 'Dark']].map(([value, label]) =>
@@ -259,7 +261,7 @@ class App {
   }
 
   async stopReview() {
-    await busy($('reviewPending'), async () => {
+    await busy($('#reviewPending'), async () => {
       await api('jobs/stop-review', 'POST', {});
     }, 'Stopping AI review after the current article; remaining stories stay queued.');
     try { await this.refreshOverview(); }
@@ -278,7 +280,7 @@ class App {
       } catch (error) {
         if (error.connection) {
           if (kind === 'collect') this.unconfirmedRefresh = previousRun;
-          $('sourceRefreshStatus').textContent = 'Refresh request was not confirmed. Reconnecting to check whether the server started it.';
+          $('#sourceRefreshStatus').textContent = 'Refresh request was not confirmed. Reconnecting to check whether the server started it.';
         }
         throw error;
       }
