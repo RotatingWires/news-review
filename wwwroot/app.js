@@ -1,3 +1,4 @@
+/* Startup, navigation, menus, and collection status. */
 import { syncDropdowns } from './dropdowns.js';
 import { Feed } from './feed.js';
 import { Settings } from './settings.js';

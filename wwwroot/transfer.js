@@ -1,3 +1,4 @@
+/* File > Import/Export...: the backup download, upload, and restore confirmation. */
 import { $, notify, revisionHeaders } from './shared.js';
 
 const MAX_UPLOAD = 256 * 1024 * 1024;

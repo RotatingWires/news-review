@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 
 namespace NewsReview;
 
+/// <summary>One fetched page: its text, final address after redirects, and content type.</summary>
 record FetchResult(string Text, string Url, string ContentType);
 
 interface IFetcher

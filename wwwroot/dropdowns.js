@@ -1,3 +1,4 @@
+/* Win95 single-select and editable category menus built over the page's select fields. */
 import { el } from './shared.js';
 
 const controls = new WeakMap();

@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace NewsReview;
 
+/// <summary>What one source check found: the entries, the method that worked, the feed address, and a note for the source list.</summary>
 sealed record SourceResult(List<Entry> Entries, string Method, string? FeedUrl, string Note);
 
 /// <summary>Feed-first collection with website checks for failed or stale Automatic feeds.</summary>
