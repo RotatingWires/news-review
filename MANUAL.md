@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.52
+# NewsReview v1.0.53
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -137,7 +137,7 @@ The salted PBKDF2-SHA256 password hash (600,000 iterations) is saved automatical
 
 ZIP export/import and Fresh start keep authentication separate: they never export, replace, or delete this file. Preserve it separately when moving the installation. To reset a forgotten password, stop the app, remove only `auth.json`, restart, and use the new console token. Your stories and settings stay intact.
 
-The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie survive restarts, so sessions do too. When NewsReview runs from a signed-in Windows account, they are kept in that profile's ASP.NET key ring (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys`), as for TaskList, TaskList Stats, and SpendTracker. Otherwise (Linux, or Windows Task Scheduler without a loaded profile) they are stored in `data/keys/`, protected on Windows with machine-scope DPAPI. The startup log names the location (`Sign-in keys: ...`). Delete the `data/keys/` folder while NewsReview is stopped to sign every browser out there. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
+The browser login issues an HttpOnly, SameSite=Strict cookie that lasts 30 days and slides while you keep using the app. It is marked Secure automatically when the request uses HTTPS. The keys that protect the cookie survive restarts, so sessions do too. They are stored in `data/keys/`, protected on Windows with machine-scope DPAPI, as for TaskList, TaskList Stats, and SpendTracker; a Windows profile's own key ring is no longer used, since a service account's profile is not always loaded when the app starts. The startup log names the location (`Sign-in keys: ...`). Delete the `data/keys/` folder while NewsReview is stopped to sign every browser out there. Setup and login share a limit of five attempts per IP address per minute; a rejected cross-origin request does not count.
 
 API writes require JSON and reject cross-origin browser requests. Only the files in `wwwroot/` are served; the database, logs, and source files are not. Until setup is complete, all reading data and settings remain protected; only the setup/login page and authentication endpoints are accessible. Public news-source requests reject private/reserved network addresses, including on redirects. The local model endpoint intentionally permits LAN addresses.
 
@@ -452,7 +452,7 @@ data/
   newsreview.db-shm     SQLite's shared-memory file, when present
   auth.json             saved login password hash, excluded from exports
   model-credentials.json  saved model API keys, excluded from exports
-  keys/                 sign-in cookie keys when there is no Windows profile key ring (Linux, Task Scheduler), excluded from exports
+  keys/                 sign-in cookie keys (machine-scope DPAPI on Windows), excluded from exports
   backups/              recovery ZIPs written before each restore
 logs/
   console.log          application/HTTP logs, one file up to 10 MiB
@@ -629,7 +629,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.0.52**.
+Current release: **v1.0.53**.
+
+### v1.0.53
+
+- Restarting the server no longer signs you out on Windows: sign-in keys always live in `data/keys/` (protected with machine-scope DPAPI), not in the Windows profile's key ring, which a service account does not always have loaded when the app starts (then the keys only lived in memory). Everyone signs in once more after updating.
 
 ### v1.0.52
 

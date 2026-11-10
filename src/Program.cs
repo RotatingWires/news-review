@@ -59,24 +59,17 @@ builder.Services.AddSingleton(services => new SourceFetcher(new Fetcher(publicOn
 builder.Services.AddSingleton<Reviewer>();
 builder.Services.AddSingleton<Collector>();
 
-// Session-cookie keys must outlive restarts, or every restart signs you out. On Windows with a loaded user profile
-// (signed in and started from a terminal), they stay in that profile's ASP.NET key ring, as for TaskList, TaskList
-// Stats, and SpendTracker. Otherwise (Linux services under systemd ProtectHome, Windows Task Scheduler without a
-// loaded profile) they live in the data folder; Windows then uses machine-scope DPAPI, since user-scope DPAPI fails
-// when the profile isn't loaded.
-var profileKeyRing = OperatingSystem.IsWindows()
-    && Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) is { Length: > 0 } localAppData
-    && Directory.Exists(localAppData);
+// Session-cookie keys must outlive restarts, or every restart signs you out, so they always live in the data folder's
+// keys folder, the same in every app. A Windows profile's own ASP.NET key ring was used before when the profile looked
+// available, but a service account's profile is not always loaded when the app starts (say, at boot), and then the keys
+// only lived in memory. On Windows they are encrypted with machine-scope DPAPI, which works with or without a profile.
 builder.Services.AddDataProtection().SetApplicationName("NewsReview");
-if (!profileKeyRing)
+builder.Services.AddOptions<KeyManagementOptions>().Configure<IServiceProvider>((options, services) =>
 {
-    builder.Services.AddOptions<KeyManagementOptions>().Configure<IServiceProvider>((options, services) =>
-    {
-        var loggers = services.GetRequiredService<ILoggerFactory>();
-        options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(DataDirectory(services), "keys")), loggers);
-        if (OperatingSystem.IsWindows()) options.XmlEncryptor = new DpapiXmlEncryptor(protectToLocalMachine: true, loggers);
-    });
-}
+    var loggers = services.GetRequiredService<ILoggerFactory>();
+    options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(DataDirectory(services), "keys")), loggers);
+    if (OperatingSystem.IsWindows()) options.XmlEncryptor = new DpapiXmlEncryptor(protectToLocalMachine: true, loggers);
+});
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -134,7 +127,7 @@ catch (Exception error) when (error is StorageUnavailableException or InvalidOpe
 app.Logger.LogInformation("NewsReview v{Version}, data folder {DataDirectory}.", Transfer.Version, Path.GetDirectoryName(store.Path));
 app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", store.JournalMode);
 if (store.RulesWarning is { } rulesWarning) app.Logger.LogWarning("{Warning}", rulesWarning.Trim());
-app.Logger.LogInformation("Sign-in keys: {Location}.", profileKeyRing ? "this Windows profile's ASP.NET key ring" : Path.Combine(DataDirectory(app.Services), "keys"));
+app.Logger.LogInformation("Sign-in keys: {Location}.", Path.Combine(DataDirectory(app.Services), "keys"));
 
 if (passwords.SetupToken is { } setupToken)
 {
