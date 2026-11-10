@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.1.1
+# NewsReview v1.1.2
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -639,7 +639,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.1.1**.
+Current release: **v1.1.2**.
+
+### v1.1.2
+
+- The menu bar is the same height as in TaskList, TaskList Stats, and SpendTracker: its File, View, and Help buttons no longer take the taller line height and minimum height of ordinary buttons.
 
 ### v1.1.1
 

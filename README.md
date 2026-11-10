@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.1.1
+# NewsReview v1.1.2
 
 A self-hosted news aggregator that collects your chosen sources and uses a local model or OpenRouter to review and summarize stories. Browse daily tiles, search your archive, and bookmark articles; SQLite keeps the history.
 

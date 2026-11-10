@@ -391,7 +391,7 @@ input:not([type="checkbox"]), textarea { user-select: text; -webkit-user-select:
 .menubar { padding: 2px 4px; border-bottom: 1px solid var(--shadow); display: flex; align-items: center; }
 .menubar-menus { display: flex; align-items: center; gap: 1px; }
 .menubar-menus > button,
-.menubar-menus > .menu-wrap > button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 4px 10px; }
+.menubar-menus > .menu-wrap > button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 4px 10px; min-height: 0; line-height: normal; }
 .menubar-menus > .menu-wrap > button[aria-expanded="true"] { background: var(--title); color: var(--title-text); }
 @media (hover: hover) and (pointer: fine) {
   .menubar-menus > button:hover,
