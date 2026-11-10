@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# NewsReview v1.0.53
+# NewsReview v1.1.0
 
 A small self-hosted news reader for whatever you want to follow. Choose sources, describe your interests, and let a local model or OpenRouter review the stories. NewsReview ships without bundled sources or preset interests: add the feeds and websites you want to follow, then describe what matters to you.
 
@@ -50,6 +50,7 @@ NewsReview.csproj         project file and authoritative version
 src/
   Program.cs              startup, options, authentication, security headers, and API routes
   PasswordAuth.cs         setup token, password file, and sign-in cookie (the same file in all four apps)
+  SignInKeys.cs           where the sign-in keys live and how they are encrypted (the same file in all four apps)
   SingleFileLogger.cs     single-file logging with in-place 10 MiB truncation (the same file in all four apps)
   Onboarding.cs           first-start backup reminder marker (the same file as TaskList's and SpendTracker's)
   Hosting/
@@ -452,7 +453,7 @@ data/
   newsreview.db-shm     SQLite's shared-memory file, when present
   auth.json             saved login password hash, excluded from exports
   model-credentials.json  saved model API keys, excluded from exports
-  keys/                 sign-in cookie keys (machine-scope DPAPI on Windows), excluded from exports
+  keys/                 sign-in cookie keys, encrypted (DPAPI on Windows, a systemd credential on Linux), excluded from exports
   backups/              recovery ZIPs written before each restore
 logs/
   console.log          application/HTTP logs, one file up to 10 MiB
@@ -509,6 +510,15 @@ The app must stay running for its scheduler to run. It can also be launched at l
 5. Install the unit using your normal system administration process, then enable/start it.
 
 The template listens on loopback. Change its `--urls` value for direct LAN access; find the first-run setup token in the service console/journal. The scheduler uses elapsed hours, independent of timezone or daylight-saving changes. The app does not install or alter system services automatically.
+
+**Encrypted sign-in keys on Linux.** On Windows the sign-in keys in `data/keys/` are encrypted with machine-scope DPAPI. On Linux the template's `ImportCredential=newsreview-sign-in-keys` hands NewsReview a secret that systemd encrypts with the machine's credential key (or its TPM), and the keys are encrypted with it (AES-256-GCM, `src/SignInKeys.cs`, the same in all four apps), so a copied data folder or backup holds no readable key. Create the secret once (systemd 254 or later), then restart the service:
+
+```sh
+sudo mkdir -p /etc/credstore.encrypted
+head -c 32 /dev/urandom | sudo systemd-creds encrypt --name=newsreview-sign-in-keys - /etc/credstore.encrypted/newsreview-sign-in-keys
+```
+
+Keys already in `data/keys/` are encrypted in place on that start, so nobody is signed out. The startup log says how the keys are kept (`Sign-in keys: ..., encrypted with the newsreview-sign-in-keys systemd credential`). Without the credential (or when started from a terminal) the service still runs and the key files stay unencrypted but readable only by the service account, in an owner-only folder. Once keys are encrypted, starting the app without the credential cannot read them: everyone signs in again, or start it through the service.
 
 ### Windows / Task Scheduler
 
@@ -629,7 +639,12 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.0.53**.
+Current release: **v1.1.0**.
+
+### v1.1.0
+
+- Sign-in keys are encrypted on Linux too, as on Windows: with the `newsreview-sign-in-keys` systemd credential (AES-256-GCM, shared `src/SignInKeys.cs`), so a copied data folder or backup holds no readable key. The systemd template imports it; create it once with the command in the manual. Existing keys are encrypted in place, so nobody is signed out. Without the credential the keys stay unencrypted, as before, in a folder only the app's account can open.
+- Windows is unchanged: machine-scope DPAPI. The startup log now says how the keys are kept.
 
 ### v1.0.53
 

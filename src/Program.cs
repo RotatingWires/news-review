@@ -60,16 +60,9 @@ builder.Services.AddSingleton<Reviewer>();
 builder.Services.AddSingleton<Collector>();
 
 // Session-cookie keys must outlive restarts, or every restart signs you out, so they always live in the data folder's
-// keys folder, the same in every app. A Windows profile's own ASP.NET key ring was used before when the profile looked
-// available, but a service account's profile is not always loaded when the app starts (say, at boot), and then the keys
-// only lived in memory. On Windows they are encrypted with machine-scope DPAPI, which works with or without a profile.
-builder.Services.AddDataProtection().SetApplicationName("NewsReview");
-builder.Services.AddOptions<KeyManagementOptions>().Configure<IServiceProvider>((options, services) =>
-{
-    var loggers = services.GetRequiredService<ILoggerFactory>();
-    options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(DataDirectory(services), "keys")), loggers);
-    if (OperatingSystem.IsWindows()) options.XmlEncryptor = new DpapiXmlEncryptor(protectToLocalMachine: true, loggers);
-});
+// keys folder, encrypted with machine-scope DPAPI on Windows and with the newsreview-sign-in-keys systemd credential on
+// Linux (src/SignInKeys.cs, the same in every app). The startup log says how.
+SignInKeys.Configure(builder.Services, "NewsReview", services => Path.Combine(DataDirectory(services), "keys"), "newsreview");
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -127,7 +120,7 @@ catch (Exception error) when (error is StorageUnavailableException or InvalidOpe
 app.Logger.LogInformation("NewsReview v{Version}, data folder {DataDirectory}.", Transfer.Version, Path.GetDirectoryName(store.Path));
 app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", store.JournalMode);
 if (store.RulesWarning is { } rulesWarning) app.Logger.LogWarning("{Warning}", rulesWarning.Trim());
-app.Logger.LogInformation("Sign-in keys: {Location}.", Path.Combine(DataDirectory(app.Services), "keys"));
+app.Logger.LogInformation("Sign-in keys: {Location}.", SignInKeys.Describe(Path.Combine(DataDirectory(app.Services), "keys"), "newsreview"));
 
 if (passwords.SetupToken is { } setupToken)
 {
