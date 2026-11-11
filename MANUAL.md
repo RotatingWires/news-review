@@ -218,11 +218,11 @@ For OpenRouter or an authenticated compatible server, **Settings > AI > API Key*
 
 Saved keys belong to the selected provider and normalized server base URL, including its scheme, host, port, and path. A trailing slash or explicit default port does not create a different scope. Changing models on the same provider/server reuses its saved key; changing the provider or server does not. Use a base URL without embedded credentials, query parameters, or fragments. Provider/URL changes clear an unsaved key entry and refresh its configured status.
 
-Keys live in `model-credentials.json` beside the reading database, separate from SQLite and `auth.json`. The file contains plaintext secrets; POSIX files are created with owner-only permissions, while Windows access follows the data folder's ACLs. Writes flush a temporary file in the same directory and replace the destination atomically, without hard links. Failed writes retain the previous saved key. Invalid credential-file formats stop startup without discarding the file; restore a valid file or move it aside and re-enter keys. Protect this file and any independent filesystem backups of it.
+Keys live in `model-credentials.json` beside the reading database, separate from SQLite and `auth.json`. The keys in it are encrypted with ASP.NET Data Protection using the sign-in keys in `data/keys/`: machine-scope DPAPI on Windows, and on Linux the `newsreview-sign-in-keys` systemd credential (see [Linux / systemd](#linux--systemd)). A copied data folder or backup is then useless on another machine. On Linux without that credential, `data/keys/` holds plain owner-only files, so the protection is only file permissions. POSIX credential files are created owner-only; on Windows, also restrict the data folder to the account that runs NewsReview. A plain-text file written by v1.1.2 or earlier is encrypted once on the first start of v1.1.3 (the log says "Encrypted the saved model API keys"). If `data/keys/` is deleted or the data folder moves to another machine, the saved keys cannot be decrypted: the log says so, the keys show as not saved, and saving a key again replaces them. Writes flush a temporary file in the same directory and replace the destination atomically, without hard links. Failed writes retain the previous saved key. Invalid credential-file formats stop startup without discarding the file; restore a valid file or move it aside and re-enter keys. Protect this file and any independent filesystem backups of it.
 
 Save, replace, and remove apply to the next model request, including requests in an active review batch. An in-flight request keeps the key it already received. This applies to article reviews, sample tests, and learned-preference generation. Keys are sent only as Authorization headers, never as model prompt fields or reading settings. Authenticated requests cannot redirect to a different origin, and model error messages redact the Authorization secret before entering logs/history. The authenticated key API returns status only; static file serving does not expose the credentials file.
 
-Application ZIP exports, recovery ZIPs, database backups, restores, and Fresh start exclude or preserve the separate credential file. Copy it privately when moving an installation, or re-enter keys on the new host. It is Git-ignored. The key is sent from your browser to NewsReview when saved; use HTTPS for remote access, since a password field does not encrypt HTTP traffic.
+Application ZIP exports, recovery ZIPs, database backups, restores, and Fresh start exclude or preserve the separate credential file. It only decrypts with the same `data/keys/` on the same machine, so re-enter keys after moving to a new host. It is Git-ignored. The key is sent from your browser to NewsReview when saved; use HTTPS for remote access, since a password field does not encrypt HTTP traffic.
 
 `NEWSREVIEW_MODEL_API_KEY` remains a process-environment fallback for non-Ollama servers without a saved key. Saved keys take priority. The UI reports an environment-provided key and disables removal when no saved key exists. If both are present, the removal dialog explains that the environment key will be used afterward. The UI cannot remove an environment variable; remove it from the shell/service configuration and restart if you want to disable the fallback. Existing deployments can instead save a replacement through the UI immediately. `.env` files are not loaded automatically.
 
@@ -452,7 +452,7 @@ data/
   newsreview.db-wal     SQLite's live write-ahead log, when present
   newsreview.db-shm     SQLite's shared-memory file, when present
   auth.json             saved login password hash, excluded from exports
-  model-credentials.json  saved model API keys, excluded from exports
+  model-credentials.json  saved model API keys, encrypted with data/keys, excluded from exports
   keys/                 sign-in cookie keys, encrypted (DPAPI on Windows, a systemd credential on Linux), excluded from exports
   backups/              recovery ZIPs written before each restore
 logs/
@@ -640,6 +640,10 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 ## Release notes
 
 Current release: **v1.1.2**.
+
+### v1.1.3
+
+- Encrypt saved model API keys in `model-credentials.json` with the same Data Protection keys as sign-in cookies (machine-scope DPAPI on Windows, the systemd credential on Linux), so the OpenRouter or compatible-server key is no longer stored in plain text. Existing plain files are encrypted on the first start. Keys that cannot be decrypted (deleted `data/keys/`, another machine) show as not saved instead of stopping startup.
 
 ### v1.1.2
 

@@ -52,7 +52,8 @@ static string DataDirectory(IServiceProvider services)
 
 builder.Services.AddSingleton(services => new Store(Path.Combine(DataDirectory(services), "newsreview.db")));
 builder.Services.AddSingleton(services => new PasswordStore(Path.Combine(DataDirectory(services), "auth.json")));
-builder.Services.AddSingleton(services => new ModelKeys(Path.Combine(DataDirectory(services), "model-credentials.json")));
+builder.Services.AddSingleton(services => new ModelKeys(Path.Combine(DataDirectory(services), "model-credentials.json"),
+    services.GetRequiredService<IDataProtectionProvider>(), logger: services.GetRequiredService<ILogger<ModelKeys>>()));
 // Model servers may be on the LAN; news sources must be public internet addresses.
 builder.Services.AddSingleton<IFetcher>(services => new Fetcher(publicOnly: false, services.GetRequiredService<ILogger<Fetcher>>()));
 builder.Services.AddSingleton(services => new SourceFetcher(new Fetcher(publicOnly: true)));

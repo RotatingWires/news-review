@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -66,13 +67,18 @@ static class Fixtures
     public static Entry Entry(string headline, string url, string? published = null, string excerpt = "Details") =>
         new() { Headline = headline, Url = url, Excerpt = excerpt, PublishedAt = published };
 
+    /// <summary>Data Protection keys in dataDirectory/keys, as a fresh start of the app reads them.</summary>
+    public static IDataProtectionProvider Protection(string dataDirectory) =>
+        DataProtectionProvider.Create(new DirectoryInfo(System.IO.Path.Combine(dataDirectory, "keys")));
+
     public static void Sql(Store store, string sql, params (string Name, object? Value)[] args) => store.Write(db => { db.Execute(sql, args); });
 
     public static Collector Collector(Store store, IFetcher? fetcher = null, Func<string, string?>? environment = null)
     {
         fetcher ??= new Fetcher(publicOnly: false);
         return new Collector(store, new SourceFetcher(fetcher), new Reviewer(fetcher, NullLogger<Reviewer>.Instance),
-            new ModelKeys(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(store.Path)!, "model-credentials.json"), environment ?? (_ => null)),
+            new ModelKeys(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(store.Path)!, "model-credentials.json"),
+                Protection(System.IO.Path.GetDirectoryName(store.Path)!), environment ?? (_ => null)),
             NullLogger<Collector>.Instance);
     }
 
@@ -179,13 +185,15 @@ sealed class AppHost : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton(new SourceFetcher(SourceFetcher));
-            services.AddSingleton(new ModelKeys(System.IO.Path.Combine(DataPath, "model-credentials.json"), name => Environment.GetValueOrDefault(name)));
+            services.AddSingleton(provider => new ModelKeys(System.IO.Path.Combine(DataPath, "model-credentials.json"),
+                provider.GetRequiredService<IDataProtectionProvider>(), name => Environment.GetValueOrDefault(name)));
         });
     }
 
     public Store Store => Services.GetRequiredService<Store>();
     public Collector Collector => Services.GetRequiredService<Collector>();
     public PasswordStore Passwords => Services.GetRequiredService<PasswordStore>();
+    public IDataProtectionProvider Protection => Services.GetRequiredService<IDataProtectionProvider>();
 
     /// <summary>A client signed in through the real first-run setup flow.</summary>
     public async Task<HttpClient> SignedIn(string password = "correct horse")

@@ -768,7 +768,7 @@ public class WorkflowTests : IntegrationBase
         Transfer.RestoreArchive(store, archive);
         Assert.Equal(credentialFile, File.ReadAllBytes(credentialPath));
         Assert.Equal(secret, collector.ModelKeys.Get(config));
-        Assert.Equal(secret, new ModelKeys(credentialPath, _ => null).Get(config));
+        Assert.Equal(secret, new ModelKeys(credentialPath, host.Protection, _ => null).Get(config));
     }
 
     [Fact]

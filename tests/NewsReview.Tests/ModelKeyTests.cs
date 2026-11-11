@@ -27,12 +27,13 @@ public class ModelKeyTests : IDisposable
     public ModelKeyTests()
     {
         path = directory.File("model-credentials.json");
-        keys = new ModelKeys(path, name => environment.GetValueOrDefault(name));
+        keys = new ModelKeys(path, Fixtures.Protection(directory.Path), name => environment.GetValueOrDefault(name));
     }
 
     public void Dispose() => directory.Dispose();
 
-    static ModelKeys Reload(string path) => new(path, _ => null);
+    /// <summary>The file as a restarted app reads it, with the same data/keys.</summary>
+    ModelKeys Reload(string path) => new(path, Fixtures.Protection(directory.Path), _ => null);
 
     [Fact]
     public void SaveReplaceRemoveRestartAndPermissions()
@@ -41,6 +42,7 @@ public class ModelKeyTests : IDisposable
         var result = keys.Save(Config(), "fake-first-key");
         Assert.True(JsonNode.DeepEquals(new JsonObject { ["configured"] = true, ["saved"] = true, ["environment"] = false, ["source"] = "saved" }, result));
         Assert.DoesNotContain("fake-first-key", result.ToJsonString());
+        Assert.DoesNotContain("fake-first-key", File.ReadAllText(path));
         Assert.Equal("fake-first-key", Reload(path).Get(Config()));
         if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
         keys.Save(Config(), "fake-second-key");
@@ -49,6 +51,39 @@ public class ModelKeyTests : IDisposable
         Assert.False(keys.Remove(Config())["configured"]!.GetValue<bool>());
         Assert.Equal("", Reload(path).Get(Config()));
         Assert.Empty(Directory.GetFiles(directory.Path, ".model-credentials-*"));
+    }
+
+    [Fact]
+    public void PlainVersionOneFileIsEncryptedOnceOnLoad()
+    {
+        File.WriteAllText(path, """{"version":1,"keys":[{"provider":"openrouter","base_url":"https://openrouter.ai/api/v1","key":"fake-plain-key"}]}""");
+        var logger = new ListLogger();
+        var loaded = new ModelKeys(path, Fixtures.Protection(directory.Path), _ => null, logger);
+        Assert.Equal("fake-plain-key", loaded.Get(Config()));
+        var written = File.ReadAllText(path);
+        Assert.DoesNotContain("fake-plain-key", written);
+        Assert.Equal(2, JsonNode.Parse(written)!["version"]!.GetValue<int>());
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+        Assert.Contains(logger.Messages, m => m.Contains("Encrypted the saved model API keys"));
+        // Already encrypted: a restart reads it without writing it again.
+        var before = File.GetLastWriteTimeUtc(path);
+        Assert.Equal("fake-plain-key", Reload(path).Get(Config()));
+        Assert.Equal(written, File.ReadAllText(path));
+        Assert.Equal(before, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Fact]
+    public void KeysThatCannotBeDecryptedAreTreatedAsNotSaved()
+    {
+        keys.Save(Config(), "fake-lost-key");
+        // A different keys folder stands in for a deleted data/keys or a data folder copied to another machine.
+        var logger = new ListLogger();
+        var elsewhere = new ModelKeys(path, Fixtures.Protection(directory.File("other")), _ => null, logger);
+        Assert.False(elsewhere.Status(Config())["saved"]!.GetValue<bool>());
+        Assert.Contains(logger.Messages, m => m.Contains("cannot be decrypted"));
+        Assert.DoesNotContain("fake-lost-key", string.Join('\n', logger.Messages));
+        elsewhere.Save(Config(), "fake-new-key");
+        Assert.Equal("fake-new-key", new ModelKeys(path, Fixtures.Protection(directory.File("other")), _ => null).Get(Config()));
     }
 
     [Fact]
