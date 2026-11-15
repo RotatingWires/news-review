@@ -108,4 +108,4 @@ TaskList, TaskList Stats, NewsReview, and SpendTracker are four small self-hoste
 
 ## Credits
 
-**View > Use Retro Font** uses [W95FA](https://fontsarena.com/w95fa-by-alina-sava/) by Alina Sava, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).
+**View > Use Retro Font** uses [Good Old DOS](https://www.dafont.com/good-old-dos.font) by Vasily Draigo, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).

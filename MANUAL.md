@@ -293,7 +293,7 @@ The interval scheduler runs independently on the server and still collects with 
 - **Include filtered / duplicates** (inside Filter...): reveals editorially filtered stories and additional coverage. Bookmarked stories remain visible even if later filtered or grouped as duplicates.
 - **Ordering and pagination:** 48 results per page using your chosen Sort order. Rank sorting compares scores across the entire selected date range, so an older green story can precede a newer yellow one. Publication sorting compares the actual timestamp, including the time within a day. Pending stories retain their stored/default score (initially 50) for sorting even though their square is gray.
 - **Themes:** Windows 95-style raised buttons, recessed fields, square panels, title bars, and explicit light/dark themes. Light is the default; the selection is saved in browser local storage. Every color is a token in `wwwroot/theme.css`, defined once per theme with the same names TaskList, TaskList Stats, and SpendTracker use; the other stylesheets contain no color values of their own.
-- **Retro font:** **View > Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
+- **Retro font:** **View > Use Retro Font** switches the whole app, including the login page and chart labels, to Good Old DOS, an open-source DOS-style bitmap font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
 
 Tiles show the original headline and source, tags, the generated summary when available, publication time when known (otherwise collection time), relevant standards/availability milestones, the reviewing model, and the original link. Excerpt-based summaries and failed reviews are labeled. Dates are formatted in the browser's timezone; day and date-range filters match those displayed timestamps.
 
@@ -639,7 +639,11 @@ For verification, run `dotnet build` (no warnings expected), the unit/integratio
 
 ## Release notes
 
-Current release: **v1.1.2**.
+Current release: **v1.1.4**.
+
+### v1.1.4
+
+- **View > Use Retro Font** now uses Good Old DOS by Vasily Draigo (SIL Open Font License) instead of W95FA, in all four apps. Its letters are as tall as Tahoma's, so the app no longer looks smaller with it on.
 
 ### v1.1.3
 
