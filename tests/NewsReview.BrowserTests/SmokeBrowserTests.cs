@@ -189,14 +189,46 @@ public class SmokeBrowserTests : BrowserTest
         Assert.Equal("☆", bookmarkStates.Single().Icon);
         Assert.Contains("Saving bookmark", bookmarkStates.Single().Status);
         Assert.Equal(0, await page.Locator(".read-link").CountAsync());
+        var dates = page.GetByLabel("Date or date range", new() { Exact = true });
+        var todayText = $"{DateTime.Now.Month}/{DateTime.Now.Day}/{DateTime.Now.Year}";
+        await Expect(dates).ToHaveValueAsync(todayText);
+        // Every arrow is a drawn triangle centered in its box, not placed by a font's baseline.
+        foreach (var (arrow, box) in new[] { ("#previousDay .arrow", "#previousDay"), ("#nextDay .arrow", "#nextDay"),
+                     ("#topicButton .arrow", "#topicButton .dropdown-arrow"), (".sort-control .arrow", ".sort-control .dropdown-arrow") })
+        {
+            var (a, b) = (await Box(page.Locator(arrow)), await Box(page.Locator(box)));
+            Assert.True(Math.Abs(a.X + a.Width / 2 - (b.X + b.Width / 2)) <= 0.5 && Math.Abs(a.Y + a.Height / 2 - (b.Y + b.Height / 2)) <= 0.5, $"{arrow} is off-center");
+        }
         await page.Tab("Bookmarks").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(1);
         Assert.Contains("HTTP", await page.Locator(".story h3").InnerTextAsync());
+        // Bookmarks start with every date: an empty box and no day arrows.
+        await Expect(dates).ToHaveValueAsync("");
+        await Expect(page.GetByLabel("Previous day", new() { Exact = true })).ToBeHiddenAsync();
+        await dates.FillAsync($"{yesterday.Month}/{yesterday.Day}/{yesterday.Year}");
+        await dates.PressAsync("Enter");
+        await Expect(page.Locator("#empty")).ToBeVisibleAsync();
+        await dates.FillAsync(todayText);
+        await dates.PressAsync("Enter");
+        await Expect(Stories()).ToHaveCountAsync(1);
         await page.Tab("Daily Feed").ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
+        await Expect(dates).ToHaveValueAsync(todayText);
+        await page.Tab("Bookmarks").ClickAsync();
+        await Expect(dates).ToHaveValueAsync(todayText);
+        await Button("Clear Search", exact: false).ClickAsync();
+        await Expect(dates).ToHaveValueAsync("");
+        await page.Tab("Daily Feed").ClickAsync();
+        await Expect(Stories()).ToHaveCountAsync(4);
+        // A lone day that isn't real says so and goes back to the day shown.
+        await dates.FillAsync("2/30/26");
+        await dates.PressAsync("Enter");
+        await Expect(page.Locator("#statusMessage")).ToContainTextAsync("Type a day as m/d/yy");
+        await Expect(dates).ToHaveValueAsync(todayText);
         await page.GetByLabel("Previous day", new() { Exact = true }).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(1);
         Assert.Contains("Yesterday", await page.Locator(".story h3").InnerTextAsync());
+        await Expect(dates).ToHaveValueAsync($"{yesterday.Month}/{yesterday.Day}/{yesterday.Year}");
         await Expect(page.Locator(".relevance-indicator.relevance-pending")).ToHaveCountAsync(1);
         await Button("Today").ClickAsync();
         await page.GetByLabel("Search history").FillAsync("Example News");
@@ -250,13 +282,18 @@ public class SmokeBrowserTests : BrowserTest
             Store.BackfillStoryTimes(db);
         });
         await page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
-        var range = page.GetByLabel("Date/time range", new() { Exact = true });
+        var range = dates;
         await range.FillAsync("10am - 12pm");
         await range.PressAsync("Enter");
         await Expect(Stories()).ToHaveCountAsync(0);
+        // A time range alone applies to the day shown, which the box adds in front of it.
+        await Expect(range).ToHaveValueAsync(todayText + ", 10am - 12pm");
+        await Expect(page.Locator("#resultsHeading")).ToHaveTextAsync("Today's Edition");
         await range.FillAsync("10/15/26 - 10/15/26, 10am - 12pm");
         await range.PressAsync("Enter");
         await Expect(Stories()).ToHaveCountAsync(1);
+        await Expect(page.Locator("#resultsHeading")).ToHaveTextAsync("From Your History");
+        await Expect(page.GetByLabel("Previous day", new() { Exact = true })).ToBeDisabledAsync();
         await Expect(page.Locator(".story h3")).ToContainTextAsync("Experimental HTTP method");
         Store.Write(db =>
         {
@@ -271,6 +308,8 @@ public class SmokeBrowserTests : BrowserTest
         await Expect(Stories()).ToHaveCountAsync(5);
         await Button("Clear Search", exact: false).ClickAsync();
         await Expect(Stories()).ToHaveCountAsync(4);
+        await Expect(range).ToHaveValueAsync(todayText);
+        await Expect(page.GetByLabel("Previous day", new() { Exact = true })).ToBeEnabledAsync();
 
         await page.Tab("Settings").ClickAsync();
         await Button("Interests").ClickAsync();

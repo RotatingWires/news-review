@@ -4,7 +4,7 @@ import { Feed } from './feed.js';
 import { Settings } from './settings.js';
 import { Transfer } from './transfer.js';
 
-import { $, el, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus, closeMenus, toggleMenu, menuItem, menuSeparator, parseTypedDate, typedDate, $$ } from './shared.js';
+import { $, el, api, busy, notify, formatTime, setConnectionStatus, setDefaultStatus, dismissStatus, closeMenus, toggleMenu, menuItem, menuSeparator, $$ } from './shared.js';
 
 /** The release from /version.json, like the other apps; the server's version if that file can't be read. */
 async function releaseVersion(fallback) {
@@ -107,7 +107,6 @@ class App {
   async load() {
     this.authenticated = true;
     await this.refreshOverview();
-    if (!parseTypedDate($('#day').value)) $('#day').value = typedDate(this.overview.today);
     await this.feed.load();
     this.poll();
     await this.showImportReminder();

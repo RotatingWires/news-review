@@ -34,8 +34,9 @@ function build(field) {
   trigger.setAttribute('aria-haspopup', 'listbox');
   trigger.setAttribute('aria-expanded', 'false');
   const text = el('span', 'dropdown-label');
-  const arrow = el('span', 'dropdown-arrow', '▼');
+  const arrow = el('span', 'dropdown-arrow');
   arrow.setAttribute('aria-hidden', 'true');
+  arrow.append(el('span', 'arrow arrow-down'));
   if (!combo) trigger.append(text);
   trigger.append(arrow);
   const menu = el('span', 'dropdown-menu');

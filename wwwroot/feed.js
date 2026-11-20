@@ -1,8 +1,24 @@
 import { $, api, el, externalLink, formatTime, notify, busy, parseTypedDate, typedDate, $$ } from './shared.js';
 
-/** The day box holds m/d/yyyy; the code and the server use yyyy-mm-dd. */
-const dayValue = () => parseTypedDate($('#day').value);
-const setDay = iso => { $('#day').value = typedDate(iso); };
+/**
+ * The one date box holds a day (m/d/yy) for that day's edition, or a date range (9/1/26 - 10/1/26) to search across
+ * days; either can be followed by a comma and a time range (10am - 3pm), and a time range alone applies to the day
+ * shown. On Bookmarks it starts empty, meaning every date. Returns the day typed, the range for the server's period
+ * search (the same syntax as TaskList), and whether that range spans days; null when a lone day isn't a real date.
+ */
+function readDates(text) {
+  const value = text.trim();
+  const comma = value.indexOf(',');
+  const dates = (comma < 0 ? value : value.slice(0, comma)).trim(), times = comma < 0 ? '' : value.slice(comma + 1).trim();
+  if (!value) return { day: '', period: '', across: false };
+  const day = parseTypedDate(dates);
+  if (day) return { day, period: times, across: false };
+  if (!dates.includes('/') && !/^\d{4}-/.test(dates)) return { day: '', period: value, across: false }; // A time range alone.
+  if (!/\d\s*[-–—]\s*\d/.test(dates)) return null; // One date, but not a real one.
+  return { day: '', period: value, across: true };
+}
+const dayValue = () => readDates($('#dates').value)?.day || '';
+const setDay = (iso, times = '') => { $('#dates').value = typedDate(iso) + (times ? `, ${times}` : ''); };
 
 const RELEVANCE = [
   { name: 'high', minimum: 75, label: 'Highly relevant', range: '75–100' },
@@ -50,14 +66,7 @@ export class Feed {
     });
     $('#feedbackRemove').addEventListener('click', () => this.saveFeedback(0, $('#feedbackRemove')));
     $('#search').addEventListener('submit', event => { event.preventDefault(); this.reload(); });
-    ['query', 'period', 'showHidden'].forEach(id => { $(`#${id}`).addEventListener('change', () => this.reload()); });
-    // The day is typed like every app's dates; a day that isn't real says so and goes back to the last one shown.
-    $('#day').addEventListener('change', () => {
-      const typed = parseTypedDate($('#day').value);
-      if (!typed) { notify('Type a day as m/d/yy, for example 11/8/26.', true); setDay(this.shownDay || this.app.overview.today); return; }
-      setDay(typed);
-      this.reload();
-    });
+    ['query', 'dates', 'showHidden'].forEach(id => { $(`#${id}`).addEventListener('change', () => this.reload()); });
     $$('input[name="relevance"]').forEach(input => { input.addEventListener('change', () => this.reload()); });
     $$('#topicMenu .filter-option').forEach(row => checkboxRow(row, row.querySelector('input')));
     $('#topicButton').addEventListener('click', () => this.closeTopics(!$('#topicMenu').hidden));
@@ -82,6 +91,7 @@ export class Feed {
     $('#previousDay').addEventListener('click', () => this.moveDay(-1));
     $('#nextDay').addEventListener('click', () => this.moveDay(1));
     $('#today').addEventListener('click', () => { this.clearFilters(); setDay(app.overview.today); this.reload(); });
+    this.dateText = { daily: '', bookmarks: '' };
     $('#clearSearch').addEventListener('click', () => { this.clearFilters(); this.reload(); });
     $('#emptyAction').addEventListener('click', () => this.app.collect('collect', $('#emptyAction')));
     $('#pagePrev').addEventListener('click', () => { this.page--; this.loadSafe(); });
@@ -127,8 +137,10 @@ export class Feed {
     }, 'Saving article feedback...');
   }
 
+  /** Clearing a search keeps the day shown (on Bookmarks, every date) and drops any range or times typed with it. */
   clearFilters() {
-    ['query', 'period'].forEach(id => { $(`#${id}`).value = ''; });
+    $('#query').value = '';
+    $('#dates').value = this.app.view === 'bookmarks' ? '' : typedDate(this.shownDay || this.app.overview.today);
     this.selectedTopics.clear();
     this.renderTopics(this.app.overview.tags);
     $('#showHidden').checked = false;
@@ -165,31 +177,64 @@ export class Feed {
   moveDay(offset) {
     const value = new Date(`${dayValue() || this.app.overview.today}T12:00:00Z`);
     value.setUTCDate(value.getUTCDate() + offset);
-    setDay(value.toISOString().slice(0, 10));
     this.clearFilters();
+    setDay(value.toISOString().slice(0, 10));
     this.reload();
   }
 
-  reload() { this.page = 1; this.loadSafe(); }
+  /** A reload follows something the reader did, so it reads the date box again; background refreshes keep the dates in use. */
+  reload() { this.page = 1; this.datesChanged = true; this.loadSafe(); }
   async loadSafe() {
     try { await this.load(); } catch (error) { notify(error.message, true); }
   }
 
+  /** What the date box asks for in this view, tidied in place: a lone day reads m/d/yyyy, and times alone gain the day. */
+  dates(bookmarked) {
+    const view = bookmarked ? 'bookmarks' : 'daily';
+    // Each view keeps its own dates: the Daily Feed always shows a day, Bookmarks every date until one is typed.
+    if (this.datesView !== view) {
+      if (this.datesView) this.dateText[this.datesView] = $('#dates').value;
+      $('#dates').value = this.dateText[view];
+      this.datesView = view;
+    }
+    let dates = readDates($('#dates').value);
+    if (!dates) {
+      notify('Type a day as m/d/yy, for example 11/8/26, or a range such as 11/1/26 - 11/8/26.', true);
+      $('#dates').value = bookmarked ? '' : typedDate(this.shownDay || this.app.overview.today);
+      dates = readDates($('#dates').value);
+    }
+    if (bookmarked) {
+      if (!dates.day) return dates;
+      // Bookmarks have no edition: a day there searches a one-day range.
+      const day = typedDate(dates.day);
+      return { day: '', period: `${day} - ${day}${dates.period ? `, ${dates.period}` : ''}`, across: true };
+    }
+    if (!dates.across) {
+      setDay(dates.day || this.shownDay || this.app.overview.today, dates.period);
+      dates.day = dayValue();
+      this.shownDay = dates.day;
+    }
+    return dates;
+  }
+
   async load() {
     const requestId = ++this.requestId;
-    if (!dayValue()) setDay(this.app.overview.today);
-    this.shownDay = dayValue();
-    const query = $('#query').value.trim(), period = $('#period').value.trim();
-    const history = period.includes('/');
-    const searching = Boolean(query || period);
-    ['day', 'previousDay', 'nextDay'].forEach(id => { $(`#${id}`).disabled = history; });
-    $('#day').title = history ? 'The date range controls which days are searched. Clear it to type a day here.' : 'Publication day, typed as m/d/yy';
     const bookmarked = this.app.view === 'bookmarks';
+    if (this.datesChanged || !this.shownDates || this.datesView !== (bookmarked ? 'bookmarks' : 'daily')) {
+      this.shownDates = this.dates(bookmarked);
+      this.datesChanged = false;
+    }
+    const { period, across } = this.shownDates;
+    const query = $('#query').value.trim();
+    const searching = Boolean(query || period);
+    ['previousDay', 'nextDay'].forEach(id => { $(`#${id}`).disabled = across; });
+    $('#dates').title = bookmarked ? 'Bookmarks from a day or a date range, optionally with a time range, for example 11/1/26 - 11/8/26, 9am - 5pm. Leave empty for every date.'
+      : 'A day, or a date range to search across days, optionally followed by a time range: 11/8/26, or 11/1/26 - 11/8/26, 9am - 5pm';
     const params = new URLSearchParams({ page: this.page, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, sort: $('#storySort').value });
     if (query) params.set('query', query);
     if (period) params.set('period', period);
     this.selectedTopics.forEach(topic => params.append('tag', topic));
-    if (!bookmarked) params.set('day', dayValue());
+    if (!bookmarked) params.set('day', this.shownDay);
     const excludedRelevance = [...$$('input[name="relevance"]')].filter(input => !input.checked).map(input => input.value);
     excludedRelevance.forEach(value => params.append('excludeRelevance', value));
     if (bookmarked) params.set('bookmarks', '1');
@@ -199,13 +244,13 @@ export class Feed {
       const result = await api(`stories?${params}`);
       if (requestId !== this.requestId) return;
       $('#stories').replaceChildren(...result.items.map(story => this.tile(story)));
-      $('#dayControls').hidden = bookmarked;
+      ['previousDay', 'nextDay', 'today'].forEach(id => { $(`#${id}`).hidden = bookmarked; });
       $('#clearSearch').hidden = !searching && !this.selectedTopics.size && !$('#showHidden').checked && !excludedRelevance.length;
-      $('#resultsHeading').textContent = history ? 'From Your History' : bookmarked ? 'Saved Stories' : this.editionTitle();
+      $('#resultsHeading').textContent = bookmarked ? 'Saved Stories' : across ? 'From Your History' : this.editionTitle();
       $('#storyCount').textContent = `${result.total} ${result.total === 1 ? 'story' : 'stories'}`;
       $('#empty').hidden = result.total > 0;
       $('#emptyTitle').textContent = bookmarked ? 'No bookmarks yet.' : searching ? 'Nothing matched this search.' : 'No stories in this edition.';
-      $('#emptyDescription').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, select a different day, or enter a date range to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Configure a review model whenever you\'re ready.';
+      $('#emptyDescription').textContent = bookmarked ? 'Use the bookmark on any story to save it here. Saved stories stay in your history.' : searching ? 'Try another keyword, type a different day, or type a date range in the date box to search across days. Search includes source names, headlines, summaries, excerpts, and tags.' : 'No stories in this edition yet. Check your sources to start collecting, or browse a different day. Configure a review model whenever you\'re ready.';
       $('#emptyAction').hidden = bookmarked || searching;
       $('#pagePrev').hidden = this.page <= 1;
       $('#pageNext').hidden = this.page * result.pageSize >= result.total;

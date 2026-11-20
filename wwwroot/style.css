@@ -120,11 +120,10 @@ footer {
 .browse-bar { justify-content: space-between; flex-wrap: wrap; }
 #search { flex: 1; max-width: 540px; }
 #query { flex: 1; width: 100%; }
-#day { width: 162px; }
+#dates { width: 230px; }
 .filter-bar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 12px 0; margin-bottom: 7px; }
 .filter-bar label { font-size: 12px; }
 .sort-control .custom-dropdown { width: 220px; }
-.filter-bar input[type="text"] { width: 350px; max-width: 100%; }
 .filter-bar .checkbox { align-self: center; margin-left: auto; }
 .topic-filter { position: relative; }
 #topicButton { width: 120px; min-width: 0; }
@@ -332,9 +331,8 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
   .titlebar { margin: 0; }
   .browse-bar, #search { width: 100%; max-width: none; }
   .day-controls { width: 100%; }
-  #day { flex: 1; width: 130px; }
+  #dates { flex: 1; width: 130px; }
   .filter-bar { gap: 10px; }
-  .filter-bar input[type="text"] { width: min(350px, calc(100vw - 40px)); }
   .filter-bar label { min-width: 0; }
   .story-grid, .form-grid { grid-template-columns: 1fr; }
   .interest-row { flex-wrap: wrap; }
@@ -356,7 +354,7 @@ button.danger:disabled { color: var(--error); opacity: 1; }
 .native-dropdown { display: none; }
 .dropdown-trigger { display: flex; align-items: stretch; justify-content: space-between; gap: 8px; width: 100%; padding: 3px 4px 3px 7px; text-align: left; background: var(--surface); }
 .dropdown-label { align-self: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dropdown-arrow { display: grid; place-items: center; flex: 0 0 22px; width: 22px; min-height: 22px; font-size: 10px; line-height: 1; color: var(--ink); background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); }
+.dropdown-arrow { display: grid; place-items: center; flex: 0 0 22px; width: 22px; min-height: 22px; color: var(--ink); background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); }
 .dropdown-menu { position: absolute; z-index: 10; left: 0; top: 100%; margin-top: 2px; min-width: 100%; width: max-content; max-width: min(440px, calc(100vw - 48px)); max-height: 180px; overflow: auto; padding: 2px; background: var(--face); border: 2px solid; border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge); box-shadow: 2px 2px var(--black); }
 .dropdown-option { display: flex; gap: 7px; align-items: center; width: 100%; border: 0; box-shadow: none; text-align: left; padding: 4px 6px; }
 .dropdown-option:hover, .dropdown-option:focus-visible { background: var(--title); color: var(--title-text); outline: none; }
@@ -434,10 +432,13 @@ button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button { white-space: nowrap; padding: 5px 11px 6px; position: relative; top: 1px; }
 .tabs button[aria-selected="true"] { padding-top: 7px; margin-top: -2px; border-bottom-color: var(--face); font-weight: 700; z-index: 2; }
-/* Drawn arrows, since Tahoma has no small triangles, like SpendTracker's month arrows. */
-.arrow { display: inline-block; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; vertical-align: middle; }
-.arrow-left { border-right: 6px solid currentColor; }
-.arrow-right { border-left: 6px solid currentColor; }
+/* Drawn arrows, since fonts place triangle characters differently: each is centered in its grid box, not on the
+   text baseline, so it sits in the middle of its button whatever the font. */
+.arrow { display: block; width: 0; height: 0; border: 0 solid transparent; }
+.arrow-left { border-width: 5px 6px 5px 0; border-right-color: currentColor; }
+.arrow-right { border-width: 5px 0 5px 6px; border-left-color: currentColor; }
+.arrow-down { border-width: 6px 5px 0; border-top-color: currentColor; }
+.icon-button { display: inline-grid; place-items: center; }
 
 /* The first-start backup prompt, the same box as TaskList's. */
 #firstRunDialog { width: min(460px, calc(100vw - 24px)); font-size: 16px; }

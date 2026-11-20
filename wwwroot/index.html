@@ -60,7 +60,7 @@
       <div class="browse-bar">
         <div id="dayControls" class="day-controls">
           <button id="previousDay" type="button" class="icon-button" aria-label="Previous day"><span class="arrow arrow-left" aria-hidden="true"></span></button>
-          <label class="sr-only" for="day">Edition date</label><input type="text" id="day" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="m/d/yy">
+          <label class="sr-only" for="dates">Date or date range</label><input type="text" id="dates" form="search" autocomplete="off" spellcheck="false" maxlength="200" placeholder="Any date, or 9/1/26 - 10/1/26">
           <button id="nextDay" type="button" class="icon-button" aria-label="Next day"><span class="arrow arrow-right" aria-hidden="true"></span></button>
           <button type="button" id="today" class="text-button">Today</button>
         </div>
@@ -68,7 +68,7 @@
       </div>
       <div class="filter-bar">
         <div class="topic-filter custom-dropdown">
-          <button type="button" id="topicButton" class="dropdown-trigger" aria-expanded="false" aria-controls="topicMenu" aria-haspopup="true"><span id="topicLabel" class="dropdown-label">Filter...</span><span class="dropdown-arrow" aria-hidden="true">▼</span></button>
+          <button type="button" id="topicButton" class="dropdown-trigger" aria-expanded="false" aria-controls="topicMenu" aria-haspopup="true"><span id="topicLabel" class="dropdown-label">Filter...</span><span class="dropdown-arrow" aria-hidden="true"><span class="arrow arrow-down"></span></span></button>
           <div id="topicMenu" class="dropdown-menu" role="group" aria-label="Story filters" hidden>
             <label class="checkbox filter-option"><input class="retro-check" type="checkbox" id="showHidden"> Include filtered / duplicates</label>
             <fieldset class="filter-group"><legend>Relevance</legend>
@@ -86,7 +86,6 @@
           <option value="published">Published: newest first</option>
           <option value="published_asc">Published: oldest first</option>
         </select></label>
-        <label>Date/time range<input type="text" id="period" form="search" placeholder="9/1/26 - 10/1/26, 10am - 3pm" autocomplete="off" spellcheck="false" maxlength="200"></label>
         <button type="button" id="clearSearch" class="text-button" hidden>Clear Search</button>
       </div>
       <div class="results-heading"><h2 id="resultsHeading">Today's Edition</h2><span id="storyCount"></span><div id="relevanceKey" aria-label="Relevance color key"></div></div>

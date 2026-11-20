@@ -67,7 +67,7 @@ Database exports and recovery ZIPs contain private reading history/preferences a
 
 See the manual for [model setup](MANUAL.md#connect-your-own-model), [configuration](MANUAL.md#data-configuration-and-logging), [service installation](MANUAL.md#run-as-a-service), and [troubleshooting](MANUAL.md#troubleshooting).
 
-The Daily Feed date picker and archive date ranges use story publication dates in your browser timezone, falling back to collection dates for undated stories. The **Sort** dropdown offers published newest/oldest and relevance rank highest/lowest on Daily Feed and Bookmarks. Your browser remembers the choice; rank highest is the default. Sorting applies to all matching stories before pagination.
+The Daily Feed day and date ranges use story publication dates in your browser timezone, falling back to collection dates for undated stories. The **Sort** dropdown offers published newest/oldest and relevance rank highest/lowest on Daily Feed and Bookmarks. Your browser remembers the choice; rank highest is the default. Sorting applies to all matching stories before pagination.
 
 On mobile, use your browser's Add to Home Screen action to install NewsReview with its app icon. The app still needs a connection to your NewsReview server.
 
@@ -75,7 +75,7 @@ A fresh install starts with no sources, no interest topics, and no article topic
 
 Day/date-range browsing uses an indexed publication timestamp and reads display fields only for the selected 48-story page. Schema-2/3 ZIP backups still restore and are indexed during the restore. Opening a database on a sleeping hard drive still has wake-up latency.
 
-Keyword and time-only searches stay within the selected day. Enter a date range to search across days; clear it to return to the day picker. Bookmarks search all saved stories unless limited by a date range.
+One date box, beside the previous/next day arrows, holds the day shown: type another day, or type a date range such as `9/1/26 - 10/1/26` to search across days, either one optionally followed by a time range (`, 10am - 3pm`). Keywords and a time range alone stay within the day shown. **Today** or the arrows return to a single day. On Bookmarks the box starts empty, meaning every date.
 
 Use **Settings > Collection & History > Purge Duplicates** to remove AI-marked duplicate stories and compact the database. Bookmarks and stories referenced by other saved stories are kept.
 
